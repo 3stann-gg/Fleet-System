@@ -26,6 +26,7 @@
 
     <div class="modal-body">
       <form id="editDriverForm" class="driver-form vehicle-form">
+        @csrf
         <div class="vehicle-image-section">
           <label class="vehicle-image-label" for="editDriverImage">
             Driver Photo
@@ -41,6 +42,7 @@
             <input
               type="file"
               id="editDriverImage"
+              name="photo"
               accept="image/*"
               hidden
             />
@@ -54,23 +56,46 @@
 
         <div class="form-grid">
           <div class="form-group">
-            <label for="editDriverName">Full Name *</label>
-            <input type="text" id="editDriverName" required />
-          </div>
+            <label for="editDriverFirstName">First Name *</label>
+            <input
+                type="text"
+                id="editDriverFirstName"
+                name="first_name"
+                required
+            >
+        </div>
+
+        <div class="form-group">
+            <label for="editDriverLastName">Last Name *</label>
+            <input
+                type="text"
+                id="editDriverLastName"
+                name="last_name"
+                required
+            >
+        </div>
 
           <div class="form-group">
             <label for="editDriverEmployeeId">Employee ID *</label>
-            <input type="text" id="editDriverEmployeeId" required />
+            <input
+                type="text"
+                id="editDriverEmployeeId"
+                readonly
+            >
           </div>
 
           <div class="form-group">
             <label for="editDriverLicenseNumber">License Number *</label>
-            <input type="text" id="editDriverLicenseNumber" required />
+            <input type="text" id="editDriverLicenseNumber" name="license_number" required />
           </div>
 
           <div class="form-group">
             <label for="editDriverLicenseClass">License Class *</label>
-            <select id="editDriverLicenseClass" required>
+            <select
+                id="editDriverLicenseClass"
+                name="license_class"
+                required
+            >
               <option value="">Select License Class</option>
               <option value="Professional">Professional</option>
               <option value="Non-Professional">Non-Professional</option>
@@ -79,12 +104,22 @@
 
           <div class="form-group">
             <label for="editDriverLicenseExpiry">License Expiry *</label>
-            <input type="date" id="editDriverLicenseExpiry" required />
+            <input
+                type="date"
+                id="editDriverLicenseExpiry"
+                name="license_expiry"
+                required
+            >
           </div>
 
           <div class="form-group">
             <label for="editDriverPhone">Phone Number *</label>
-            <input type="tel" id="editDriverPhone" required />
+            <input
+                type="tel"
+                id="editDriverPhone"
+                name="contact_number"
+                required
+            >
           </div>
 
           <div class="form-group">
@@ -94,7 +129,10 @@
 
           <div class="form-group">
             <label for="editDriverAssignedVehicle">Assigned Vehicle</label>
-            <select id="editDriverAssignedVehicle">
+            <select
+                id="editDriverAssignedVehicle"
+                name="assigned_vehicle_id"
+            >
               <option value="">Select Assigned Vehicle</option>
               <option value="Ambulance 01">Ambulance 01</option>
               <option value="Patient Van 02">Patient Van 02</option>
@@ -105,12 +143,16 @@
 
           <div class="form-group">
             <label for="editDriverExperience">Experience (Years)</label>
-            <input type="number" id="editDriverExperience" min="0" />
+            <input type="number" id="editDriverExperience" name="email" min="0" />
           </div>
 
           <div class="form-group">
             <label for="editDriverStatus">Status *</label>
-            <select id="editDriverStatus" required>
+            <select
+                id="editDriverStatus"
+                name="status"
+                required
+            >
               <option value="">Select Status</option>
               <option value="Available">Available</option>
               <option value="On Duty">On Duty</option>
@@ -121,17 +163,17 @@
 
           <div class="form-group full-width">
             <label for="editDriverAddress">Address</label>
-            <input type="text" id="editDriverAddress" />
+            <input type="text" id="editDriverAddress" name="address" />
           </div>
 
           <div class="form-group">
             <label for="editDriverEmergencyContact">Emergency Contact</label>
-            <input type="tel" id="editDriverEmergencyContact" />
+            <input type="tel" id="editDriverEmergencyContact" name="emergency_contact" />
           </div>
 
           <div class="form-group full-width">
             <label for="editDriverNotes">Notes</label>
-            <textarea id="editDriverNotes" rows="4"></textarea>
+            <textarea id="editDriverNotes" name="notes" rows="4"></textarea>
           </div>
         </div>
 

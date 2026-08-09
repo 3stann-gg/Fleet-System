@@ -11,6 +11,7 @@ function openVehicleModal(modal) {
 
   modal.classList.add("show");
   document.body.style.overflow = "hidden";
+  loadAvailableDrivers();
 }
 
 function closeVehicleModal(modal) {

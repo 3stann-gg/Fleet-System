@@ -28,7 +28,7 @@
                 </div>
 
                 <div class="stat-content">
-                  <h3 id="totalDrivers">24</h3>
+                  <h3 id="totalDrivers">0</h3>
 
                   <p>Total Drivers</p>
                 </div>
@@ -40,7 +40,9 @@
                 </div>
 
                 <div class="stat-content">
-                  <h3 id="availableDrivers">12</h3>
+                  <h3 id="availableDrivers">
+                      0
+                  </h3>
 
                   <p>Available</p>
                 </div>
@@ -52,7 +54,9 @@
                 </div>
 
                 <div class="stat-content">
-                  <h3 id="onDutyDrivers">9</h3>
+                  <h3 id="onDutyDrivers">
+                      0
+                  </h3>
 
                   <p>On Duty</p>
                 </div>
@@ -64,7 +68,9 @@
                 </div>
 
                 <div class="stat-content">
-                  <h3 id="onLeaveDrivers">3</h3>
+                  <h3 id="onLeaveDrivers">
+                      0
+                  </h3>
 
                   <p>On Leave</p>
                 </div>
@@ -215,6 +221,7 @@
                         <input
                           type="checkbox"
                           id="selectAllDrivers"
+                          data-id="${driver.id}"
                           aria-label="Select all drivers"
                         />
                       </th>
@@ -259,197 +266,7 @@
                   </thead>
 
                   <tbody id="driverTableBody">
-                    <tr>
-                      <td>
-                        <input
-                          type="checkbox"
-                          class="driver-checkbox"
-                          aria-label="Select Juan Dela Cruz"
-                        />
-                      </td>
-
-                      <td>
-                        <div class="driver-info">
-                          <div class="driver-avatar">JD</div>
-
-                          <div>
-                            <div class="driver-name">Juan Dela Cruz</div>
-
-                            <small>Emergency Transport</small>
-                          </div>
-                        </div>
-                      </td>
-
-                      <td>DRV-001</td>
-
-                      <td class="driver-license">N01-23-456789</td>
-
-                      <td>Professional</td>
-
-                      <td class="driver-assignment">Ambulance-01</td>
-
-                      <td>
-                        <span class="status-badge available">Available</span>
-                      </td>
-
-                      <td>+63 917 555 0101</td>
-
-                      <td>
-                        <div class="action-buttons">
-                          <button
-                            type="button"
-                            class="action-btn view-driver"
-                            aria-label="View Juan Dela Cruz"
-                          >
-                            <i class="ph ph-eye"></i>
-                          </button>
-
-                          <button
-                            type="button"
-                            class="action-btn edit-driver"
-                            aria-label="Edit Juan Dela Cruz"
-                          >
-                            <i class="ph ph-pencil-simple"></i>
-                          </button>
-
-                          <button
-                            type="button"
-                            class="action-btn delete-driver"
-                            aria-label="Delete Juan Dela Cruz"
-                          >
-                            <i class="ph ph-trash"></i>
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-
-                    <tr>
-                      <td>
-                        <input
-                          type="checkbox"
-                          class="driver-checkbox"
-                          aria-label="Select Maria Reyes"
-                        />
-                      </td>
-
-                      <td>
-                        <div class="driver-info">
-                          <div class="driver-avatar">MR</div>
-
-                          <div>
-                            <div class="driver-name">Maria Reyes</div>
-
-                            <small>Patient Transfer</small>
-                          </div>
-                        </div>
-                      </td>
-
-                      <td>DRV-014</td>
-
-                      <td class="driver-license">N02-24-738291</td>
-
-                      <td>Professional</td>
-
-                      <td class="driver-assignment">Patient Van-02</td>
-
-                      <td>
-                        <span class="status-badge trip">On Duty</span>
-                      </td>
-
-                      <td>+63 917 555 0144</td>
-
-                      <td>
-                        <div class="action-buttons">
-                          <button
-                            type="button"
-                            class="action-btn view-driver"
-                            aria-label="View Maria Reyes"
-                          >
-                            <i class="ph ph-eye"></i>
-                          </button>
-
-                          <button
-                            type="button"
-                            class="action-btn edit-driver"
-                            aria-label="Edit Maria Reyes"
-                          >
-                            <i class="ph ph-pencil-simple"></i>
-                          </button>
-
-                          <button
-                            type="button"
-                            class="action-btn delete-driver"
-                            aria-label="Delete Maria Reyes"
-                          >
-                            <i class="ph ph-trash"></i>
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-
-                    <tr>
-                      <td>
-                        <input
-                          type="checkbox"
-                          class="driver-checkbox"
-                          aria-label="Select Carlo Mendoza"
-                        />
-                      </td>
-
-                      <td>
-                        <div class="driver-info">
-                          <div class="driver-avatar">CM</div>
-
-                          <div>
-                            <div class="driver-name">Carlo Mendoza</div>
-
-                            <small>Service Support</small>
-                          </div>
-                        </div>
-                      </td>
-
-                      <td>DRV-021</td>
-
-                      <td class="driver-license">C03-25-194837</td>
-
-                      <td>Non-Professional</td>
-
-                      <td class="driver-assignment">Unassigned</td>
-
-                      <td>
-                        <span class="status-badge maintenance">On Leave</span>
-                      </td>
-
-                      <td>+63 917 555 0218</td>
-
-                      <td>
-                        <div class="action-buttons">
-                          <button
-                            type="button"
-                            class="action-btn view-driver"
-                            aria-label="View Carlo Mendoza"
-                          >
-                            <i class="ph ph-eye"></i>
-                          </button>
-
-                          <button
-                            type="button"
-                            class="action-btn edit-driver"
-                            aria-label="Edit Carlo Mendoza"
-                          >
-                            <i class="ph ph-pencil-simple"></i>
-                          </button>
-
-                          <button
-                            type="button"
-                            class="action-btn delete-driver"
-                            aria-label="Delete Carlo Mendoza"
-                          >
-                            <i class="ph ph-trash"></i>
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
+                      
                   </tbody>
                 </table>
               </div>
@@ -458,7 +275,11 @@
             <!-- Pagination -->
             <div class="table-footer">
               <div id="driverPaginationInfo">
-                Showing <strong>1–3</strong> of <strong>24</strong> drivers
+                  Showing
+                  <strong>0–0</strong>
+                  of
+                  <strong>0</strong>
+                  drivers
               </div>
 
               <div class="pagination" id="driverPagination">
@@ -480,10 +301,10 @@
           </div>
         </section>
 
-    <div id="add-driver-modal"></div>
-    <div id="view-driver-modal"></div>
-    <div id="edit-driver-modal"></div>
-    <div id="delete-driver-modal"></div>
+    @include('components.driver.add-driver-modal')
+    @include('components.driver.view-driver-modal')
+    @include('components.driver.edit-driver-modal')
+    @include('components.driver.delete-driver-modal')
 
     <!-- Export dependencies -->
     <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
@@ -496,12 +317,13 @@
     <script src="{{ asset('assets/js/components/dropdown.js') }}"></script>
     <script src="{{ asset('assets/js/driver/driver.js') }}"></script>
     <script src="{{ asset('assets/js/driver/driver-search.js') }}"></script>
+    <script src="{{ asset('assets/js/driver/driver-table.js') }}"></script>
     <script src="{{ asset('assets/js/driver/driver-add.js') }}"></script>
     <script src="{{ asset('assets/js/driver/driver-view.js') }}"></script>
     <script src="{{ asset('assets/js/driver/driver-edit.js') }}"></script>
     <script src="{{ asset('assets/js/driver/driver-delete.js') }}"></script>
     <script src="{{ asset('assets/js/driver/driver-filter.js') }}"></script>
-    <script src="{{ asset('assets/js/driver/driver-pagination.j') }}"></script>
+    <script src="{{ asset('assets/js/driver/driver-pagination.js') }}"></script>
     <script src="{{ asset('assets/js/driver/driver-sort.js') }}"></script>
     <script src="{{ asset('assets/js/driver/driver-export.js') }}"></script>
     <script src="{{ asset('assets/js/driver/driver-print.js') }}"></script>

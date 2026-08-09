@@ -1,20 +1,6 @@
 /* ==========================================
-   View Driver Modal
+   View Driver Modal :)
 ========================================== */
-
-function getViewDriverRowText(row, columnIndex, selector) {
-  const selectedElement = selector ? row.querySelector(selector) : null;
-  const cell = row.children && row.children[columnIndex];
-  const value = selectedElement ? selectedElement.textContent : cell?.textContent;
-
-  return value && value.trim() ? value.trim() : "Not provided";
-}
-
-function getViewDriverData(row, key) {
-  const value = row.dataset && row.dataset[key];
-
-  return value && value.trim() ? value.trim() : "Not provided";
-}
 
 function setViewDriverText(modal, id, value) {
   const element = modal.querySelector(`#${id}`);
@@ -36,79 +22,108 @@ function getViewDriverStatusClass(status) {
 }
 
 function populateViewDriverModal(modal, row) {
-  const name = getViewDriverRowText(row, 1, ".driver-name");
-  const subtitle = getViewDriverRowText(row, 1, ".driver-info small");
-  const employeeId = getViewDriverRowText(row, 2);
-  const licenseNumber = getViewDriverRowText(row, 3, ".driver-license");
-  const licenseClass = getViewDriverRowText(row, 4);
-  const assignedVehicle = getViewDriverRowText(row, 5, ".driver-assignment");
-  const status = getViewDriverRowText(row, 6, ".status-badge");
-  const phone = getViewDriverRowText(row, 7);
-  const image = modal.querySelector("#viewDriverImage");
-  const statusBadge = modal.querySelector("#viewDriverStatus");
-  const rowImage = row.querySelector(".driver-photo");
-
-  if (image) {
-    if (!image.dataset.placeholderSrc) {
-      image.dataset.placeholderSrc = image.getAttribute("src") || image.src;
+    const name =
+      `${row.dataset.firstName || ""} ${row.dataset.lastName || ""}`.trim() || "Not provided";
+    const employeeId =
+        "DRV-" + String(row.dataset.id).padStart(3, "0");
+    const status = row.dataset.status || "Not provided";
+    const image = modal.querySelector("#viewDriverImage");
+    const statusBadge = modal.querySelector("#viewDriverStatus");
+    if (image) {
+        if (!image.dataset.placeholderSrc) {
+            image.dataset.placeholderSrc =
+                image.getAttribute("src") || image.src;
+        }
+        image.src = image.dataset.placeholderSrc;
+        image.alt = "Driver Photo";
     }
 
-    const placeholderSource = image.dataset.placeholderSrc;
-    const imageSource = (rowImage && rowImage.src) || placeholderSource;
+    setViewDriverText(modal, "viewDriverName", name);
+    setViewDriverText(
+        modal,
+        "viewDriverSubtitle",
+        "Fleet Driver"
+    );
+    setViewDriverText(
+        modal,
+        "viewDriverEmployeeId",
+        employeeId
+    );
+    setViewDriverText(
+        modal,
+        "viewDriverLicenseNumber",
+        row.dataset.licenseNumber
+    );
+    setViewDriverText(
+        modal,
+        "viewDriverLicenseClass",
+        row.dataset.licenseClass
+    );
 
-    if (imageSource) {
-      image.src = imageSource;
+    setViewDriverText(
+        modal,
+        "viewDriverLicenseExpiry",
+        row.dataset.licenseExpiry
+    );
+    setViewDriverText(
+        modal,
+        "viewDriverPhone",
+        row.dataset.contactNumber
+    );
+    setViewDriverText(
+        modal,
+        "viewDriverEmail",
+        row.dataset.email
+    );
+    setViewDriverText(
+        modal,
+        "viewDriverAssignedVehicle",
+        row.dataset.vehicle
+    );
+    setViewDriverText(
+        modal,
+        "viewDriverExperience",
+        row.dataset.experience
+    );
+    setViewDriverText(
+        modal,
+        "viewDriverAddress",
+        row.dataset.address
+    );
+    setViewDriverText(
+        modal,
+        "viewDriverEmergencyContact",
+        row.dataset.emergencyContact
+    );
+    setViewDriverText(
+        modal,
+        "viewDriverNotes",
+        row.dataset.notes
+    );
+
+    if (statusBadge) {
+
+        statusBadge.className = "status-badge";
+        statusBadge.classList.add(
+            getViewDriverStatusClass(status)
+        );
+        statusBadge.textContent = status;
+
+        const summary =
+            modal.querySelector("#viewDriverStatusSummary");
+
+        if (summary) {
+
+            summary.className = "status-badge";
+            summary.classList.add(
+                getViewDriverStatusClass(status)
+            );
+            summary.textContent = status;
+
+        }
+
     }
 
-    image.alt = "Driver photo";
-  }
-
-  setViewDriverText(modal, "viewDriverName", name);
-  setViewDriverText(
-    modal,
-    "viewDriverSubtitle",
-    subtitle === "Not provided" ? "Fleet Driver" : subtitle,
-  );
-  setViewDriverText(modal, "viewDriverEmployeeId", employeeId);
-  setViewDriverText(modal, "viewDriverLicenseNumber", licenseNumber);
-  setViewDriverText(modal, "viewDriverLicenseClass", licenseClass);
-  setViewDriverText(
-    modal,
-    "viewDriverLicenseExpiry",
-    getViewDriverData(row, "licenseExpiry"),
-  );
-  setViewDriverText(modal, "viewDriverPhone", phone);
-  setViewDriverText(modal, "viewDriverEmail", getViewDriverData(row, "email"));
-  setViewDriverText(modal, "viewDriverAssignedVehicle", assignedVehicle);
-  setViewDriverText(
-    modal,
-    "viewDriverExperience",
-    getViewDriverData(row, "experience"),
-  );
-  setViewDriverText(
-    modal,
-    "viewDriverAddress",
-    getViewDriverData(row, "address"),
-  );
-  setViewDriverText(
-    modal,
-    "viewDriverEmergencyContact",
-    getViewDriverData(row, "emergencyContact"),
-  );
-  setViewDriverText(modal, "viewDriverNotes", getViewDriverData(row, "notes"));
-
-  if (statusBadge) {
-    statusBadge.className = "status-badge";
-    statusBadge.classList.add(getViewDriverStatusClass(status));
-    statusBadge.textContent = status;
-
-    const summaryStatus = modal.querySelector("#viewDriverStatusSummary");
-    if (summaryStatus) {
-      summaryStatus.className = "status-badge";
-      summaryStatus.classList.add(getViewDriverStatusClass(status));
-      summaryStatus.textContent = status;
-    }
-  }
 }
 
 function openDriverDetailsModal(modal) {
@@ -143,7 +158,7 @@ function initViewDriverModal() {
   document.addEventListener("click", (event) => {
     if (!event.target || typeof event.target.closest !== "function") return;
 
-    const viewButton = event.target.closest(".action-btn.view-driver");
+    const viewButton = event.target.closest(".action-btn.view");
 
     if (!viewButton) return;
 
@@ -198,3 +213,7 @@ function initViewDriverModal() {
     }
   });
 }
+
+document.addEventListener("DOMContentLoaded", () => {
+    initViewDriverModal();
+});

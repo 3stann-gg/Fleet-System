@@ -187,3 +187,7 @@ function initDriverPagination() {
 
   return renderDriverPagination();
 }
+
+document.addEventListener("DOMContentLoaded", () => {
+    initDriverPagination();
+});

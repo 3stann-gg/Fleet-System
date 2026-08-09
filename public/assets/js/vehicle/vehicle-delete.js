@@ -58,63 +58,72 @@ function initDeleteVehicleModal() {
     const vehicleId = deleteButton.dataset.id;
 
     fetch(`/fleet/${vehicleId}`)
-        .then(response => response.json())
-        .then(vehicle => {
+      .then(response => response.json())
+      .then(data => {
 
-            console.log(vehicle);
+          console.log("DELETE VEHICLE RESPONSE:", data);
 
-            modal.dataset.vehicleId = vehicle.id;
+          const vehicle = data.vehicle;
 
-            if (vehicleNameElement) {
-                vehicleNameElement.textContent =
-                    `${vehicle.brand} ${vehicle.model}`;
-            }
+          if (!vehicle) {
+              console.error("Vehicle data not found.");
+              return;
+          }
 
-            openDeleteVehicleModal(modal);
+          modal.dataset.vehicleId = vehicle.id;
 
-        });
+          if (vehicleNameElement) {
+              vehicleNameElement.textContent =
+                  `${vehicle.brand} ${vehicle.model}`;
+          }
+
+          openDeleteVehicleModal(modal);
+
+      });
   });
 
   cancelButton?.addEventListener("click", () => closeDeleteVehicleModal(modal));
-
   confirmButton?.addEventListener("click", () => {
       const vehicleId = modal.dataset.vehicleId;
 
+      if (!vehicleId) {
+          console.error("No vehicle ID found.");
+          return;
+      }
+
       fetch(`/fleet/${vehicleId}`, {
-
           method: "DELETE",
-
           headers: {
               "Accept": "application/json",
-
               "X-CSRF-TOKEN": document
                   .querySelector('meta[name="csrf-token"]')
                   .content
-
           }
       })
-
       .then(response => response.json())
       .then(data => {
+
           if (!data.success) return;
-
-          const row = document
-              .querySelector(
-                  `.action-btn.delete[data-id="${vehicleId}"]`
-              )
-              .closest("tr");
-
-          row.remove();
 
           closeDeleteVehicleModal(modal);
 
-          refreshVehicleAfterDelete();
-
           if (typeof window.showToast === "function") {
-
               window.showToast(
                   data.message,
                   "success"
+              );
+          }
+
+          loadVehicles();
+
+      })
+      .catch(error => {
+          console.error("DELETE VEHICLE ERROR:", error);
+
+          if (typeof window.showToast === "function") {
+              window.showToast(
+                  "Unable to delete vehicle.",
+                  "error"
               );
           }
       });

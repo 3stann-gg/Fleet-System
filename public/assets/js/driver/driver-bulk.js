@@ -65,20 +65,6 @@ function clearDriverSelection() {
   refreshDriverBulkState();
 }
 
-function refreshDriverAfterBulkDelete() {
-  if (typeof applyDriverFilters === "function") {
-    applyDriverFilters();
-  } else if (typeof refreshDriverPagination === "function") {
-    refreshDriverPagination();
-  }
-
-  if (typeof updateDriverStats === "function") {
-    updateDriverStats();
-  }
-
-  refreshDriverBulkState();
-}
-
 function initDriverBulkActions() {
   const tableBody = document.getElementById("driverTableBody");
   const selectAll = document.getElementById("selectAllDrivers");
@@ -126,26 +112,60 @@ function initDriverBulkActions() {
 
   clearButton?.addEventListener("click", clearDriverSelection);
 
-  deleteButton.addEventListener("click", () => {
-    const selectedRows = getDriverBulkCheckboxes()
-      .filter((checkbox) => checkbox.checked)
-      .map((checkbox) => checkbox.closest("tr"))
-      .filter(Boolean);
+  deleteButton.addEventListener("click", async () => {
+      const ids = getDriverBulkCheckboxes()
+          .filter(checkbox => checkbox.checked)
+          .map(checkbox => checkbox.dataset.id);
+      if (ids.length === 0) return;
 
-    if (selectedRows.length === 0) return;
+      try {
 
-    selectedRows.forEach((row) => row.remove());
-    selectAll.checked = false;
-    selectAll.indeterminate = false;
-    refreshDriverAfterBulkDelete();
+          const response = await fetch("/drivers/bulk-delete", {
+              method: "DELETE",
+              headers: {
+                  "Content-Type": "application/json",
+                  "Accept": "application/json",
+                  "X-CSRF-TOKEN": document
+                      .querySelector('meta[name="csrf-token"]').content
+              },
+              body: JSON.stringify({
+                  ids: ids
+              })
+          });
 
-    if (
-      typeof window !== "undefined" &&
-      typeof window.showToast === "function"
-    ) {
-      window.showToast("Driver(s) deleted successfully.", "success");
-    }
+          const data = await response.json();
+
+          if (!response.ok) {
+              window.showToast(
+                  data.message || "Failed to delete drivers.",
+                  "error"
+              );
+
+              return;
+
+          }
+
+          clearDriverSelection();
+          loadDrivers();
+          window.showToast(
+              data.message,
+              "success"
+          );
+
+      }
+      catch (error) {
+          console.error(error);
+          window.showToast(
+              "Failed to delete drivers.",
+              "error"
+          );
+      }
+
   });
 
   refreshDriverBulkState();
 }
+
+document.addEventListener("DOMContentLoaded", () => {
+    initDriverBulkActions();
+});

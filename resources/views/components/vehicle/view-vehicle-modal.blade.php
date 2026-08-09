@@ -30,7 +30,7 @@
 
       <h3 id="viewVehicleName"></h3>
 
-      <p id="viewVehicleSubtitle"></p>
+      <p id="viewVehicleSubtitle">Emergency Response Unit</p>
       <span
         id="viewVehicleStatus"
         class="status-badge available">

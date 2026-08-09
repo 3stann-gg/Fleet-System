@@ -12,26 +12,16 @@ function openDeleteDriverModal(modal) {
 }
 
 function closeDeleteDriverModal(modal) {
-  if (!modal.classList.contains("show")) return;
+    if (!modal.classList.contains("show")) return;
 
-  modal.classList.remove("show");
-  document.body.style.overflow = modal.dataset.previousBodyOverflow || "";
-  delete modal.dataset.previousBodyOverflow;
-  modal.currentRow = null;
-}
+    modal.classList.remove("show");
+    document.body.style.overflow =
+        modal.dataset.previousBodyOverflow || "";
 
-function refreshDriverAfterDelete() {
-  if (typeof updateDriverStats === "function") {
-    updateDriverStats();
-  }
+    delete modal.dataset.previousBodyOverflow;
+    delete modal.dataset.driverId;
 
-  if (typeof initDriverPagination === "function") {
-    initDriverPagination();
-  }
-
-  if (typeof refreshDriverBulkState === "function") {
-    refreshDriverBulkState();
-  }
+    modal.currentRow = null;
 }
 
 function initDeleteDriverModal() {
@@ -49,16 +39,18 @@ function initDeleteDriverModal() {
   document.addEventListener("click", (event) => {
     if (!event.target || typeof event.target.closest !== "function") return;
 
-    const deleteButton = event.target.closest(".action-btn.delete-driver");
+    const deleteButton = event.target.closest(".action-btn.delete");
 
     if (!deleteButton) return;
 
     const row = deleteButton.closest("tr");
+    if (!row) return;
+    modal.dataset.driverId = row.dataset.id;;
 
     if (!row) return;
 
-    const name = row.querySelector(".driver-name")?.textContent.trim() ||
-      "this driver";
+    const name =
+      `${row.dataset.firstName} ${row.dataset.lastName}`.trim();
 
     modal.currentRow = row;
 
@@ -71,29 +63,52 @@ function initDeleteDriverModal() {
 
   cancelButton?.addEventListener("click", () => closeDeleteDriverModal(modal));
 
-  confirmButton?.addEventListener("click", () => {
-    const row = modal.currentRow;
+  confirmButton?.addEventListener("click", async () => {
+      const driverId = modal.dataset.driverId;
+      if (!driverId) return;
 
-    if (!row) return;
+      try {
+          const response = await fetch(`/drivers/${driverId}`, {
+              method: "DELETE",
 
-    row.remove();
-    closeDeleteDriverModal(modal);
-    refreshDriverAfterDelete();
+              headers: {
+                  "X-CSRF-TOKEN": document
+                      .querySelector('meta[name="csrf-token"]')
+                      .content,
+                  "Accept": "application/json"
+              }
+          });
 
-    if (typeof window.showToast === "function") {
-      window.showToast("Driver deleted successfully.", "success");
-    }
-  });
+          const data = await response.json();
 
-  modal.addEventListener("click", (event) => {
-    if (event.target === modal) {
-      closeDeleteDriverModal(modal);
-    }
-  });
+          if (data.success) {
+              closeDeleteDriverModal(modal);
+              loadDrivers();
+              window.showToast(data.message, "success");
+          }
 
-  document.addEventListener("keydown", (event) => {
-    if (event.key === "Escape" && modal.classList.contains("show")) {
-      closeDeleteDriverModal(modal);
-    }
+          if (!response.ok) {
+              window.showToast(
+                  data.message || "Failed to delete driver.",
+                  "error"
+              );
+
+              return;
+          }
+
+      }
+      catch(error){
+          console.error(error);
+          window.showToast(
+              "Failed to delete driver.",
+              "error"
+          );
+      }
+
   });
 }
+
+document.addEventListener("DOMContentLoaded", () => {
+    initDeleteDriverModal();
+});
+

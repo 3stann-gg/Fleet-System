@@ -5,6 +5,7 @@
 let vehicleFilterState = null;
 let currentSort = "id";
 let currentDirection = "asc";
+let vehicleSearchTimeout = null;
 
 const vehicleSortMap = {
     1: "brand",
@@ -13,317 +14,227 @@ const vehicleSortMap = {
     5: "status",
 };
 
-function getVehicleRowText(row, columnIndex, selector) {
-  const selectedElement = selector ? row.querySelector(selector) : null;
-  const cell = row.children?.[columnIndex];
-  const value = selectedElement ? selectedElement.textContent : cell?.textContent;
+function getVehicleDataRows(tableBody) {
 
-  return value ? value.trim() : "";
+    if (!tableBody) return [];
+
+    return Array.from(tableBody.querySelectorAll("tr")
+    ).filter((row) => {
+
+        const isHelperRow =
+            row.classList.contains("vehicle-no-results") ||
+            row.classList.contains("helper-row") ||
+            row.classList.contains("empty-state") ||
+            row.dataset.helperRow === "true" ||
+            row.dataset.temporary === "true";
+        return (
+            !isHelperRow &&
+            Boolean(
+                row.querySelector(".vehicle-name") ||
+                row.querySelector(".vehicle-checkbox")
+            )
+        );
+    });
+}
+
+function updateVehicleNoResultsRow(tableBody, shouldShow) {
+    if (!tableBody) return;
+
+    const existingRow = tableBody.querySelector(".vehicle-no-results");
+
+    if (!shouldShow) {existingRow?.remove();
+        return;
+    }
+
+    if (existingRow) return;
+
+    const row = document.createElement("tr");
+    const cell = document.createElement("td");
+
+    row.className = "vehicle-no-results";
+    cell.colSpan = 9;
+    cell.className = "text-center";
+    cell.textContent = "No vehicles found.";
+
+    row.appendChild(cell);
+    tableBody.appendChild(row);
+}
+
+
+function getVehicleSearchText(row, columnIndex, selector) {
+    const selectedElement = selector
+        ? row.querySelector(selector)
+        : null;
+
+    const cell = row.children?.[columnIndex];
+    const value = selectedElement
+        ? selectedElement.textContent
+        : cell?.textContent;
+
+    return value
+        ? value.trim()
+        : "";
 }
 
 function getVehicleFilterLabel(select) {
-  if (!select || select.value === "all") return "";
-
-  const option = select.options[select.selectedIndex];
-
-  return (option?.textContent || select.value).trim().toLowerCase();
-}
-
-function normalizeVehicleFilterValue(value) {
-  return (value || "")
-    .trim()
-    .toLowerCase()
-    .replace(/\s+/g, " ")
-    .replace(/^on\s*trip$/, "on trip");
-}
-
-function getVehicleDataRows(tableBody) {
-  if (!tableBody) return [];
-
-  return Array.from(tableBody.querySelectorAll("tr")).filter((row) => {
-    const isHelperRow =
-      row.classList.contains("helper-row") ||
-      row.classList.contains("empty-state") ||
-      row.dataset.helperRow === "true" ||
-      row.dataset.temporary === "true";
-
-    return (
-      !isHelperRow &&
-      Boolean(
-        row.querySelector(".vehicle-name") ||
-          row.querySelector(".vehicle-checkbox"),
-      )
-    );
-  });
-}
-
-function renderVehicleFilterRows(matchingRows) {
-  if (!vehicleFilterState) return;
-
-  const matchingRowSet = new Set(matchingRows);
-
-  getVehicleDataRows(vehicleFilterState.tableBody).forEach((row) => {
-    row.style.display = matchingRowSet.has(row) ? "" : "none";
-  });
-}
-
-function getVehicleIcon(type){
-    switch(type){
-
-        case "Ambulance":
-            return "ph-fill ph-ambulance";
-
-        case "Patient Van":
-        case "Van":
-            return "ph-fill ph-van";
-
-        case "Motorcycle":
-            return "ph-fill ph-motorcycle";
-
-        case "SUV":
-        case "Car":
-            return "ph-fill ph-car";
-
-        default:
-            return "ph-fill ph-car";
+    if (!select || select.value === "all") {
+        return "";
     }
+
+    const option = select.options[select.selectedIndex];
+    const value = option
+            ? option.textContent
+            : select.value;
+    return value
+        .trim()
+        .toLowerCase();
 }
 
-function renderVehicleTable(vehicles) {
-    const tableBody = document.getElementById("vehicleTableBody");
+function applyVehicleFilters({resetPage = false} = {}) {
+    if (!vehicleFilterState) {
+        return [];
+    }
+    const {tableBody, searchInput, typeFilter, statusFilter,} = vehicleFilterState;
+    const searchQuery = (searchInput?.value || "")
+            .trim()
+            .toLowerCase();
+    const typeValue = getVehicleFilterLabel(typeFilter);
+    const statusValue = getVehicleFilterLabel(statusFilter);
+    const matchingRows = [];
 
-    if (!tableBody) return;
+    getVehicleDataRows(tableBody).forEach((row) => {
+        const searchableText = [
+            row.dataset.brand,
+            row.dataset.model,
+            row.dataset.plateNumber,
+            row.dataset.vehicleType,
+            row.dataset.driverName,
+            row.dataset.driverLicense,
+            row.dataset.fuelType,
+        ]
+            .filter(Boolean)
+            .join(" ")
+            .toLowerCase();
 
-    let html = "";
+        const rowType = (row.dataset.vehicleType || "")
+                .trim()
+                .toLowerCase();
+        const rowStatus = (row.dataset.status || "")
+                .trim()
+                .toLowerCase();
+        const matchesSearch = !searchQuery || searchableText.includes(searchQuery);
+        const matchesType = !typeValue || rowType === typeValue;
+        const matchesStatus = !statusValue || rowStatus === statusValue;
+        const isMatch = matchesSearch && matchesType && matchesStatus;
+        row.dataset.vehicleMatchesFilter = String(isMatch);
 
-    vehicles.forEach(vehicle => {
-      const badgeClass =
-      typeof getVehicleStatusClass === "function"
-        ? getVehicleStatusClass(vehicle.status)
-        : "";
-      const vehicleIcon = getVehicleIcon(vehicle.vehicle_type);
-      const driverName = vehicle.driver_name ?? "Not Assigned";
-      const initials =
-          driverName === "Not Assigned"
-              ? "  "
-              : driverName
-                  .split(" ")
-                  .map(name => name[0])
-                  .join("")
-                  .substring(0,2)
-                  .toUpperCase();
-
-        html += `
-            <tr>
-
-                <td>
-                    <input
-                        type="checkbox"
-                        class="vehicle-checkbox"
-                        data-id="${vehicle.id}"
-                    >
-                </td>
-
-                <td>
-                    <div class="vehicle-info">
-                        <div class="vehicle-avatar">
-                            <i class="${vehicleIcon}"></i>
-                        </div>
-                        <div>
-                            <div class="vehicle-name">
-                                ${vehicle.brand} ${vehicle.model}
-                            </div>
-                            <small>
-                                ${vehicle.year_model ?? ""}
-                            </small>
-                        </div>  
-                    </div>
-                </td>
-
-                <td>${vehicle.plate_number}</td>
-
-                <td>${vehicle.vehicle_type}</td>
-
-                <td>
-                    <div class="driver-info">
-                        <div class="driver-avatar">
-                            ${initials}
-                        </div>
-                        <span>
-                            ${driverName}
-                        </span>
-                    </div>
-                </td>
-
-                <td>
-                    <span class="status-badge ${badgeClass}">
-                        ${vehicle.status}
-                    </span>
-                </td>
-
-                <td>${vehicle.fuel_type}</td>
-
-                <td>${vehicle.last_service ?? "---"}</td>
-
-                <td>
-                    <div class="action-buttons">
-                        <button
-                            class="action-btn view"
-                            data-id="${vehicle.id}"
-                            title="View">
-                            <i class="ph ph-eye"></i>
-                        </button>
-
-                        <button
-                            class="action-btn edit"
-                            data-id="${vehicle.id}"
-                            title="Edit">
-                            <i class="ph ph-pencil-simple"></i>
-                        </button>
-
-                        <button
-                            class="action-btn delete"
-                            data-id="${vehicle.id}"
-                            title="Delete">
-                            <i class="ph ph-trash"></i>
-                        </button>
-                    </div>
-                </td>
-
-            </tr>
-        `;
-
+        if (isMatch) {matchingRows.push(row);}
     });
 
-    tableBody.innerHTML = html;
-
-    if (typeof initVehiclePagination === "function") {
-        initVehiclePagination();
-    }
+    updateVehicleNoResultsRow(tableBody, matchingRows.length === 0);
 
     if (typeof refreshVehiclePagination === "function") {
-        refreshVehiclePagination({ reset: true });
-    }
+    const paginationUpdated = refreshVehiclePagination({reset: resetPage});
 
-    if (typeof refreshVehicleBulkState === "function") {
-        refreshVehicleBulkState();
+    if (paginationUpdated) {
+        return matchingRows;
     }
-
 }
 
-function applyVehicleFilters() {
-    const search = document.getElementById("vehicleSearch").value;
-    const type = document.getElementById("vehicleTypeFilter").value;
-    const status = document.getElementById("vehicleStatusFilter").value;
+    const matchingRowSet = new Set(matchingRows);
 
-    const url =
-    `/fleet/search?search=${encodeURIComponent(search)}
-    &type=${encodeURIComponent(type)}
-    &status=${encodeURIComponent(status)}
-    &sort=${currentSort}
-    &direction=${currentDirection}`;
+    getVehicleDataRows(tableBody)
+        .forEach((row) => {
+            row.style.display = matchingRowSet.has(row)
+                ? ""
+                : "none";
 
-    console.log(url);
-
-    fetch(url, {
-      headers: {
-          "Accept": "application/json"
-      }
-  })
-
-    .then(response => response.json())
-    .then(data => {
-        console.log(data);
-
-        renderVehicleTable(data.vehicles);
-
-    })
-
-    .catch(error => {
-
-        console.error(error);
-
-    });
-
+        });
+    return matchingRows;
 }
 
-function initVehicleFilters() {
-  console.log("Vehicle Filters Initialized");
+function initVehicleSearch() {
+    const tableBody = document.getElementById(
+        "vehicleTableBody"
+    );
+    const searchInput = document.getElementById(
+        "vehicleSearch"
+    );
+    const typeFilter = document.getElementById(
+        "vehicleTypeFilter"
+    );
+    const statusFilter = document.getElementById(
+        "vehicleStatusFilter"
+    );
+    const refreshButton = document.getElementById(
+        "refreshVehicles"
+    );
 
-  const tableBody = document.getElementById("vehicleTableBody");
-  const searchInput = document.getElementById("vehicleSearch");
-  const typeFilter = document.getElementById("vehicleTypeFilter");
-  const statusFilter = document.getElementById("vehicleStatusFilter");
-  const refreshButton = document.getElementById("refreshVehicles");
+    if (!tableBody || tableBody.dataset.vehicleSearchInitialized === "true") {
+        return;
+    }
 
-  if (!tableBody || tableBody.dataset.vehicleFiltersInitialized === "true") {
-    return;
-  }
+    tableBody.dataset.vehicleSearchInitialized = "true";
 
-  tableBody.dataset.vehicleFiltersInitialized = "true";
-  vehicleFilterState = {
-    tableBody,
-    searchInput,
-    typeFilter,
-    statusFilter,
-  };
+    vehicleFilterState = {
+        tableBody,
+        searchInput,
+        typeFilter,
+        statusFilter,
+    };
 
-  searchInput?.addEventListener("input", () => {
-    console.log("Searching...", searchInput.value);
-    applyVehicleFilters({ resetPage: true });
+    searchInput?.addEventListener("input", () => {
+            clearTimeout(vehicleSearchTimeout);
 
+            vehicleSearchTimeout = setTimeout(() => {
+                applyVehicleFilters({resetPage: true});
+            }, 300);
+        }
+    );
+
+    typeFilter?.addEventListener("change", () =>
+        {applyVehicleFilters({resetPage: true});}
+    );
+    statusFilter?.addEventListener("change", () => 
+        {applyVehicleFilters({resetPage: true});}
+    );
+
+    refreshButton?.addEventListener("click", () => {
+        if (searchInput) {searchInput.value = "";}
+        if (typeFilter) {typeFilter.value = "all";}
+        if (statusFilter) {statusFilter.value = "all";}
+            currentSort = "id";
+            currentDirection = "asc";
+            applyVehicleFilters({resetPage: true});
+        }
+    );
+
+
+    document.querySelectorAll(".sortable")
+        .forEach((header) => {
+            header.addEventListener("click", () => {
+                const column = header.dataset.column;
+                const sortField = vehicleSortMap[column];
+                if (!sortField) {
+                    return;
+                }
+                if (currentSort === sortField) {
+                        currentDirection = currentDirection === "asc"
+                            ? "desc"
+                            : "asc";
+                        } else {
+                            currentSort = sortField;
+                            currentDirection = "asc";
+                        }
+                        applyVehicleFilters({resetPage: true});
+
+                }
+            );
+        });
+        applyVehicleFilters();
+}
+
+
+document.addEventListener("DOMContentLoaded",() => {
+    initVehicleSearch();
 });
-  typeFilter?.addEventListener("change", () => {
-    applyVehicleFilters({ resetPage: true });
-  });
-  statusFilter?.addEventListener("change", () => {
-    applyVehicleFilters({ resetPage: true });
-  });
-  refreshButton?.addEventListener("click", () => {
-    if (searchInput) {
-      searchInput.value = "";
-    }
-
-    if (typeFilter) {
-      typeFilter.value = "all";
-    }
-
-    if (statusFilter) {
-      statusFilter.value = "all";
-    }
-
-    applyVehicleFilters({ resetPage: true });
-  });
-
-  applyVehicleFilters();
-
-  document.querySelectorAll(".sortable").forEach(header => {
-      header.addEventListener("click", () => {
-
-          const column = header.dataset.column;
-          const sortField = vehicleSortMap[column];
-
-          if (!sortField) return;
-
-          if (currentSort === sortField) {
-
-              currentDirection =
-                  currentDirection === "asc"
-                      ? "desc"
-                      : "asc";
-
-          } else {
-              currentSort = sortField;
-              currentDirection = "asc";
-
-          }
-
-          applyVehicleFilters();
-
-      });
-
-  });
-
-}
-
-document.addEventListener("DOMContentLoaded", initVehicleFilters);

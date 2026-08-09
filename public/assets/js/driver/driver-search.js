@@ -58,6 +58,7 @@ function updateDriverNoResultsRow(tableBody, shouldShow) {
 
   row.className = "driver-no-results";
   cell.colSpan = 9;
+  cell.className = "text-center";
   cell.textContent = "No drivers found.";
   row.appendChild(cell);
   tableBody.appendChild(row);
@@ -96,8 +97,8 @@ function applyDriverFilters({ resetPage = false } = {}) {
     const searchableText = [
       getDriverSearchText(row, 1, ".driver-name"),
       getDriverSearchText(row, 2),
-      getDriverSearchText(row, 3, ".driver-license"),
-      getDriverSearchText(row, 5, ".driver-assignment"),
+      getDriverSearchText(row, 3),
+      getDriverSearchText(row, 5),
       getDriverSearchText(row, 7),
     ]
       .join(" ")
@@ -205,3 +206,7 @@ function initDriverSearch() {
 
   applyDriverFilters();
 }
+
+document.addEventListener("DOMContentLoaded", () => {
+    initDriverSearch();
+});

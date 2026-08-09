@@ -162,23 +162,30 @@ function refreshVehiclePagination({ reset = false } = {}) {
 }
 
 function initVehiclePagination() {
-  const tableBody = document.getElementById("vehicleTableBody");
-  const pagination = document.getElementById("pagination");
-  const info = document.getElementById("paginationInfo");
 
-  if (!tableBody || !pagination) return false;
+    const tableBody =
+        document.getElementById("vehicleTableBody");
+    const pagination =
+        document.getElementById("vehiclePagination");
+    const info =
+        document.getElementById("vehiclePaginationInfo");
 
-  if (vehiclePaginationState?.tableBody === tableBody) {
-    return refreshVehiclePagination();
-  }
-
-  vehiclePaginationState = {
-    tableBody,
-    pagination,
-    info,
-    currentPage: 1,
-  };
-  tableBody.dataset.vehiclePaginationInitialized = "true";
-
-  return renderVehiclePagination();
+    if (!tableBody || !pagination) {
+        return false;
+    }
+    if (vehiclePaginationState?.tableBody === tableBody) {
+        return refreshVehiclePagination();
+    }
+    vehiclePaginationState = {
+        tableBody,
+        pagination,
+        info,
+        currentPage: 1,
+    };
+    tableBody.dataset.vehiclePaginationInitialized = "true";
+    return renderVehiclePagination();
 }
+
+document.addEventListener("DOMContentLoaded", () => {
+    initVehiclePagination();
+});

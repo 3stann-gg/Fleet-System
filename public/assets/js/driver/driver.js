@@ -75,6 +75,59 @@ function setDriverSelectOptions(select, options) {
   select.replaceChildren(...optionElements);
 }
 
+async function loadDriverVehicleOptions() {
+    const select = document.getElementById("driverAssignedVehicle");
+
+    if (!select) return;
+
+    try {
+        const response = await fetch("/fleet/available", {
+            headers: {
+                "Accept": "application/json"
+            }
+        });
+
+        if (!response.ok) {
+            throw new Error(`Failed to load vehicles: ${response.status}`);
+        }
+
+        const data = await response.json();
+        const vehicles = data.vehicles ?? data;
+
+        const options = [
+            {
+                label: "Select Assigned Vehicle",
+                value: ""
+            }
+        ];
+
+        vehicles.forEach(vehicle => {
+            const brand = vehicle.brand ?? "";
+            const model = vehicle.model ?? "";
+            const type = vehicle.vehicle_type ?? "";
+
+            const vehicleName = `${brand} ${model}`.trim();
+
+            options.push({
+                label: `${vehicleName} - ${type}`,
+                value: vehicle.id
+            });
+        });
+
+        setDriverSelectOptions(select, options);
+
+    } catch (error) {
+        console.error("DRIVER VEHICLE DROPDOWN ERROR:", error);
+
+        setDriverSelectOptions(select, [
+            {
+                label: "Unable to load vehicles",
+                value: ""
+            }
+        ]);
+    }
+}
+
 function initDriverForm() {
   const form = document.getElementById("driverForm");
 
@@ -90,14 +143,7 @@ function initDriverForm() {
     { label: "Non-Professional", value: "Non-Professional" },
   ]);
 
-  // Temporary frontend values; this list will later come from the Laravel API/database.
-  setDriverSelectOptions(assignedVehicle, [
-    { label: "Select Assigned Vehicle", value: "" },
-    { label: "Ambulance 01", value: "Ambulance 01" },
-    { label: "Patient Van 02", value: "Patient Van 02" },
-    { label: "Service Vehicle 01", value: "Service Vehicle 01" },
-    { label: "Unassigned", value: "Unassigned" },
-  ]);
+  loadDriverVehicleOptions();
 
   setDriverSelectOptions(status, [
     { label: "Select Status", value: "" },
@@ -166,3 +212,10 @@ function initDriverImageUpload() {
     reader.readAsDataURL(file);
   });
 }
+
+document.addEventListener("DOMContentLoaded", () => {
+    initDriverModal();
+    initDriverForm();
+    initDriverImageUpload();
+    initDriverAdd();
+});

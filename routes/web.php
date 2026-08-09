@@ -3,6 +3,7 @@
 use App\Http\Controllers\ProfileController;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\VehicleController;
+use App\Http\Controllers\DriverController;
 
 Route::get('/', function () {
     return view('welcome');
@@ -20,6 +21,7 @@ Route::middleware('auth')->group(function () {
 
 require __DIR__.'/auth.php';
 
+// ***VEHICLE MODULE***
 Route::get('/fleet/search', [VehicleController::class, 'index']);
 
 Route::get('/fleet/stats', [VehicleController::class, 'stats'])
@@ -28,7 +30,8 @@ Route::get('/fleet/stats', [VehicleController::class, 'stats'])
 Route::delete('/fleet/bulk-delete', [VehicleController::class, 'bulkDelete'])
     ->name('vehicles.bulkDelete');
 
-Route::get('/fleet', [VehicleController::class, 'index'])->name('fleet');
+Route::get('/fleet', [VehicleController::class, 'index']) ->name('fleet');
+Route::get('/fleet/available', [VehicleController::class, 'available']);
 
 Route::post('/fleet', [VehicleController::class, 'store'])
     ->name('vehicles.store');
@@ -42,22 +45,49 @@ Route::put('/fleet/{vehicle}', [VehicleController::class, 'update'])
 Route::delete('/fleet/{vehicle}', [VehicleController::class, 'destroy'])
     ->name('vehicles.destroy');
 
+
 Route::view('/reservation', 'reservation.index')->name('reservation');
+
 
 Route::view('/dispatch', 'dispatch.index')->name('dispatch');
 
-Route::view('/driver', 'driver.index')->name('driver');
+// ***DRIVER MODULE***
+Route::delete('/drivers/bulk-delete', [DriverController::class, 'bulkDelete'])
+    ->name('drivers.bulkDelete');
+
+Route::get('/driver', [DriverController::class, 'index']) ->name('driver');
+Route::get('/drivers', [DriverController::class, 'getDrivers']);
+Route::get('/drivers/available', [DriverController::class, 'available']);
+
+Route::post('/drivers', [DriverController::class, 'store'])
+    ->name('drivers.store');
+
+Route::get('/drivers/{driver}', [DriverController::class, 'show'])
+    ->name('drivers.show');
+
+Route::put('/drivers/{driver}', [DriverController::class, 'update'])
+    ->name('drivers.update');
+
+Route::delete('/drivers/{driver}', [DriverController::class, 'destroy'])
+    ->name('drivers.destroy');
+
 
 Route::view('/maintenance', 'maintenance.index')->name('maintenance');
 
+
 Route::view('/fuel', 'fuel.index')->name('fuel');
+
 
 Route::view('/route-planning', 'route-planning.index')->name('route-planning');
 
+
 Route::view('/cost-analysis', 'cost-analysis.index')->name('cost-analysis');
 
+
 Route::view('/reports', 'reports.index')->name('reports');
+
 
 Route::view('/settings', 'settings.index')->name('settings');
 
 Route::view('/profile', 'profile.index')->name('profile');
+

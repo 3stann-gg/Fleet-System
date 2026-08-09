@@ -1,5 +1,5 @@
 /* ==========================================
-   View Vehicle Modal
+   View Vehicle Modal 
 ========================================== */
 
 function getViewVehicleRowText(row, columnIndex, selector) {
@@ -45,17 +45,21 @@ function closeVehicleDetailsModal(modal) {
 function populateViewVehicleModal(modal, vehicle) {
 
     const name = `${vehicle.brand} ${vehicle.model}`;
+    const driver = vehicle.drivers?.[0];
 
     setViewVehicleText(modal, "viewVehicleName", name);
-    setViewVehicleText(modal, "viewVehicleSubtitle", vehicle.year_model);
+    //setViewVehicleText(modal, "viewVehicleSubtitle", vehicle.year_model);
     setViewVehicleText(modal, "viewPlateNumber", vehicle.plate_number);
     setViewVehicleText(modal, "viewVehicleType", vehicle.vehicle_type);
-    setViewVehicleText(modal, "viewDriver", vehicle.driver_name ?? "Not Assigned");
+    setViewVehicleText(modal, "viewDriver", driver
+            ? `${driver.first_name} ${driver.last_name}`
+            : "Not Assigned"
+    );
     setViewVehicleText(modal, "viewFuelType", vehicle.fuel_type);
-    setViewVehicleText(modal, "viewFuelLevel", vehicle.fuel_level ?? "N/A");
-    setViewVehicleText(modal, "viewMileage", vehicle.mileage ?? "N/A");
-    setViewVehicleText(modal, "viewPurchaseDate", vehicle.purchase_date ?? "N/A");
-    setViewVehicleText(modal, "viewInsuranceExpiry", vehicle.insurance_expiry ?? "N/A");
+    setViewVehicleText(modal, "viewFuelLevel", vehicle.fuel_level ?? "Not provided");
+    setViewVehicleText(modal, "viewMileage", vehicle.mileage ?? "Not provided");
+    setViewVehicleText(modal, "viewPurchaseDate", vehicle.purchase_date ?? "Not provided");
+    setViewVehicleText(modal, "viewInsuranceExpiry", vehicle.insurance_expiry ?? "Not provided");
     setViewVehicleText(modal, "viewVehicleNotes", vehicle.notes ?? "No additional information");
 
     const statusBadge = modal.querySelector("#viewVehicleStatus");
@@ -97,13 +101,19 @@ function initViewVehicleModal() {
 
     if (!viewButton) return;
 
-    const row = viewButton.closest("tr");
+    const vehicleId = viewButton.dataset.id;
 
-    if (!row) return;
+    fetch(`/fleet/${vehicleId}`)
+        .then(response => response.json())
+        .then(data => {
 
-    modal.currentRow = row;
-    populateViewVehicleModal(modal, row);
-    openVehicleDetailsModal(modal);
+            modal.currentVehicle = data.vehicle;
+            populateViewVehicleModal(
+                modal,
+                data.vehicle
+            );
+            openVehicleDetailsModal(modal);
+        });
   });
 
   closeButton?.addEventListener("click", () => closeVehicleDetailsModal(modal));
@@ -111,18 +121,23 @@ function initViewVehicleModal() {
     closeVehicleDetailsModal(modal),
   );
   editFromViewButton?.addEventListener("click", () => {
-    const editModal = document.getElementById("editVehicleModal");
+      const editModal = document.getElementById("editVehicleModal");
 
-      if (
-          !modal.currentVehicle ||
-          !editModal
-      ) {
+      if (!modal.currentVehicle || !editModal) {
           return;
       }
 
-      closeVehicleDetailsModal(modal);
-      populateEditVehicleModal(modal.currentVehicle);
-      openEditVehicleModal(editModal);
+      fetch(`/fleet/${modal.currentVehicle.id}`)
+          .then(response => response.json())
+          .then(data => {
+              populateEditVehicleModal(data.vehicle);
+              populateEditDriverDropdown(
+                  data.drivers,
+                  data.vehicle
+              );
+              closeVehicleDetailsModal(modal);
+              openEditVehicleModal(editModal);
+          });
 
   });
 
@@ -139,29 +154,6 @@ function initViewVehicleModal() {
   });
 }
 
-function initVehicleView() {
-    const modal = document.getElementById("viewVehicleModal");
-
-    document.addEventListener("click", function (event) {
-
-        const button = event.target.closest(".action-btn.view");
-
-        if (!button) return;
-
-        const vehicleId = button.dataset.id;
-
-        fetch(`/fleet/${vehicleId}`)
-          .then(response => response.json())
-          .then(vehicle => {
-              modal.currentVehicle = vehicle;
-              populateViewVehicleModal(modal, vehicle);
-              openVehicleDetailsModal(modal);
-          });
-
-    });
-}
-
 document.addEventListener("DOMContentLoaded", () => {
-    initVehicleView();
     initViewVehicleModal();
 });

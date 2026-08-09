@@ -44,21 +44,33 @@ function getDriverReportOptionalValue(row, key) {
 }
 
 function getDriverReportData(row) {
-  return {
-    name: getDriverReportText(row, 1, ".driver-name"),
-    employeeId: getDriverReportText(row, 2),
-    licenseNumber: getDriverReportText(row, 3, ".driver-license"),
-    licenseClass: getDriverReportText(row, 4),
-    assignedVehicle: getDriverReportText(row, 5, ".driver-assignment"),
-    status: getDriverReportText(row, 6, ".status-badge"),
-    contact: getDriverReportText(row, 7),
-    licenseExpiry: getDriverReportOptionalValue(row, "licenseExpiry"),
-    email: getDriverReportOptionalValue(row, "email"),
-    experience: getDriverReportOptionalValue(row, "experience"),
-    address: getDriverReportOptionalValue(row, "address"),
-    emergencyContact: getDriverReportOptionalValue(row, "emergencyContact"),
-    notes: getDriverReportOptionalValue(row, "notes"),
-  };
+    return {
+        name: `${row.dataset.firstName} ${row.dataset.lastName}`.trim(),
+        employeeId:
+            "DRV-" + String(row.dataset.id).padStart(3, "0"),
+        licenseNumber:
+            row.dataset.licenseNumber,
+        licenseClass:
+            row.dataset.licenseClass,
+        assignedVehicle:
+            row.dataset.vehicle,
+        status:
+            row.dataset.status,
+        contact:
+            row.dataset.contactNumber,
+        licenseExpiry:
+            getDriverReportOptionalValue(row, "licenseExpiry"),
+        email:
+            getDriverReportOptionalValue(row, "email"),
+        experience:
+            getDriverReportOptionalValue(row, "experience"),
+        address:
+            getDriverReportOptionalValue(row, "address"),
+        emergencyContact:
+            getDriverReportOptionalValue(row, "emergencyContact"),
+        notes:
+            getDriverReportOptionalValue(row, "notes"),
+    };
 }
 
 function showDriverReportToast(message, type) {
@@ -236,3 +248,9 @@ function initDriverPDFExport() {
     }
   });
 }
+
+document.addEventListener("DOMContentLoaded", () => {
+    initDriverExport();
+    initDriverPDFExport();
+    initDriverPrint();
+});

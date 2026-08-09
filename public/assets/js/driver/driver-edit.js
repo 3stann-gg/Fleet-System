@@ -1,7 +1,7 @@
 /* ==========================================
    Edit Driver Modal
 ========================================== */
-
+/*
 function getEditDriverRowText(row, columnIndex, selector) {
   const selectedElement = selector ? row.querySelector(selector) : null;
   const cell = row.children && row.children[columnIndex];
@@ -15,7 +15,7 @@ function getEditDriverData(row, key) {
 
   return value && value.trim() ? value.trim() : "";
 }
-
+*/
 function setEditDriverFieldValue(id, value) {
   const field = document.getElementById(id);
 
@@ -72,12 +72,117 @@ function closeEditDriverModal(modal) {
   modal.dataset.photoChanged = "false";
 }
 
+async function loadEditDriverVehicleOptions(currentVehicleId = "") {
+    const select = document.getElementById("editDriverAssignedVehicle");
+
+    if (!select) return;
+
+    try {
+        const response = await fetch("/fleet/available", {
+            headers: {
+                "Accept": "application/json"
+            }
+        });
+
+        if (!response.ok) {
+            throw new Error(
+                `Failed to load vehicles: ${response.status}`
+            );
+        }
+
+        const vehicles = await response.json();
+
+        const options = [
+            {
+                label: "Select Assigned Vehicle",
+                value: ""
+            }
+        ];
+
+        vehicles.forEach(vehicle => {
+            const brand = vehicle.brand ?? "";
+            const model = vehicle.model ?? "";
+            const type = vehicle.vehicle_type ?? "";
+
+            const vehicleName =
+                `${brand} ${model}`.trim();
+
+            options.push({
+                label: `${vehicleName} - ${type}`,
+                value: String(vehicle.id)
+            });
+        });
+
+        /*
+         * Add the driver's current vehicle
+         * even though it is already assigned.
+         */
+        if (
+            currentVehicleId &&
+            !options.some(
+                option => option.value === String(currentVehicleId)
+            )
+        ) {
+            const currentResponse =
+                await fetch(`/fleet/${currentVehicleId}`, {
+                    headers: {
+                        "Accept": "application/json"
+                    }
+                });
+
+            if (currentResponse.ok) {
+                const currentData =
+                    await currentResponse.json();
+
+                const vehicle = currentData.vehicle;
+
+                if (vehicle) {
+                    const brand = vehicle.brand ?? "";
+                    const model = vehicle.model ?? "";
+                    const type = vehicle.vehicle_type ?? "";
+
+                    const vehicleName =
+                        `${brand} ${model}`.trim();
+
+                    options.push({
+                        label: `${vehicleName} - ${type}`,
+                        value: String(vehicle.id)
+                    });
+                }
+            }
+        }
+
+        setDriverSelectOptions(
+            select,
+            options
+        );
+
+        select.value =
+            currentVehicleId
+                ? String(currentVehicleId)
+                : "";
+
+    } catch (error) {
+        console.error(
+            "EDIT DRIVER VEHICLE DROPDOWN ERROR:",
+            error
+        );
+        setDriverSelectOptions(select, [
+            {
+                label: "Unable to load vehicles",
+                value: ""
+            }
+        ]);
+    }
+}
+
 function populateEditDriverModal(modal, row) {
   const preview = document.getElementById("editDriverPreview");
   const imageInput = document.getElementById("editDriverImage");
   const rowImage = row.querySelector(".driver-photo");
   const photoSource =
     (rowImage && rowImage.src) || getEditDriverPlaceholderSource(preview);
+  const driverId = row.dataset.id;
 
   modal.currentRow = row;
   modal.dataset.photoChanged = "false";
@@ -91,81 +196,61 @@ function populateEditDriverModal(modal, row) {
   }
 
   setEditDriverFieldValue(
-    "editDriverName",
-    getEditDriverRowText(row, 1, ".driver-name"),
-  );
-  setEditDriverFieldValue("editDriverEmployeeId", getEditDriverRowText(row, 2));
-  setEditDriverFieldValue(
-    "editDriverLicenseNumber",
-    getEditDriverRowText(row, 3, ".driver-license"),
-  );
-  setEditDriverSelectValue("editDriverLicenseClass", getEditDriverRowText(row, 4));
-  setEditDriverFieldValue(
-    "editDriverLicenseExpiry",
-    getEditDriverData(row, "licenseExpiry"),
-  );
-  setEditDriverFieldValue("editDriverPhone", getEditDriverRowText(row, 7));
-  setEditDriverFieldValue("editDriverEmail", getEditDriverData(row, "email"));
-  setEditDriverSelectValue(
-    "editDriverAssignedVehicle",
-    getEditDriverRowText(row, 5, ".driver-assignment"),
+      "editDriverFirstName",
+      row.dataset.firstName || ""
   );
   setEditDriverFieldValue(
-    "editDriverExperience",
-    getEditDriverData(row, "experience"),
+      "editDriverLastName",
+      row.dataset.lastName || ""
+  );
+  setEditDriverFieldValue(
+      "editDriverEmployeeId",
+      "DRV-" + String(driverId).padStart(3, "0")
+  );
+  setEditDriverFieldValue(
+      "editDriverLicenseNumber",
+      row.dataset.licenseNumber
   );
   setEditDriverSelectValue(
-    "editDriverStatus",
-    getEditDriverRowText(row, 6, ".status-badge"),
+      "editDriverLicenseClass",
+      row.dataset.licenseClass
   );
   setEditDriverFieldValue(
-    "editDriverAddress",
-    getEditDriverData(row, "address"),
+      "editDriverLicenseExpiry",
+      row.dataset.licenseExpiry
   );
   setEditDriverFieldValue(
-    "editDriverEmergencyContact",
-    getEditDriverData(row, "emergencyContact"),
+      "editDriverPhone",
+      row.dataset.contactNumber
   );
-  setEditDriverFieldValue("editDriverNotes", getEditDriverData(row, "notes"));
-}
-
-function updateDriverRowPhoto(row, photoSource, name) {
-  const driverInfo = row.querySelector(".driver-info");
-
-  if (!driverInfo || !photoSource) return;
-
-  const existingPhoto = driverInfo.querySelector(".driver-photo");
-
-  if (existingPhoto) {
-    existingPhoto.src = photoSource;
-    existingPhoto.alt = `Photo of ${name}`;
-    return;
-  }
-
-  const photo = document.createElement("img");
-  const avatar = driverInfo.querySelector(".driver-avatar");
-
-  photo.className = "driver-photo vehicle-photo";
-  photo.src = photoSource;
-  photo.alt = `Photo of ${name}`;
-
-  if (avatar) {
-    avatar.remove();
-  }
-
-  driverInfo.prepend(photo);
-}
-
-function updateDriverActionLabels(row, name) {
-  const checkbox = row.querySelector(".driver-checkbox");
-  const viewButton = row.querySelector(".view-driver");
-  const editButton = row.querySelector(".edit-driver");
-  const deleteButton = row.querySelector(".delete-driver");
-
-  checkbox?.setAttribute("aria-label", `Select ${name}`);
-  viewButton?.setAttribute("aria-label", `View ${name}`);
-  editButton?.setAttribute("aria-label", `Edit ${name}`);
-  deleteButton?.setAttribute("aria-label", `Delete ${name}`);
+  setEditDriverFieldValue(
+      "editDriverEmail",
+      row.dataset.email
+  );
+  setEditDriverFieldValue(
+      "editDriverExperience",
+      row.dataset.experience
+  );
+  setEditDriverFieldValue(
+      "editDriverAddress",
+      row.dataset.address
+  );
+  setEditDriverFieldValue(
+      "editDriverEmergencyContact",
+      row.dataset.emergencyContact
+  );
+  setEditDriverFieldValue(
+      "editDriverNotes",
+      row.dataset.notes
+  );
+  setEditDriverSelectValue(
+      "editDriverStatus",
+      row.dataset.status
+  );
+  setEditDriverSelectValue(
+      "editDriverAssignedVehicle",
+      row.dataset.assignedVehicleId
+  );
 }
 
 function initEditDriverModal() {
@@ -206,10 +291,11 @@ function initEditDriverModal() {
     });
   }
 
-  document.addEventListener("click", (event) => {
-    if (!event.target || typeof event.target.closest !== "function") return;
-
-    const editButton = event.target.closest(".action-btn.edit-driver");
+  document.addEventListener("click", async (event) => {
+    if (!event.target || typeof event.target.closest !== "function") {
+        return;
+    }
+    const editButton = event.target.closest(".action-btn.edit");
 
     if (!editButton) return;
 
@@ -217,9 +303,12 @@ function initEditDriverModal() {
 
     if (!row) return;
 
+    const currentVehicleId = row.dataset.assignedVehicleId || "";
+    await loadEditDriverVehicleOptions(currentVehicleId);
     populateEditDriverModal(modal, row);
+
     openEditDriverModal(modal);
-  });
+});
 
   closeButton?.addEventListener("click", () => closeEditDriverModal(modal));
   cancelButton?.addEventListener("click", () => closeEditDriverModal(modal));
@@ -236,11 +325,12 @@ function initEditDriverModal() {
     }
   });
 
-  form.addEventListener("submit", (event) => {
+  form.addEventListener("submit", async (event) => {
     event.preventDefault();
 
     const requiredFields = [
-      "editDriverName",
+      "editDriverFirstName",
+      "editDriverLastName",
       "editDriverEmployeeId",
       "editDriverLicenseNumber",
       "editDriverLicenseClass",
@@ -268,105 +358,114 @@ function initEditDriverModal() {
     }
 
     const row = modal.currentRow;
-
     if (!row) return;
+    const driverId = row.dataset.id;
 
-    const name = document.getElementById("editDriverName").value.trim();
-    const employeeId = document
-      .getElementById("editDriverEmployeeId")
-      .value.trim();
-    const licenseNumber = document
-      .getElementById("editDriverLicenseNumber")
-      .value.trim();
-    const licenseClass = document.getElementById("editDriverLicenseClass").value;
-    const licenseExpiry = document.getElementById("editDriverLicenseExpiry").value;
-    const phone = document.getElementById("editDriverPhone").value.trim();
-    const email = document.getElementById("editDriverEmail").value.trim();
-    const assignedVehicle = document.getElementById(
-      "editDriverAssignedVehicle",
-    ).value;
-    const experience = document.getElementById("editDriverExperience").value;
-    const status = document.getElementById("editDriverStatus").value;
-    const address = document.getElementById("editDriverAddress").value.trim();
-    const emergencyContact = document
-      .getElementById("editDriverEmergencyContact")
-      .value.trim();
-    const notes = document.getElementById("editDriverNotes").value.trim();
-    const nameElement = row.querySelector(".driver-name");
-    const licenseElement = row.querySelector(".driver-license");
-    const assignmentElement = row.querySelector(".driver-assignment");
-    const statusBadge = row.querySelector(".status-badge");
-    const avatar = row.querySelector(".driver-avatar");
-    const photoChanged = modal.dataset.photoChanged === "true";
+    const formData = new FormData();
 
-    if (nameElement) {
-      nameElement.textContent = name;
+    formData.append(
+        "first_name",
+        document.getElementById("editDriverFirstName").value.trim()
+    );
+    formData.append(
+        "last_name",
+        document.getElementById("editDriverLastName").value.trim()
+    );
+    formData.append(
+        "license_number",
+        document.getElementById("editDriverLicenseNumber").value
+    );
+    formData.append(
+        "license_class",
+        document.getElementById("editDriverLicenseClass").value
+    );
+    formData.append(
+        "license_expiry",
+        document.getElementById("editDriverLicenseExpiry").value
+    );
+    formData.append(
+        "contact_number",
+        document.getElementById("editDriverPhone").value
+    );
+    formData.append(
+        "email",
+        document.getElementById("editDriverEmail").value
+    );
+    formData.append(
+        "experience",
+        document.getElementById("editDriverExperience").value
+    );
+    formData.append(
+        "address",
+        document.getElementById("editDriverAddress").value
+    );
+    formData.append(
+        "emergency_contact",
+        document.getElementById("editDriverEmergencyContact").value
+    );
+    formData.append(
+        "notes",
+        document.getElementById("editDriverNotes").value
+    );
+    formData.append(
+        "status",
+        document.getElementById("editDriverStatus").value
+    );
+    formData.append(
+        "assigned_vehicle_id",
+        document.getElementById("editDriverAssignedVehicle").value
+    );
+
+    const image = document.getElementById("editDriverImage").files[0];
+
+    if (image) {
+        formData.append("photo", image);
     }
 
-    if (row.children[2]) {
-      row.children[2].textContent = employeeId;
+    try {
+        const response = await fetch(`/drivers/${driverId}`, {
+
+            method: "POST",
+
+            headers: {
+                "X-CSRF-TOKEN": document
+                    .querySelector('meta[name="csrf-token"]').content,
+                "Accept": "application/json"
+            },
+
+            body: (() => {
+                formData.append("_method", "PUT");
+                return formData;
+            })()
+
+        });
+
+        const data = await response.json();
+
+        if (response.status === 422) {
+            console.log(data.errors);
+            return;
+
+        }
+
+        if (data.success) {
+
+            loadDrivers();
+            form.reset();
+            closeEditDriverModal(modal);
+            window.showToast(data.message, "success");
+
+        }
+
+    }
+    catch (error) {
+        console.error(error);
+        window.showToast("Failed to update driver.", "error");
     }
 
-    if (licenseElement) {
-      licenseElement.textContent = licenseNumber;
-    } else if (row.children[3]) {
-      row.children[3].textContent = licenseNumber;
-    }
-
-    if (row.children[4]) {
-      row.children[4].textContent = licenseClass;
-    }
-
-    if (assignmentElement) {
-      assignmentElement.textContent = assignedVehicle || "Unassigned";
-    } else if (row.children[5]) {
-      row.children[5].textContent = assignedVehicle || "Unassigned";
-    }
-
-    if (statusBadge) {
-      const statusClass =
-        typeof getDriverStatusClass === "function"
-          ? getDriverStatusClass(status)
-          : "out";
-
-      statusBadge.textContent = status;
-      statusBadge.className = `status-badge ${statusClass}`;
-    }
-
-    if (row.children[7]) {
-      row.children[7].textContent = phone;
-    }
-
-    row.dataset.licenseExpiry = licenseExpiry;
-    row.dataset.email = email;
-    row.dataset.experience = experience;
-    row.dataset.address = address;
-    row.dataset.emergencyContact = emergencyContact;
-    row.dataset.notes = notes;
-
-    if (photoChanged && preview) {
-      updateDriverRowPhoto(row, preview.src, name);
-    } else if (avatar) {
-      avatar.textContent = name
-        .split(/\s+/)
-        .filter(Boolean)
-        .slice(0, 2)
-        .map((part) => part[0])
-        .join("")
-        .toUpperCase();
-    }
-
-    updateDriverActionLabels(row, name);
-
-    if (typeof updateDriverStats === "function") {
-      updateDriverStats();
-    }
-
-    form.reset();
-    closeEditDriverModal(modal);
-
-    if (typeof window.showToast === "function") {
-      window.showToast("Driver updated successfully.", "success");
-    }
   });
 }
+
+document.addEventListener("DOMContentLoaded", () => {
+    initEditDriverModal();
+})

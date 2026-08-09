@@ -103,18 +103,6 @@
             >
         </div>
 
-        <div class="form-group">
-            <label for="vehicleYear">Year Model *</label>
-
-            <input
-                type="number"
-                id="vehicleYear"
-                name="year_model"
-                placeholder="2025"
-                required
-            >
-        </div>
-
           <div class="form-group">
             <label for="vehicleCapacity">Capacity</label>
             <input

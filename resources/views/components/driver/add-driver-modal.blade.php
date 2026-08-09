@@ -44,10 +44,11 @@
             />
 
             <input
-              type="file"
-              id="driverImage"
-              accept="image/*"
-              hidden
+                type="file"
+                id="driverImage"
+                name="photo"
+                accept="image/*"
+                hidden
             />
 
             <label for="driverImage" class="btn-outline upload-btn">
@@ -57,25 +58,40 @@
           </div>
         </div>
 
-        <div class="form-grid">
-          <div class="form-group">
-            <label for="driverName">Full Name *</label>
-            <input type="text" id="driverName" />
+          <div class="form-grid">
+            <div class="form-group">
+              <label for="driverFirstName">First Name *</label>
+              <input
+                  type="text"
+                  id="driverFirstName"
+                  name="first_name"
+                  required
+              >
           </div>
 
           <div class="form-group">
-            <label for="driverEmployeeId">Employee ID *</label>
-            <input type="text" id="driverEmployeeId" />
+              <label for="driverLastName">Last Name *</label>
+              <input
+                  type="text"
+                  id="driverLastName"
+                  name="last_name"
+                  required
+              >
           </div>
 
           <div class="form-group">
             <label for="driverLicenseNumber">License Number *</label>
-            <input type="text" id="driverLicenseNumber" />
+            <input
+                type="text"
+                id="driverLicenseNumber"
+                name="license_number"
+                required
+            />
           </div>
 
           <div class="form-group">
             <label for="driverLicenseClass">License Class *</label>
-            <select id="driverLicenseClass">
+            <select id="driverLicenseClass" name="license_class" required>
               <option value="">Select License Class</option>
               <option value="Professional">Professional</option>
               <option value="Non-Professional">Non-Professional</option>
@@ -84,37 +100,56 @@
 
           <div class="form-group">
             <label for="driverLicenseExpiry">License Expiry *</label>
-            <input type="date" id="driverLicenseExpiry" />
+            <input
+                type="date"
+                id="driverLicenseExpiry"
+                name="license_expiry"
+                required
+            />
           </div>
 
           <div class="form-group">
             <label for="driverPhone">Phone Number *</label>
-            <input type="tel" id="driverPhone" />
+            <input
+                type="tel"
+                id="driverPhone"
+                name="contact_number"
+                required
+            />
           </div>
 
           <div class="form-group">
             <label for="driverEmail">Email</label>
-            <input type="email" id="driverEmail" />
+            <input
+                type="email"
+                id="driverEmail"
+                name="email"
+            />
           </div>
 
           <div class="form-group">
             <label for="driverAssignedVehicle">Assigned Vehicle</label>
-            <select id="driverAssignedVehicle">
+            <select id="driverAssignedVehicle" name="assigned_vehicle_id">
               <option value="">Select Assigned Vehicle</option>
-              <option value="Ambulance 01">Ambulance 01</option>
-              <option value="VAN 01">VAN 01</option>
-              <option value="CAR 01">CAR 01</option>
+              <option value="1">Ambulance 01</option>
+              <option value="2">VAN 01</option>
+              <option value="3">CAR 01</option>
             </select>
           </div>
 
           <div class="form-group">
             <label for="driverExperience">Experience (Years)</label>
-            <input type="number" id="driverExperience" min="0" />
+            <input
+                type="number"
+                id="driverExperience"
+                name="experience"
+                min="0"
+            />
           </div>
 
           <div class="form-group">
             <label for="driverStatus">Status *</label>
-            <select id="driverStatus">
+            <select id="driverStatus" name="status" required>
               <option value="">Select Status</option>
               <option value="Available">Available</option>
               <option value="On Duty">On Duty</option>
@@ -125,17 +160,25 @@
 
           <div class="form-group full-width">
             <label for="driverAddress">Address</label>
-            <input type="text" id="driverAddress" />
+            <input
+                type="text"
+                id="driverAddress"
+                name="address"
+            />
           </div>
 
           <div class="form-group">
             <label for="driverEmergencyContact">Emergency Contact</label>
-            <input type="tel" id="driverEmergencyContact" />
+            <input
+                type="tel"
+                id="driverEmergencyContact"
+                name="emergency_contact"
+            />
           </div>
 
           <div class="form-group full-width">
             <label for="driverNotes">Notes</label>
-            <textarea id="driverNotes" rows="4"></textarea>
+            <textarea id="driverNotes" name="notes" rows="4"></textarea>
           </div>
         </div>
 

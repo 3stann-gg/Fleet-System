@@ -30,6 +30,7 @@
       >
         <input type="hidden" id="editVehicleId">
         <div class="form-grid">
+          <!--
           <div class="form-group">
               <label for="editVehicleBrand">Brand</label>
               <input
@@ -40,7 +41,8 @@
                   required
               >
           </div>
-
+          -->
+          <!--
           <div class="form-group">
               <label for="editVehicleModel">Model</label>
               <input
@@ -51,7 +53,7 @@
                   required
               >
           </div>
-
+          -->
           <div class="form-group">
             <label for="editVehiclePlate">Plate Number</label>
             <input
@@ -74,19 +76,7 @@
               <option>Motorcycle</option>
             </select>
           </div>
-
-          <div class="form-group">
-              <label for="editYearModel">Year Model</label>
-
-              <input
-                  type="number"
-                  id="editYearModel"
-                  name="year_model"
-                  placeholder="2025"
-                  required
-              >
-          </div>
-
+        
           <div class="form-group">
               <label for="editVehicleCapacity">Capacity</label>
 
@@ -94,7 +84,7 @@
                   type="number"
                   id="editVehicleCapacity"
                   name="capacity"
-                  placeholder="8"
+                  placeholder="4"
                   required
               >
           </div>
@@ -102,11 +92,7 @@
           <div class="form-group">
             <label for="editVehicleDriver">Assigned Driver</label>
             <select id="editVehicleDriver">
-              <option value="">Select Driver</option>
-              <option>Juan Dela Cruz</option>
-              <option>Pedro Santos</option>
-              <option>Maria Reyes</option>
-              <option>Carlos Mendoza</option>
+        
             </select>
           </div>
 

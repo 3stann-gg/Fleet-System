@@ -241,85 +241,18 @@
                   </thead>
 
                   <tbody id="vehicleTableBody">
-                    @forelse($vehicles as $vehicle)
-                    <tr>
-                        <td>
-                            <input
-                                type="checkbox"
-                                class="vehicle-checkbox"
-                                data-id="{{ $vehicle->id }}"
-                            >
-                        </td>
-                        <td>
-                            <div class="vehicle-info">
-                                <div class="vehicle-avatar">
-                                    <i class="ph-fill ph-ambulance"></i>
-                                </div>
-                                <div>
-                                    <div class="vehicle-name">
-                                        {{ $vehicle->brand }} {{ $vehicle->model }}
-                                    </div>
-                                    <small>
-                                        {{ $vehicle->year_model }}
-                                    </small>
-                                </div>
-                            </div>
-                        </td>
-                        <td>{{ $vehicle->plate_number }}</td>
-                        <td>{{ $vehicle->vehicle_type }}</td>
-                        <td>---</td>
-                        <td>
-                            <span class="status-badge">
-                                {{ $vehicle->status }}
-                            </span>
-                        </td>
-                        <td>{{ $vehicle->fuel_type }}</td>
-                        <td>---</td>
-                        <td>
-                          <div class="action-buttons">
-
-                              <button
-                                  class="action-btn view"
-                                  data-id="{{ $vehicle->id }}"
-                                  title="View">
-                                  <i class="ph ph-eye"></i>
-                              </button>
-
-                              <button
-                                  class="action-btn edit"
-                                  data-id="{{ $vehicle->id }}"
-                                  title="Edit">
-                                  <i class="ph ph-pencil-simple"></i>
-                              </button>
-
-                              <button
-                                  class="action-btn delete"
-                                  data-id="{{ $vehicle->id }}"
-                                  title="Delete">
-                                  <i class="ph ph-trash"></i>
-                              </button>
-
-                          </div>
-                      </td>
-                    </tr>
-                    @empty
-                    <tr>
-                    <td colspan="9" class="text-center">
-                    No vehicles found.
-                    </td>
-                    </tr>
-                    @endforelse
+                    
                   </tbody>
                 </table>
               </div>
             </div>
 
             <div class="table-footer">
-              <div id="paginationInfo">
-                Showing <strong>1–3</strong> of <strong>24</strong> vehicles
+              <div id="vehiclePaginationInfo">
+                Showing <strong>0–0</strong> of <strong>0</strong> vehicles
               </div>
 
-              <div class="pagination" id="pagination">
+              <div class="pagination" id="vehiclePagination">
                 <button>
                   <i class="ph ph-caret-left"></i>
                 </button>
@@ -372,6 +305,7 @@
     <script src="{{ asset('assets/js/vehicle/vehicle-add.js') }}"></script>
     <script src="{{ asset('assets/js/vehicle/vehicle-bulk.js') }}"></script>
     <script src="{{ asset('assets/js/vehicle/vehicle-filters.js') }}"></script>
+    <script src="{{ asset('assets/js/vehicle/vehicle-table.js') }}"></script>
     <script src="{{ asset('assets/js/vehicle/vehicle-pagination.js') }}"></script>
     <script src="{{ asset('assets/js/vehicle/vehicle-sort.js') }}"></script>
     <script src="{{ asset('assets/js/vehicle/vehicle-export.js') }}"></script>

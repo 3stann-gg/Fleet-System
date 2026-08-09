@@ -2,6 +2,32 @@
    Edit Vehicle Modal
 ========================================== */
 
+function populateEditDriverDropdown(drivers, vehicle) {
+    const select = document.getElementById("editVehicleDriver");
+
+    if (!select) return;
+
+    select.innerHTML = `
+        <option value="">Select Driver</option>
+    `;
+
+    drivers.forEach(driver => {
+        const option = document.createElement("option");
+        option.value = driver.id;
+        option.textContent =
+            `${driver.first_name} ${driver.last_name}`;
+
+        if (
+            vehicle.drivers &&
+            vehicle.drivers.length > 0 &&
+            vehicle.drivers[0].id == driver.id
+        ) {
+            option.selected = true;
+        }
+        select.appendChild(option);
+    });
+}
+
 function getEditVehicleRowText(row, columnIndex, selector) {
   const selectedElement = selector ? row.querySelector(selector) : null;
   const cell = row.children?.[columnIndex];
@@ -58,30 +84,18 @@ function closeEditVehicleModal(modal) {
 }
 
 function populateEditVehicleModal(vehicle) {
-
     document.getElementById("editVehicleId").value = vehicle.id;
-
+    /*
     document.getElementById("editVehicleBrand").value = vehicle.brand;
-
     document.getElementById("editVehicleModel").value = vehicle.model;
-
+    */
     document.getElementById("editVehiclePlate").value = vehicle.plate_number;
-
     document.getElementById("editVehicleType").value = vehicle.vehicle_type;
-
-    document.getElementById("editYearModel").value = vehicle.year_model;
-
     document.getElementById("editVehicleCapacity").value = vehicle.capacity;
-
-    document.getElementById("editVehicleDriver").value =
-        vehicle.driver_name ?? "";
-
     document.getElementById("editVehicleFuel").value =
         vehicle.fuel_type;
-
     document.getElementById("editVehicleStatus").value =
         vehicle.status;
-
     document.getElementById("editVehicleNotes").value =
         vehicle.notes ?? "";
 }
@@ -134,14 +148,17 @@ function initEditVehicleModal() {
       const vehicleId = button.dataset.id;
 
       fetch(`/fleet/${vehicleId}`)
-          .then(response => response.json())
-          .then(vehicle => {
+        .then(response => response.json())
+        .then(data => {
+            console.log(data);
 
-              populateEditVehicleModal(vehicle);
-
-              openEditVehicleModal(modal);
-
-          });
+            populateEditVehicleModal(data.vehicle);
+            populateEditDriverDropdown(
+                data.drivers,
+                data.vehicle
+            );
+            openEditVehicleModal(modal);
+        });
 
   });
 
@@ -166,14 +183,17 @@ function initEditVehicleModal() {
       const vehicleId = document.getElementById("editVehicleId").value;
 
       const formData = {
+          /*
           brand: document.getElementById("editVehicleBrand").value,
           model: document.getElementById("editVehicleModel").value,
+          */
           plate_number: document.getElementById("editVehiclePlate").value,
           vehicle_type: document.getElementById("editVehicleType").value,
-          year_model: document.getElementById("editYearModel").value,
           capacity: document.getElementById("editVehicleCapacity").value,
           fuel_type: document.getElementById("editVehicleFuel").value,
           status: document.getElementById("editVehicleStatus").value,
+          notes: document.getElementById("editVehicleNotes").value || null,
+          assigned_driver_id: document.getElementById("editVehicleDriver").value || null,
       };
 
       fetch(`/fleet/${vehicleId}`, {
@@ -198,43 +218,14 @@ function initEditVehicleModal() {
       .then(data => {
           if (!data.success) return;
 
-          const vehicle = data.vehicle;
-
-          const row = document.querySelector(
-              `.action-btn.edit[data-id="${vehicle.id}"]`
-          ).closest("tr");
-
-          if (!row) return;
-
-          row.querySelector(".vehicle-name").textContent =
-              `${vehicle.brand} ${vehicle.model}`;
-
-          row.querySelector(".vehicle-info small").textContent =
-              vehicle.year_model;
-
-          row.children[2].textContent =
-              vehicle.plate_number;
-
-          row.children[3].textContent =
-              vehicle.vehicle_type;
-
-          row.children[5].querySelector(".status-badge").textContent =
-              vehicle.status;
-
-          row.children[6].textContent =
-              vehicle.fuel_type;
-
           closeEditVehicleModal(modal);
 
-          if (typeof window.showToast === "function") {
-
-              window.showToast(
-                  "Vehicle updated successfully!",
-                  "success"
-              );
-
-          }
-
+          window.showToast(
+              data.message,
+              "success"
+          );
+          
+          loadVehicles();
       });
 
   });

@@ -87,8 +87,8 @@ function applyDriverSort(columnIndex, direction) {
     tableBody.appendChild(row);
   });
 
-  if (typeof updateDriverPagination === "function") {
-    updateDriverPagination();
+  if (typeof refreshDriverPagination === "function") {
+      refreshDriverPagination();
   }
 }
 
@@ -137,3 +137,7 @@ function initDriverSorting() {
     applyDriverSort(activeColumn, activeDirection);
   });
 }
+
+document.addEventListener("DOMContentLoaded", () => {
+    initDriverSorting();
+});

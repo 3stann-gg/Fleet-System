@@ -148,12 +148,16 @@ function initBulkActions() {
       .then(response => response.json())
       .then(data => {
 
-          console.log(data);
-
+          if (!data.success) return;
+          clearVehicleSelection();
           applyVehicleFilters();
 
-          window.showToast("Vehicle(s) deleted successfully!", "success");
+          window.showToast(
+              data.message,
+              "success"
+          );
 
+          loadVehicles();
       })
       .catch(error => console.error(error));
 

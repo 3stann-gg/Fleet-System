@@ -11,9 +11,17 @@ class Vehicle extends Model
         'vehicle_type',
         'brand',
         'model',
-        'year_model',
+        'purchase_date',
+        'insurance_expiry',
         'capacity',
         'fuel_type',
         'status',
+        'notes',
+        //'last_service',
     ];
+    
+     public function drivers()
+    {
+        return $this->hasMany(Driver::class, 'assigned_vehicle_id');
+    }
 }

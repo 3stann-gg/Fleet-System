@@ -4,6 +4,8 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use App\Models\Vehicle;
+use App\Models\Driver;
+use Illuminate\Support\Facades\Validator;
 
 class VehicleController extends Controller
 {
@@ -12,7 +14,7 @@ class VehicleController extends Controller
      */
     public function index(Request $request)
     {
-        $query = Vehicle::query();
+        $query = Vehicle::with('drivers');
 
         if ($request->filled('search')) {
 
@@ -21,7 +23,12 @@ class VehicleController extends Controller
             $query->where(function ($q) use ($search) {
                 $q->where('brand', 'like', "%{$search}%")
                 ->orWhere('model', 'like', "%{$search}%")
-                ->orWhere('plate_number', 'like', "%{$search}%");
+                ->orWhere('plate_number', 'like', "%{$search}%")
+
+                    ->orWhereHas('drivers', function ($driver) use ($search) {
+                    $driver->where('first_name', 'like', "%{$search}%")
+                            ->orWhere('last_name', 'like', "%{$search}%");
+                });
             });
         }
 
@@ -38,8 +45,30 @@ class VehicleController extends Controller
 
         $query->orderBy($sort, $direction);
 
-        $vehicles = $query
-            ->get();
+        $vehicles = $query->get()->map(function ($vehicle) {
+            $driver = $vehicle->drivers->first();
+            return [
+                'id'                => $vehicle->id,
+                'plate_number'      => $vehicle->plate_number,
+                'vehicle_type'      => $vehicle->vehicle_type,
+                'brand'             => $vehicle->brand,
+                'model'             => $vehicle->model,
+                'purchase_date'     => $vehicle->purchase_date,
+                'insurance_expiry'  => $vehicle->insurance_expiry,
+                'capacity'          => $vehicle->capacity,
+                'fuel_type'         => $vehicle->fuel_type,
+                'status'            => $vehicle->status,
+
+                'driver_name'  => $driver
+                    ? $driver->first_name . ' ' . $driver->last_name
+                    : null,
+
+                'driver_license'=> $driver?->license_number,
+
+                'notes' => $vehicle->notes,
+                //'last_service' => $vehicle->last_service,
+            ];
+        });
 
         // if AJAX request
         if ($request->expectsJson()) {
@@ -50,7 +79,7 @@ class VehicleController extends Controller
 
         }
 
-        return view('fleet.index', compact('vehicles'));
+        return view('fleet.index',);
     }
     /**
      * Show the form for creating a new resource.
@@ -65,34 +94,67 @@ class VehicleController extends Controller
      */
     public function store(Request $request)
     {
-        $validated = $request->validate([
-            'plate_number' => 'required|unique:vehicles',
-            'vehicle_type' => 'required',
-            'brand' => 'required',
-            'model' => 'required',
-            'year_model' => 'required|integer',
-            'capacity' => 'required|integer',
-            'fuel_type' => 'required',
-            'status' => 'required',
-        ]);
+        $validator = Validator::make(
+            $request->all(),
+            [
+                'plate_number'      => 'required|unique:vehicles,plate_number',
+                'vehicle_type'      => 'required',
+                'brand'             => 'required',
+                'model'             => 'required',
+                'purchase_date'     => 'nullable|date',
+                'insurance_expiry'  => 'nullable|date',
+                'capacity'          => 'required|integer',
+                'fuel_type'         => 'required',
+                'status'            => 'required',
+                'assigned_driver_id'=> 'nullable|exists:drivers,id',
+                'notes'             => 'nullable|string',
+            ]
+        );
 
-        Vehicle::create($validated);
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Please check the vehicle information.',
+                'errors' => $validator->errors(),
+            ], 422);
+        }
 
-        $vehicles = Vehicle::latest()->get();
+        $validated = $validator->validated();
+
+        $driverId = $validated['assigned_driver_id'] ?? null;
+
+        unset($validated['assigned_driver_id']);
+
+        $vehicle = Vehicle::create($validated);
+
+        if ($driverId) {
+            Driver::where('id', $driverId)
+                ->update([
+                    'assigned_vehicle_id' => $vehicle->id,
+                ]);
+        }
 
         return response()->json([
             'success' => true,
             'message' => 'Vehicle added successfully.',
-            'vehicles' => Vehicle::latest()->get(),
+            'vehicle' => $vehicle->load('drivers'),
         ]);
     }
-
     /**
      * Display the specified resource.
      */
     public function show(Vehicle $vehicle)
     {
-        return response()->json($vehicle);
+        $vehicle->load('drivers');
+
+        $availableDrivers = Driver::whereNull('assigned_vehicle_id')
+            ->orWhere('assigned_vehicle_id', $vehicle->id)
+            ->get();
+
+        return response()->json([
+            'vehicle' => $vehicle,
+            'drivers' => $availableDrivers,
+        ]);
     }
 
     /**
@@ -109,22 +171,43 @@ class VehicleController extends Controller
     public function update(Request $request, Vehicle $vehicle)
     {
         $validated = $request->validate([
-            'plate_number' => 'required|unique:vehicles,plate_number,' . $vehicle->id,
-            'vehicle_type' => 'required',
-            'brand' => 'required',
-            'model' => 'required',
-            'year_model' => 'required|integer',
-            'capacity' => 'required|integer',
-            'fuel_type' => 'required',
-            'status' => 'required',
+            'plate_number'      => 'required|unique:vehicles,plate_number,' . $vehicle->id,
+            'vehicle_type'      => 'required',
+            //'brand'             => 'required',
+            //'model'             => 'required',
+            //'purchase_date'     => 'nullable|date',
+            //'insurance_expiry'  => 'nullable|date',
+            'capacity'          => 'required|integer',
+            'fuel_type'         => 'required',
+            'status'            => 'required',
+            'assigned_driver_id'=> 'nullable|exists:drivers,id',
+            'notes'             => 'nullable|string',
         ]);
 
+        $driverId = $validated['assigned_driver_id'] ?? null;
+
+        unset($validated['assigned_driver_id']);
+
         $vehicle->update($validated);
+
+        Driver::where('assigned_vehicle_id', $vehicle->id)
+            ->update([
+                'assigned_vehicle_id' => null,
+            ]);
+
+        if ($request->filled('assigned_driver_id')) {
+
+            Driver::where('id', $request->assigned_driver_id)
+                ->update([
+                    'assigned_vehicle_id' => $vehicle->id,
+                ]);
+
+        }
 
         return response()->json([
             'success' => true,
             'message' => 'Vehicle updated successfully.',
-            'vehicle' => $vehicle,
+            'vehicle' => $vehicle->load('drivers'),
         ]);
     }
 
@@ -170,6 +253,21 @@ class VehicleController extends Controller
 
             'out_of_service' => Vehicle::where('status', 'Out of Service')->count(),
         ]);
+    }
+
+    public function available()
+    {
+        $vehicles = Vehicle::whereDoesntHave('drivers')
+            ->orderBy('brand')
+            ->orderBy('model')
+            ->get([
+                'id',
+                'brand',
+                'model',
+                'vehicle_type',
+            ]);
+
+        return response()->json($vehicles);
     }
 }
 
