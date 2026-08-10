@@ -183,70 +183,115 @@ function validateReservationForm(form) {
 }
 
 function initReservationModal() {
-  const modal = document.getElementById("addReservationModal");
-  const openButton = document.getElementById("addReservationBtn");
-  const closeButton = document.getElementById("closeAddReservationModal");
-  const cancelButton = document.getElementById("cancelAddReservation");
-  const form = document.getElementById("reservationForm");
+    const closeButton = document.getElementById(
+        "closeAddReservationModal"
+    );
+    const cancelButton = document.getElementById(
+        "cancelAddReservation"
+    );
+    const form = document.getElementById(
+        "reservationForm"
+    );
+    // Open button
+    document.addEventListener("click", async (event) => {
+      const button = event.target.closest("#addReservationBtn");
 
-  if (!modal || modal.dataset.reservationModalInitialized === "true") return;
+      if (!button) return;
 
-  modal.dataset.reservationModalInitialized = "true";
+      event.preventDefault();
 
-  openButton?.addEventListener("click", () => openReservationModal(modal));
-  closeButton?.addEventListener("click", () => closeReservationModal(modal));
-  cancelButton?.addEventListener("click", () => closeReservationModal(modal));
+      const modal = document.getElementById("addReservationModal");
+      if (!modal) return;
 
-  modal.addEventListener("click", (event) => {
-    if (event.target === modal) {
-      closeReservationModal(modal);
-    }
+      openReservationModal(modal);
+
+      if (typeof loadReservationOptions === "function") {
+          await loadReservationOptions();
+      }
   });
 
-  document.addEventListener("keydown", (event) => {
-    if (event.key === "Escape" && modal.classList.contains("show")) {
-      closeReservationModal(modal);
-    }
-  });
+    // Close button
+    closeButton?.addEventListener("click", () => {
+        const modal = document.getElementById("addReservationModal");
+        if (!modal) return;
+        closeReservationModal(modal);
+      }
+    );
 
-  if (form && !form.dataset.reservationFormInitialized) {
-    form.dataset.reservationFormInitialized = "true";
-    form.setAttribute("novalidate", "");
+    // Cancel button
+    cancelButton?.addEventListener("click", () => {
+        const modal = document.getElementById("addReservationModal");
+        if (!modal) return;
+        closeReservationModal(modal);
+      }
+    );
 
-    const reservationNumber = document.getElementById("reservationNumber");
-    const reservationPatient = document.getElementById("reservationPatient");
-    const reservationType = document.getElementById("reservationType");
-    const reservationVehicle = document.getElementById("reservationVehicle");
-    const reservationDriver = document.getElementById("reservationDriver");
-    const reservationPickup = document.getElementById("reservationPickup");
-    const reservationDestination = document.getElementById("reservationDestination");
-    const reservationDate = document.getElementById("reservationDate");
-    const reservationTime = document.getElementById("reservationTime");
-    const reservationPriority = document.getElementById("reservationPriority");
-    const reservationStatus = document.getElementById("reservationStatus");
-    const reservationContact = document.getElementById("reservationContact");
-    const reservationNotes = document.getElementById("reservationNotes");
+    // Click outside modal
+    document.addEventListener("click", (event) => {
+        const modal = document.getElementById(
+            "addReservationModal"
+        );
 
-    const fieldsToClear = [
-      reservationNumber,
-      reservationPatient,
-      reservationType,
-      reservationVehicle,
-      reservationDriver,
-      reservationPickup,
-      reservationDestination,
-      reservationDate,
-      reservationTime,
-      reservationPriority,
-      reservationStatus,
-      reservationContact,
-      reservationNotes,
-    ];
-
-    fieldsToClear.forEach((field) => {
-      if (!field) return;
-      field.addEventListener("input", () => clearReservationFieldError(field));
-      field.addEventListener("change", () => clearReservationFieldError(field));
+        if (!modal) return;
+        if (event.target === modal) {
+            closeReservationModal(modal);
+        }
     });
-  }
+
+    // Escape key
+    document.addEventListener("keydown", (event) => {
+        if (event.key !== "Escape") return;
+
+        const modal = document.getElementById(
+            "addReservationModal"
+        );
+
+        if (!modal) return;
+        if (modal.classList.contains("show")) {
+            closeReservationModal(modal);
+        }
+    });
+
+    // Form initialization
+    if (
+        form &&
+        !form.dataset.reservationFormInitialized
+    ) {
+        form.dataset.reservationFormInitialized = "true";
+
+        form.setAttribute("novalidate", "");
+
+        const fieldsToClear = [
+            document.getElementById("reservationNumber"),
+            document.getElementById("reservationPatient"),
+            document.getElementById("reservationType"),
+            document.getElementById("reservationVehicle"),
+            document.getElementById("reservationDriver"),
+            document.getElementById("reservationPickup"),
+            document.getElementById("reservationDestination"),
+            document.getElementById("reservationDate"),
+            document.getElementById("reservationTime"),
+            document.getElementById("reservationPriority"),
+            document.getElementById("reservationStatus"),
+            document.getElementById("reservationContact"),
+            document.getElementById("reservationNotes"),
+        ];
+
+        fieldsToClear.forEach((field) => {
+            if (!field) return;
+
+            field.addEventListener("input", () => 
+              clearReservationFieldError(field)
+            );
+
+            field.addEventListener("change", () => 
+              clearReservationFieldError(field)
+            );
+        });
+    }
 }
+
+document.addEventListener("DOMContentLoaded", () => {
+    initReservationModal();
+    initReservationAdd();
+});

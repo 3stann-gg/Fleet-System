@@ -799,10 +799,10 @@
           </div>
         </section>
       
-    <div id="add-dispatch-modal"></div>
-    <div id="view-dispatch-modal"></div>
-    <div id="edit-dispatch-modal"></div>
-    <div id="delete-dispatch-modal"></div>
+    @include('components.dispatch.add-dispatch-modal')
+    @include('components.dispatch.view-dispatch-modal')
+    @include('components.dispatch.edit-dispatch-modal')
+    @include('components.dispatch.delete-dispatch-modal')
 
     <!-- Export dependencies -->
     <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
@@ -819,6 +819,7 @@
     <script src="{{ asset('assets/js/dispatch/dispatch-edit.js') }}"></script>
     <script src="{{ asset('assets/js/dispatch/dispatch-delete.js') }}"></script>
     <script src="{{ asset('assets/js/dispatch/dispatch-filter.js') }}"></script>
+    <script src="{{ asset('assets/js/dispatch/dispatch-table.js') }}"></script>
     <script src="{{ asset('assets/js/dispatch/dispatch-stats.js') }}"></script>
     <script src="{{ asset('assets/js/dispatch/dispatch-sort.js') }}"></script>
     <script src="{{ asset('assets/js/dispatch/dispatch-pagination.js') }}"></script>

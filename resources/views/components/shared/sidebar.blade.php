@@ -76,13 +76,13 @@
 
         <li>
           <a
-            href="{{ route('reservation') }}"
-            class="nav-link {{ request()->routeIs('reservation') ? 'active' : '' }}"
-            data-page="reservations"
-            data-tooltip="Reservations"
+              href="{{ route('reservation.index') }}"
+              class="nav-link {{ request()->routeIs('reservation.*') ? 'active' : '' }}"
+              data-page="reservations"
+              data-tooltip="Reservations"
           >
-            <i class="ph-fill ph-calendar-check"></i>
-            <span class="nav-label">Reservations</span>
+              <i class="ph-fill ph-calendar-check"></i>
+              <span class="nav-label">Reservations</span>
           </a>
         </li>
 

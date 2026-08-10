@@ -140,18 +140,18 @@ function initDriverBulkActions() {
                   data.message || "Failed to delete drivers.",
                   "error"
               );
-
               return;
 
           }
-
           clearDriverSelection();
           loadDrivers();
+          if (typeof loadDriverVehicleOptions === "function") {
+              await loadDriverVehicleOptions();
+          }
           window.showToast(
               data.message,
               "success"
           );
-
       }
       catch (error) {
           console.error(error);
@@ -162,7 +162,7 @@ function initDriverBulkActions() {
       }
 
   });
-
+  
   refreshDriverBulkState();
 }
 

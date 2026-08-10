@@ -287,12 +287,6 @@
                   <i class="ph ph-caret-left"></i>
                 </button>
 
-                <button type="button" class="active" aria-label="Page 1">1</button>
-
-                <button type="button" aria-label="Page 2">2</button>
-
-                <button type="button" aria-label="Page 3">3</button>
-
                 <button type="button" aria-label="Next page">
                   <i class="ph ph-caret-right"></i>
                 </button>

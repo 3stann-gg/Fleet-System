@@ -1,117 +1,137 @@
+/* ==========================================
+Reservation Sorting :)
+========================================== */
+
 let reservationSortInitialized = false;
 
 function initReservationSorting() {
-  if (reservationSortInitialized) return;
+    if (reservationSortInitialized) return;
 
-  const tableBody = document.getElementById("reservationTableBody");
-  if (!tableBody) return;
+    const tableBody = document.getElementById("reservationTableBody");
 
-  reservationSortInitialized = true;
+    if (!tableBody) return;
 
-  const sortState = new Map();
-  const sortConfig = {
-    1: ".reservation-number",
-    2: ".patient-name",
-    3: ".reservation-vehicle",
-    4: ".reservation-driver",
-    5: ".reservation-pickup",
-    6: ".reservation-destination",
-    7: ".reservation-schedule",
-    8: ".status-badge",
-  };
+    reservationSortInitialized = true;
 
-  const sortableHeaders = Array.from(
-    document.querySelectorAll("th.sortable[data-column]")
-  );
+    const sortState = new Map();
 
-  sortableHeaders.forEach((th) => {
-    const column = th.dataset.column;
-    if (!sortConfig[column]) return;
+    const sortConfig = {
+        1: ".reservation-number",
+        2: ".patient-name",
+        3: ".reservation-vehicle",
+        4: ".reservation-driver",
+        5: ".reservation-pickup",
+        6: ".reservation-destination",
+        7: ".reservation-schedule",
+        8: ".status-badge",
+    };
 
-    th.addEventListener("click", () => {
-      const current = sortState.get(column) || "asc";
-      const next = current === "asc" ? "desc" : "asc";
-      sortState.set(column, next);
+    const sortableHeaders = Array.from(
+        document.querySelectorAll("th.sortable[data-column]")
+    );
 
-      const selector = sortConfig[column];
-      const rows = Array.from(tableBody.querySelectorAll("tr"));
+    const getRealReservationRows = () => {
+        return Array.from(
+            tableBody.querySelectorAll("tr")
+        ).filter((row) => {
 
-      const noResultsRow = rows.find(
-        (row) =>
-          row.id === "reservation-no-results" ||
-          row.classList.contains("reservation-no-results")
-      );
+            if (
+                row.id === "reservation-no-results" ||
+                row.classList.contains("reservation-no-results")
+            ) {
+                return false;
+            }
 
-      const realRows = rows.filter((row) => {
-        if (
-          row.id === "reservation-no-results" ||
-          row.classList.contains("reservation-no-results")
-        ) {
-          return false;
-        }
-        return (
-          row.querySelector(".reservation-number") ||
-          row.querySelector(".reservation-checkbox")
-        );
-      });
-
-      const matchingRows = realRows.filter(
-        (row) => row.dataset.reservationMatchesFilter !== "false"
-      );
-
-      const nonMatchingRows = realRows.filter(
-        (row) => row.dataset.reservationMatchesFilter === "false"
-      );
-
-      matchingRows.sort((a, b) => {
-        const aText = (a.querySelector(selector)?.textContent || "").trim();
-        const bText = (b.querySelector(selector)?.textContent || "").trim();
-        const cmp = aText.localeCompare(bText, undefined, {
-          numeric: true,
-          sensitivity: "base",
+            return Boolean(
+                row.querySelector(".reservation-number") ||
+                row.querySelector(".reservation-checkbox")
+            );
         });
-        return next === "asc" ? cmp : -cmp;
-      });
+    };
 
-      const fragment = document.createDocumentFragment();
-      matchingRows.forEach((row) => fragment.appendChild(row));
-      nonMatchingRows.forEach((row) => fragment.appendChild(row));
+    sortableHeaders.forEach((th) => {
+        const column = th.dataset.column;
 
-      if (noResultsRow) {
-        fragment.appendChild(noResultsRow);
-      }
-
-      tableBody.appendChild(fragment);
-
-      sortableHeaders.forEach((h) => {
-        const icon = h.querySelector(".sort-icon");
-        if (h.dataset.column === column) {
-          h.setAttribute(
-            "aria-sort",
-            next === "asc" ? "ascending" : "descending"
-          );
-          if (icon) {
-            icon.className = next === "asc"
-              ? "ph ph-caret-up sort-icon"
-              : "ph ph-caret-down sort-icon";
-          }
-        } else {
-          h.removeAttribute("aria-sort");
-          if (icon) {
-            icon.className = "ph ph-caret-up-down sort-icon";
-          }
+        if (!sortConfig[column]) {
+            return;
         }
-      });
 
-      if (typeof updateReservationPagination === "function") {
-        updateReservationPagination();
-      }
+        th.addEventListener("click", () => {
+            const current = sortState.get(column) || "asc";
+            const next = current === "asc"
+                ? "desc"
+                : "asc";
+
+            sortState.set(column, next);
+
+            const selector = sortConfig[column];
+            const rows = getRealReservationRows();
+
+            rows.sort((a, b) => {
+
+                const aText = a.querySelector(selector)
+                    ?.textContent
+                    ?.trim() || "";
+
+                const bText = b.querySelector(selector)
+                    ?.textContent
+                    ?.trim() || "";
+
+                const comparison = aText.localeCompare(bText, undefined,
+                    {
+                        numeric: true,
+                        sensitivity: "base",
+                    }
+                );
+
+                return next === "asc"
+                    ? comparison
+                    : -comparison;
+            });
+
+            const fragment = document.createDocumentFragment();
+
+            rows.forEach((row) => {
+                fragment.appendChild(row);
+            });
+
+            tableBody.appendChild(fragment);
+
+            sortableHeaders.forEach((header) => {
+                const icon = header.querySelector(".sort-icon");
+                if (
+                    header.dataset.column === column
+                ) {
+                    header.setAttribute("aria-sort", next === "asc"
+                            ? "ascending"
+                            : "descending"
+                    );
+                    if (icon) {icon.className = next === "asc"
+                        ? "ph ph-caret-up sort-icon"
+                        : "ph ph-caret-down sort-icon";
+                    }
+
+                } else {
+                    header.removeAttribute("aria-sort");
+                    if (icon) {icon.className = "ph ph-caret-up-down sort-icon";}
+                }
+            });
+
+            if (typeof updateReservationPagination === "function") {
+                updateReservationPagination();
+            }
+
+            if (typeof refreshReservationBulkState === "function") {
+                refreshReservationBulkState();
+            }
+        });
     });
-  });
 }
 
 if (document.readyState === "loading") {
-  document.addEventListener("DOMContentLoaded", initReservationSorting);
+    document.addEventListener("DOMContentLoaded",
+        initReservationSorting
+    );
 } else {
-  initReservationSorting();
+    initReservationSorting();
 }

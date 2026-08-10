@@ -75,101 +75,224 @@ function refreshReservationBulkState() {
   }
 }
 
-function initReservationBulkActions() {
-  if (reservationBulkInitialized) {
-    return;
-  }
+async function deleteSelectedReservations() {
+    const tableBody = document.getElementById(
+      "reservationTableBody"
+    );
+    const selectAll = document.getElementById(
+      "selectAllReservations"
+    );
+    const deleteBtn = document.getElementById(
+      "deleteSelectedReservations"
+    );
 
-  const tableBody = document.getElementById("reservationTableBody");
-  const selectAll = document.getElementById("selectAllReservations");
-  const toolbar = document.getElementById("reservationBulkToolbar");
-  const countEl = document.getElementById("reservationSelectedCount");
-  const clearBtn = document.getElementById("clearReservationSelection");
-  const deleteBtn = document.getElementById("deleteSelectedReservations");
-
-  if (!tableBody || !selectAll || !toolbar || !countEl || !clearBtn || !deleteBtn) {
-    return;
-  }
-
-  reservationBulkInitialized = true;
-
-  tableBody.addEventListener("change", (event) => {
-    const target = event.target;
-    if (target && target.classList.contains("reservation-checkbox")) {
-      refreshReservationBulkState();
+    if (!tableBody || !deleteBtn) {
+        return;
     }
-  });
 
-  selectAll.addEventListener("change", () => {
-    const visibleSelectable = getVisibleSelectableRows(tableBody);
-    visibleSelectable.forEach((row) => {
-      const checkbox = row.querySelector(".reservation-checkbox");
-      if (checkbox) {
-        checkbox.checked = selectAll.checked;
-      }
-    });
-    refreshReservationBulkState();
-  });
+    const selectedRows =getSelectedReservationRows(tableBody);
 
-  clearBtn.addEventListener("click", () => {
-    const realRows = getRealReservationRows(tableBody);
-    realRows.forEach((row) => {
-      const checkbox = row.querySelector(".reservation-checkbox");
-      if (checkbox) {
-        checkbox.checked = false;
-      }
-    });
-
-    selectAll.checked = false;
-    selectAll.indeterminate = false;
-
-    toolbar.classList.toggle("show", getSelectedReservationRows(tableBody).length > 0);
-    updateReservationSelectedCount(tableBody, countEl);
-  });
-
-  deleteBtn.addEventListener("click", () => {
-    const selectedRows = getSelectedReservationRows(tableBody);
     if (selectedRows.length === 0) {
-      return;
+
+        if (typeof window.showToast === "function") {
+            window.showToast(
+                "Please select at least one reservation.",
+                "error"
+            );
+        }
+
+        return;
     }
 
-    selectedRows.forEach((row) => {
-      row.remove();
-    });
+    const reservationIds = selectedRows
+      .map((row) => row.dataset.id)
+      .filter(Boolean);
 
-    selectAll.checked = false;
-    selectAll.indeterminate = false;
+
+    if (reservationIds.length === 0) {
+        return;
+    }
+
+    deleteBtn.disabled = true;
+
+    try {
+        const response = await fetch(
+                "/reservation/bulk-delete",
+                {
+                    method: "DELETE",
+
+                    headers: {
+                        "Content-Type":
+                            "application/json",
+                        "Accept":
+                            "application/json",
+                        "X-CSRF-TOKEN":
+                            document.querySelector(
+                                'meta[name="csrf-token"]'
+                            ).content,
+                    },
+                    body: JSON.stringify({
+                        ids:
+                            reservationIds,
+                    }),
+                }
+            );
+
+
+        const data = await response.json();
+
+        console.log(
+            "BULK DELETE RESPONSE:",
+            response.status,
+            data
+        );
+
+        if (!response.ok) {
+            throw new Error(
+                data.message ||
+                "Failed to delete reservations."
+            );
+        }
+
+        if (data.success) {
+
+            await loadReservations();
+
+            if (selectAll) {
+                selectAll.checked = false;
+                selectAll.indeterminate = false;
+            }
+
+            refreshReservationBulkState();
+
+            if (typeof updateReservationStatistics === "function") {
+                updateReservationStatistics();
+            }
+
+            if (typeof updateReservationPagination === "function") {
+                updateReservationPagination();
+            }
+
+            if (typeof window.showToast === "function") {
+                window.showToast(
+                    data.message ||
+                    "Reservation(s) deleted successfully.",
+                    "success"
+                );
+            }
+        }
+
+    } catch (error) {
+        console.error(
+            "BULK DELETE ERROR:",
+            error
+        );
+
+        if (typeof window.showToast === "function") {
+            window.showToast(
+                error.message ||
+                "Failed to delete reservations.",
+                "error"
+            );
+        }
+
+    } finally {deleteBtn.disabled = false;}
+}
+
+function initReservationBulkActions() {
+    if (reservationBulkInitialized) {
+        return;
+    }
+
+    const tableBody = document.getElementById(
+      "reservationTableBody"
+    );
+    const selectAll = document.getElementById(
+      "selectAllReservations"
+    );
+    const toolbar = document.getElementById(
+      "reservationBulkToolbar"
+    );
+    const countEl = document.getElementById(
+      "reservationSelectedCount"
+    );
+    const clearBtn = document.getElementById(
+      "clearReservationSelection"
+    );
+    const deleteBtn = document.getElementById(
+      "deleteSelectedReservations"
+    );
+
+    if (!tableBody || !selectAll || !toolbar || !countEl || !clearBtn || !deleteBtn) {
+        console.warn("Reservation bulk actions could not initialize.");
+        return;
+    }
+
+    reservationBulkInitialized = true;
+
+    tableBody.addEventListener("change", (event) => {
+            const target =event.target;
+
+            if (target && target.classList.contains("reservation-checkbox")) {
+              refreshReservationBulkState();
+            }
+        }
+    );
+
+    selectAll.addEventListener("change", () => {
+      const visibleSelectable = getVisibleSelectableRows(tableBody);
+
+      visibleSelectable.forEach((row) => {
+        const checkbox = row.querySelector(".reservation-checkbox");
+          if (checkbox) {checkbox.checked = selectAll.checked;}
+        }
+      );
+
+        refreshReservationBulkState();
+      }
+    );
+
+    clearBtn.addEventListener("click", () => {
+
+            const realRows = getRealReservationRows(tableBody);
+            realRows.forEach((row) => {
+              const checkbox = row.querySelector(".reservation-checkbox");
+                  if (checkbox) {checkbox.checked = false;}
+              }
+            );
+
+            selectAll.checked = false;
+            selectAll.indeterminate = false;
+
+            refreshReservationBulkState();
+        }
+    );
+
+    deleteBtn.addEventListener("click", deleteSelectedReservations);
+
+    const observer = new MutationObserver(() => 
+      {
+       refreshReservationBulkState();
+      }
+    );
+
+    observer.observe(tableBody, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: [
+        "style",
+        "class",
+      ],
+    }
+  );
 
     refreshReservationBulkState();
-
-    if (typeof updateReservationStatistics === "function") {
-      updateReservationStatistics();
-    }
-    if (typeof updateReservationPagination === "function") {
-      updateReservationPagination();
-    }
-    refreshReservationBulkState();
-
-    if (typeof showToast === "function") {
-      showToast("Reservation(s) deleted successfully.", "success");
-    }
-  });
-
-  const observer = new MutationObserver(() => {
-    refreshReservationBulkState();
-  });
-  observer.observe(tableBody, {
-    childList: true,
-    subtree: true,
-    attributes: true,
-    attributeFilter: ["style", "class"],
-  });
-
-  refreshReservationBulkState();
 }
 
 if (document.readyState === "loading") {
-  document.addEventListener("DOMContentLoaded", initReservationBulkActions);
+  document.addEventListener("DOMContentLoaded",initReservationBulkActions
+);
 } else {
-  initReservationBulkActions();
+    initReservationBulkActions();
 }

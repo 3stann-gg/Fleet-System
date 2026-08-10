@@ -4,6 +4,7 @@ use App\Http\Controllers\ProfileController;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\VehicleController;
 use App\Http\Controllers\DriverController;
+use App\Http\Controllers\ReservationController;
 
 Route::get('/', function () {
     return view('welcome');
@@ -46,7 +47,16 @@ Route::delete('/fleet/{vehicle}', [VehicleController::class, 'destroy'])
     ->name('vehicles.destroy');
 
 
-Route::view('/reservation', 'reservation.index')->name('reservation');
+// ***RESERVATION MODULE***
+//Route::view('/reservation', 'reservation.index')->name('reservation');
+
+Route::get('/reservation/stats', [ReservationController::class, 'stats'])
+    ->name('reservation.stats');
+
+Route::delete('/reservation/bulk-delete', [ReservationController::class, 'bulkDelete'])
+    ->name('reservation.bulkDelete');
+    
+Route::resource('reservation', ReservationController::class);
 
 
 Route::view('/dispatch', 'dispatch.index')->name('dispatch');

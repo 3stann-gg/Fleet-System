@@ -45,7 +45,7 @@ function initDeleteDriverModal() {
 
     const row = deleteButton.closest("tr");
     if (!row) return;
-    modal.dataset.driverId = row.dataset.id;;
+    modal.dataset.driverId = row.dataset.id;
 
     if (!row) return;
 
@@ -84,15 +84,16 @@ function initDeleteDriverModal() {
           if (data.success) {
               closeDeleteDriverModal(modal);
               loadDrivers();
-              window.showToast(data.message, "success");
+              if (typeof loadDriverVehicleOptions === "function") {
+                await loadDriverVehicleOptions();
+              }
+                window.showToast(data.message, "success");
           }
-
           if (!response.ok) {
               window.showToast(
                   data.message || "Failed to delete driver.",
                   "error"
               );
-
               return;
           }
 

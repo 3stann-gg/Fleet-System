@@ -1,17 +1,113 @@
+
+async function loadEditReservationOptions(selectedVehicleId = null) {
+    const vehicleSelect = document.getElementById("editReservationVehicle");
+    const driverSelect = document.getElementById("editReservationDriver");
+
+    if (!vehicleSelect || !driverSelect) return;
+
+    vehicleSelect.innerHTML =
+        '<option value="">Loading vehicles...</option>';
+    driverSelect.innerHTML =
+        '<option value="">Select Driver</option>';
+
+    try {
+        const response = await fetch("/fleet/available", {
+            headers: {
+                Accept: "application/json",
+            },
+        });
+
+        if (!response.ok) {
+            throw new Error("Failed to load vehicles.");
+        }
+
+        const vehicles = await response.json();
+
+        vehicleSelect.innerHTML =
+            '<option value="">Select Vehicle</option>';
+
+        vehicles.forEach((vehicle) => {
+            const option = document.createElement("option");
+
+            option.value = vehicle.id;
+            option.textContent =
+                `${vehicle.brand} ${vehicle.model} - ${vehicle.vehicle_type}`;
+
+            vehicleSelect.appendChild(option);
+        });
+
+        vehicleSelect.addEventListener("change", () => {
+            updateEditReservationDriver(
+                vehicles,
+                vehicleSelect.value,
+                driverSelect
+            );
+        });
+
+        if (selectedVehicleId) {
+            vehicleSelect.value = String(selectedVehicleId);
+
+            updateEditReservationDriver(
+                vehicles,
+                selectedVehicleId,
+                driverSelect
+            );
+        }
+
+    } catch (error) {
+        vehicleSelect.innerHTML =
+            '<option value="">Failed to load vehicles</option>';
+        driverSelect.innerHTML =
+            '<option value="">Failed to load driver</option>';
+    }
+}
+
+function updateEditReservationDriver(vehicles, vehicleId, driverSelect) {
+    driverSelect.innerHTML =
+        "";
+    driverSelect.disabled = false;
+
+    if (!vehicleId) return;
+
+    const selectedVehicle = vehicles.find(
+        (vehicle) =>
+            String(vehicle.id) === String(vehicleId)
+    );
+
+    if (
+        !selectedVehicle ||
+        !selectedVehicle.drivers ||
+        !selectedVehicle.drivers.length
+    ) {
+        driverSelect.innerHTML =
+            '<option value="">No assigned driver</option>';
+        driverSelect.disabled = true;
+
+        return;
+    }
+
+    const driver = selectedVehicle.drivers[0];
+    const option = document.createElement("option");
+
+    option.value = driver.id;
+    option.textContent =
+        `${driver.first_name} ${driver.last_name}`;
+    option.selected = true;
+
+    driverSelect.appendChild(option);
+}
+
 function initEditReservationModal() {
   const modal = document.getElementById("editReservationModal");
-
   if (!modal || modal.dataset.editReservationModalInitialized === "true") {
     return;
   }
 
   modal.dataset.editReservationModalInitialized = "true";
-
   const getRowText = (row, selector) => {
     const el = row.querySelector(selector);
     return el ? el.textContent.trim() : "";
   };
-
   const getRowData = (row, key) => {
     return row.dataset[key] || "";
   };
@@ -26,19 +122,20 @@ function initEditReservationModal() {
         field.value = value;
       }
     };
-
     setValue("editReservationNumber", getRowText(row, ".reservation-number"));
     setValue("editReservationPatient", getRowText(row, ".patient-name"));
     setValue("editReservationType", getRowData(row, "requestType"));
-    setValue("editReservationVehicle", getRowText(row, ".reservation-vehicle"));
-    setValue("editReservationDriver", getRowText(row, ".reservation-driver"));
+
+    const vehicleId = getRowData(row, "vehicleId");
+    loadEditReservationOptions(vehicleId);
+
     setValue("editReservationPickup", getRowText(row, ".reservation-pickup"));
     setValue("editReservationDestination", getRowText(row, ".reservation-destination"));
     setValue("editReservationDate", getRowData(row, "scheduleDate"));
     setValue("editReservationTime", getRowData(row, "scheduleTime"));
     setValue("editReservationPriority", getRowData(row, "priority"));
     setValue("editReservationStatus", getRowText(row, ".status-badge"));
-    setValue("editReservationContact", getRowData(row, "contact"));
+    setValue("editReservationContact", getRowData(row, "contactNumber"));
     setValue("editReservationNotes", getRowData(row, "notes"));
   };
 
@@ -87,7 +184,7 @@ function initEditReservationModal() {
   if (form && !form.dataset.editReservationFormInitialized) {
     form.dataset.editReservationFormInitialized = "true";
 
-    form.addEventListener("submit", (event) => {
+    form.addEventListener("submit", async (event) => {
       event.preventDefault();
 
       if (!modal.currentRow) return;
@@ -218,102 +315,93 @@ function initEditReservationModal() {
       }
 
       const row = modal.currentRow;
-      const reservationNumberValue = reservationNumber.value.trim();
-      const reservationPatientValue = reservationPatient.value.trim();
-      const reservationTypeValue = reservationType.value;
-      const reservationVehicleValue = reservationVehicle.value;
-      const reservationDriverValue = reservationDriver.value;
-      const reservationPickupValue = reservationPickup.value.trim();
-      const reservationDestinationValue = reservationDestination.value.trim();
-      const reservationDateValue = reservationDate.value;
-      const reservationTimeValue = reservationTime.value;
-      const reservationPriorityValue = reservationPriority.value;
-      const reservationStatusValue = reservationStatus.value;
-      const reservationContactValue = reservationContact.value.trim();
-      const reservationNotesValue = document
-        .getElementById("editReservationNotes")
-        ?.value.trim() || "";
+      const reservationId = row.dataset.id;
 
-      const scheduleText = (() => {
-        if (reservationDateValue && reservationTimeValue) {
-          const dateObj = new Date(
-            reservationDateValue + "T" + reservationTimeValue,
-          );
-          if (!isNaN(dateObj.getTime())) {
-            return dateObj.toLocaleString(undefined, {
-              year: "numeric",
-              month: "short",
-              day: "numeric",
-              hour: "2-digit",
-              minute: "2-digit",
-            });
-          }
-          return reservationDateValue + " " + reservationTimeValue;
-        }
-        if (reservationDateValue) return reservationDateValue;
-        if (reservationTimeValue) return reservationTimeValue;
-        return "";
-      })();
-
-      const statusClassMap = {
-        Pending: "pending",
-        Approved: "trip",
-        Scheduled: "scheduled",
-        Completed: "completed",
-        Rejected: "rejected",
-        Cancelled: "cancelled",
+      const formData = {
+          reservation_number: reservationNumber.value.trim(),
+          patient_name: reservationPatient.value.trim(),
+          request_type: reservationType.value,
+          vehicle_id: reservationVehicle.value || null,
+          driver_id: reservationDriver.value || null,
+          pickup_location: reservationPickup.value.trim(),
+          destination: reservationDestination.value.trim(),
+          schedule_date: reservationDate.value,
+          schedule_time: reservationTime.value,
+          priority: reservationPriority.value,
+          status: reservationStatus.value,
+          contact_number: reservationContact.value.trim(),
+          notes:
+              document.getElementById("editReservationNotes")?.value.trim() || "",
       };
 
-      const numberEl = row.querySelector(".reservation-number");
-      if (numberEl) numberEl.textContent = reservationNumberValue;
+      try {
+          const response = await fetch(`/reservation/${reservationId}`, {
+              method: "PUT",
 
-      const patientNameEl = row.querySelector(".patient-name");
-      if (patientNameEl) patientNameEl.textContent = reservationPatientValue;
+              headers: {
+                  "Content-Type": "application/json",
+                  "Accept": "application/json",
+                  "X-CSRF-TOKEN":
+                      document.querySelector(
+                          'meta[name="csrf-token"]'
+                      ).content,
+              },
 
-      const patientSmallEl = row.querySelector(".patient-info small");
-      if (patientSmallEl) patientSmallEl.textContent = reservationTypeValue;
+              body: JSON.stringify(formData),
+          });
 
-      const vehicleEl = row.querySelector(".reservation-vehicle");
-      if (vehicleEl) vehicleEl.textContent = reservationVehicleValue;
+          const data = await response.json();
 
-      const driverEl = row.querySelector(".reservation-driver");
-      if (driverEl) driverEl.textContent = reservationDriverValue;
+          if (response.status === 422) {
+              const errors = data.errors;
 
-      const pickupEl = row.querySelector(".reservation-pickup");
-      if (pickupEl) pickupEl.textContent = reservationPickupValue;
+              const firstError = errors
+                  ? Object.values(errors).flat()[0]
+                  : null;
 
-      const destinationEl = row.querySelector(".reservation-destination");
-      if (destinationEl) destinationEl.textContent = reservationDestinationValue;
+              window.showToast(
+                  firstError ||
+                      data.message ||
+                      "Please check the reservation information.",
+                  "error"
+              );
 
-      const scheduleEl = row.querySelector(".reservation-schedule");
-      if (scheduleEl) scheduleEl.textContent = scheduleText;
+              return;
+          }
 
-      const statusBadge = row.querySelector(".status-badge");
-      if (statusBadge) {
-        statusBadge.textContent = reservationStatusValue;
-        statusBadge.className = "status-badge";
-        const mappedClass = statusClassMap[reservationStatusValue];
-        if (mappedClass) {
-          statusBadge.classList.add(mappedClass);
-        }
-      }
+          if (!response.ok) {
+              throw new Error(
+                  data.message || "Failed to update reservation."
+              );
+          }
 
-      row.dataset.requestType = reservationTypeValue;
-      row.dataset.priority = reservationPriorityValue;
-      row.dataset.contact = reservationContactValue;
-      row.dataset.notes = reservationNotesValue;
-      row.dataset.scheduleDate = reservationDateValue;
-      row.dataset.scheduleTime = reservationTimeValue;
+          if (data.success) {
+              await loadReservations();
 
-      if (typeof updateReservationStatistics === "function") {
-        updateReservationStatistics();
+              closeEditReservationModal();
+
+              window.showToast(
+                  data.message || "Reservation updated successfully.",
+                  "success"
+              );
+          }
+
+      } catch (error) {
+          window.showToast(
+              error.message || "Failed to update reservation.",
+              "error"
+          );
       }
 
       closeEditReservationModal();
 
-      if (typeof showToast === "function") {
-        showToast("Reservation updated successfully.", "success");
-      }
+      //if (typeof showToast === "function") {
+      //  showToast("Reservation updated successfully.", "success");
+      //}
     });
   }
 }
+
+document.addEventListener("DOMContentLoaded", () => {
+    initEditReservationModal();
+})

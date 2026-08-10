@@ -1,111 +1,191 @@
+
 function initViewReservationModal() {
-  const modal = document.getElementById("viewReservationModal");
+    const modal = document.getElementById("viewReservationModal");
 
-  if (!modal || modal.dataset.viewReservationModalInitialized === "true") {
-    return;
-  }
-
-  modal.dataset.viewReservationModalInitialized = "true";
-
-  const NOT_PROVIDED = "Not provided";
-
-  const statusClassMap = {
-    Pending: "pending",
-    Approved: "trip",
-    Scheduled: "scheduled",
-    Completed: "completed",
-    Rejected: "rejected",
-    Cancelled: "cancelled",
-  };
-
-  const setText = (id, value) => {
-    const el = document.getElementById(id);
-    if (el) {
-      el.textContent = value != null && String(value).trim() !== "" ? value : NOT_PROVIDED;
-    }
-  };
-
-  const getRowText = (row, selector) => {
-    const el = row.querySelector(selector);
-    return el ? el.textContent.trim() : "";
-  };
-
-  const populateViewReservation = (row) => {
-    if (!row) return;
-
-    setText("viewReservationNumber", getRowText(row, ".reservation-number"));
-    setText("viewReservationType", row.dataset.requestType || "");
-    setText("viewReservationPatient", getRowText(row, ".patient-name"));
-    setText("viewReservationVehicle", getRowText(row, ".reservation-vehicle"));
-    setText("viewReservationDriver", getRowText(row, ".reservation-driver"));
-    setText("viewReservationPickup", getRowText(row, ".reservation-pickup"));
-    setText("viewReservationDestination", getRowText(row, ".reservation-destination"));
-    setText("viewReservationSchedule", getRowText(row, ".reservation-schedule"));
-    setText("viewReservationPriority", row.dataset.priority || "");
-    setText("viewReservationContact", row.dataset.contact || "");
-    setText("viewReservationNotes", row.dataset.notes || "");
-
-    const statusBadge = row.querySelector(".status-badge");
-    const statusEl = document.getElementById("viewReservationStatusSummary");
-    const statusText = statusBadge ? statusBadge.textContent.trim() : "";
-    if (statusEl) {
-      statusEl.className = "status-badge";
-      statusEl.textContent = statusText || NOT_PROVIDED;
-      if (statusClassMap[statusText]) {
-        statusEl.classList.add(statusClassMap[statusText]);
-      }
-    }
-  };
-
-  document.body.addEventListener("click", (event) => {
-    const button = event.target.closest(".action-btn.view-reservation");
-    if (button) {
-      const row = button.closest("tr");
-      modal.currentRow = row;
-      populateViewReservation(row);
-      openReservationModal(modal);
-    }
-  });
-
-  document
-    .getElementById("closeViewReservationModal")
-    ?.addEventListener("click", () => {
-      closeReservationModal(modal);
-    });
-
-  document.getElementById("closeViewReservationBtn")?.addEventListener("click", () => {
-    closeReservationModal(modal);
-  });
-
-  document
-    .getElementById("editReservationFromViewBtn")
-    ?.addEventListener("click", () => {
-      const row = modal.currentRow;
-      const editModal = document.getElementById("editReservationModal");
-
-      if (
-        !row ||
-        !editModal ||
-        typeof populateEditReservationForm !== "function" ||
-        typeof openEditReservationModal !== "function"
-      ) {
+    if (
+        !modal ||
+        modal.dataset.viewReservationModalInitialized === "true"
+    ) {
         return;
-      }
+    }
 
-      closeReservationModal(modal);
-      populateEditReservationForm(row);
-      openEditReservationModal(row);
+    modal.dataset.viewReservationModalInitialized = "true";
+
+    const NOT_PROVIDED = "Not provided";
+    const statusClassMap = {
+        Pending: "pending",
+        Approved: "trip",
+        Scheduled: "scheduled",
+        Completed: "completed",
+        Rejected: "rejected",
+        Cancelled: "cancelled",
+    };
+
+    const setText = (id, value) => {
+        const element = document.getElementById(id);
+
+        if (!element) return;
+
+        element.textContent = value !== null && value !== undefined && String(value).trim() !== ""
+          ? value
+          : NOT_PROVIDED;
+    };
+
+    const formatSchedule = (date, time) => {
+        if (!date && !time) {
+            return NOT_PROVIDED;
+        }
+
+        if (date && time) {
+            const dateObject = new Date(`${date}T${time}`);
+
+            if (!isNaN(dateObject.getTime())) {
+                return dateObject.toLocaleString(undefined, {
+                    year: "numeric",
+                    month: "short",
+                    day: "numeric",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                });
+            }
+        }
+
+        if (date) return date;
+        if (time) return time;
+
+        return NOT_PROVIDED;
+    };
+
+    const populateViewReservation = (reservation) => {
+        if (!reservation) return;
+
+        const vehicle = reservation.vehicle;
+        const driver = reservation.driver;
+        const vehicleName = vehicle
+            ? `${vehicle.brand} ${vehicle.model}`
+            : null;
+        const driverName = driver
+            ? `${driver.first_name} ${driver.last_name}`
+            : null;
+
+        setText("viewReservationNumber", reservation.reservation_number);
+        setText("viewReservationType", reservation.request_type);
+        setText("viewReservationPatient", reservation.patient_name);
+        setText("viewReservationVehicle", vehicleName);
+        setText("viewReservationDriver", driverName);
+        setText("viewReservationPickup", reservation.pickup_location);
+        setText("viewReservationDestination", reservation.destination);
+        setText("viewReservationSchedule", formatSchedule(reservation.schedule_date, reservation.schedule_time));
+        setText("viewReservationPriority", reservation.priority);
+        setText("viewReservationContact", reservation.contact_number);
+        setText("viewReservationNotes", reservation.notes);
+
+        const statusElement = document.getElementById("viewReservationStatusSummary");
+
+        if (statusElement) {
+            const status = reservation.status || NOT_PROVIDED;
+
+            statusElement.className = "status-badge";
+            statusElement.textContent = status;
+
+            if (statusClassMap[status]) {
+                statusElement.classList.add(
+                    statusClassMap[status]
+                );
+            }
+        }
+    };
+
+    const openViewReservation = async (reservationId) => {
+        if (!reservationId) return;
+
+        try {
+            const response = await fetch(`/reservation/${reservationId}`,
+                {
+                    headers: {
+                        Accept: "application/json",
+                    },
+                }
+            );
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(
+                    data.message ||
+                        "Failed to load reservation."
+                );
+            }
+
+            populateViewReservation(
+                data.reservation
+            );
+
+            modal.currentReservation =
+                data.reservation;
+
+            openReservationModal(modal);
+        } catch (error) {
+            window.showToast(
+                "Failed to load reservation details.",
+                "error"
+            );
+        }
+    };
+
+    document.body.addEventListener("click", (event) => {
+        const button = event.target.closest(".action-btn.view-reservation");
+
+        if (!button) return;
+
+        const row = button.closest("tr");
+
+        if (!row) return;
+
+        const reservationId = row.dataset.id;
+
+        openViewReservation(reservationId);
     });
 
-  modal.addEventListener("click", (event) => {
-    if (event.target === modal) {
-      closeReservationModal(modal);
-    }
-  });
+    document.getElementById("closeViewReservationModal")
+        ?.addEventListener("click", () => {
+            closeReservationModal(modal);
+          }
+        );
 
-  document.addEventListener("keydown", (event) => {
-    if (event.key === "Escape" && modal.classList.contains("show")) {
-      closeReservationModal(modal);
-    }
-  });
+    document.getElementById("closeViewReservationBtn")
+        ?.addEventListener("click", () => {
+            closeReservationModal(modal);
+          }
+        );
+
+    document.getElementById("editReservationFromViewBtn")
+        ?.addEventListener("click", () => {
+              const reservation =
+                  modal.currentReservation;
+
+              if (!reservation || typeof openEditReservationModal !== "function") {
+                  return;
+              }
+
+              closeReservationModal(modal);
+              openEditReservationModal(reservation);
+          }
+        );
+
+    modal.addEventListener("click", (event) => {
+        if (event.target === modal) {
+            closeReservationModal(modal);
+        }
+    });
+
+    document.addEventListener("keydown", (event) => {
+        if (event.key === "Escape" && modal.classList.contains("show")) {
+            closeReservationModal(modal);
+        }
+    });
 }
+
+document.addEventListener("DOMContentLoaded", () => {
+    initViewReservationModal();
+});

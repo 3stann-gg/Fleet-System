@@ -1,173 +1,196 @@
-const RESERVATION_ROWS_PER_PAGE = 10;
+/* ==========================================
+Reservation Pagination
+========================================== */
 
-let reservationPaginationInitialized = false;
-let reservationCurrentPage = 1;
+const reservationRowsPerPage = 10;
+let reservationPaginationState = null;
 
-function getRealReservationRows(tableBody) {
-  return Array.from(tableBody.querySelectorAll("tr")).filter((row) => {
-    if (
-      row.id === "reservation-no-results" ||
-      row.classList.contains("reservation-no-results")
-    ) {
-      return false;
+function getReservationPaginationRows() {
+    if (!reservationPaginationState || typeof getReservationDataRows !== "function") {
+        return [];
     }
 
-    const isReal =
-      row.querySelector(".reservation-number") ||
-      row.querySelector(".reservation-checkbox");
-
-    return Boolean(isReal);
-  });
+    return getReservationDataRows(reservationPaginationState.tableBody);
 }
 
-function getMatchingReservationRows(tableBody) {
-  return getRealReservationRows(tableBody).filter(
-    (row) => row.dataset.reservationMatchesFilter !== "false",
-  );
+function createReservationPaginationButton({label, ariaLabel, iconClass, disabled = false, active = false, onClick,}) {
+    const button = document.createElement("button");
+
+    button.type = "button";
+    button.setAttribute("aria-label", ariaLabel);
+    button.disabled = disabled;
+
+    if (active) {
+        button.classList.add("active");
+    }
+    if (iconClass) {
+        const icon = document.createElement("i");
+        icon.className = iconClass;
+        button.appendChild(icon);
+    } else {
+        button.textContent = label;
+    }
+
+    button.addEventListener("click", onClick);
+
+    return button;
 }
 
-function renderReservationPaginationButtons(paginationEl, pageCount) {
-  paginationEl.innerHTML = "";
+function updateReservationPaginationInfo(info, start, end, total) {
+    if (!info) return;
 
-  const prevBtn = document.createElement("button");
-  prevBtn.type = "button";
-  prevBtn.setAttribute("aria-label", "Previous page");
-  prevBtn.innerHTML = '<i class="ph ph-caret-left"></i>';
-  prevBtn.disabled = reservationCurrentPage <= 1;
-  prevBtn.addEventListener("click", () => {
-    if (reservationCurrentPage > 1) {
-      reservationCurrentPage -= 1;
-      updateReservationPagination();
-    }
-  });
-  paginationEl.appendChild(prevBtn);
+    const range = document.createElement("strong");
+    const totalCount = document.createElement("strong");
 
-  for (let page = 1; page <= pageCount; page++) {
-    const pageBtn = document.createElement("button");
-    pageBtn.type = "button";
-    pageBtn.textContent = String(page);
-    pageBtn.setAttribute("aria-label", "Page " + page);
-    if (page === reservationCurrentPage) {
-      pageBtn.classList.add("active");
+    range.textContent = `${start}–${end}`;
+    totalCount.textContent = total;
+
+    info.replaceChildren(
+        document.createTextNode("Showing "),
+        range,
+        document.createTextNode(" of "),
+        totalCount,
+        document.createTextNode(" reservations")
+    );
+}
+
+function renderReservationPagination() {
+    if (!reservationPaginationState) {
+        return false;
     }
-    pageBtn.addEventListener("click", () => {
-      reservationCurrentPage = page;
-      updateReservationPagination();
+
+    const {tableBody, pagination, info,} = reservationPaginationState;
+    const dataRows = getReservationPaginationRows();
+    const matchingRows = dataRows.filter((row) => row.dataset.reservationMatchesFilter !== "false");
+    const total = matchingRows.length;
+    const totalPages = Math.ceil(total / reservationRowsPerPage);
+
+    if (totalPages === 0) {
+        reservationPaginationState.currentPage = 1;
+    } else {
+        reservationPaginationState.currentPage =
+            Math.min(
+                Math.max(
+                    reservationPaginationState.currentPage,
+                    1
+                ),
+                totalPages
+            );
+    }
+
+    const startIndex = (reservationPaginationState.currentPage - 1) * reservationRowsPerPage;
+    const endIndex = startIndex + reservationRowsPerPage;
+    const start = total === 0
+      ? 0
+      : startIndex + 1;
+    const end = Math.min(endIndex, total);
+
+    dataRows.forEach((row) => {
+        row.style.display = "none";
     });
-    paginationEl.appendChild(pageBtn);
-  }
 
-  const nextBtn = document.createElement("button");
-  nextBtn.type = "button";
-  nextBtn.setAttribute("aria-label", "Next page");
-  nextBtn.innerHTML = '<i class="ph ph-caret-right"></i>';
-  nextBtn.disabled = reservationCurrentPage >= pageCount;
-  nextBtn.addEventListener("click", () => {
-    if (reservationCurrentPage < pageCount) {
-      reservationCurrentPage += 1;
-      updateReservationPagination();
+    matchingRows.slice(startIndex, endIndex)
+      .forEach((row) => {
+          row.style.display = "";
+      });
+
+    if (typeof updateReservationNoResultsRow === "function") {
+      updateReservationNoResultsRow(tableBody, total === 0);
     }
-  });
-  paginationEl.appendChild(nextBtn);
+
+    updateReservationPaginationInfo(info, start, end, total);
+
+    pagination.replaceChildren();
+
+    const previousButton = createReservationPaginationButton({
+      ariaLabel: "Previous page",
+      iconClass: "ph ph-caret-left",
+      disabled: reservationPaginationState.currentPage === 1 || totalPages === 0,
+        onClick: () => {
+           if (reservationPaginationState.currentPage > 1) {
+            reservationPaginationState.currentPage -= 1;
+              renderReservationPagination();
+          }
+        },
+    });
+
+    pagination.appendChild(previousButton);
+    for (let page = 1; page <= totalPages; page += 1) {
+      pagination.appendChild(
+        createReservationPaginationButton({
+          label: page,
+          ariaLabel: `Page ${page}`,
+          active: page === reservationPaginationState.currentPage,
+            onClick: () => {
+              reservationPaginationState.currentPage = page;
+                renderReservationPagination();
+            },
+        })
+      );
+    }
+    
+    const nextButton = createReservationPaginationButton({
+      ariaLabel: "Next page",
+      iconClass: "ph ph-caret-right",
+      disabled: totalPages === 0 || reservationPaginationState.currentPage === totalPages,
+        onClick: () => {
+          if (reservationPaginationState.currentPage < totalPages) {
+            reservationPaginationState.currentPage += 1;
+              renderReservationPagination();
+          }
+        },
+    });
+
+    pagination.appendChild(nextButton);
+
+    if (typeof refreshReservationBulkState === "function") {
+      refreshReservationBulkState();
+    }
+
+    return true;
 }
 
-function updateReservationPagination() {
-  const tableBody = document.getElementById("reservationTableBody");
-  const paginationEl = document.getElementById("reservationPagination");
-  const infoEl = document.getElementById("reservationPaginationInfo");
+function updateReservationPagination({reset = false,} = {}) {
+    if (!reservationPaginationState) {
+        return false;
+    }
+    if (reset) {
+        reservationPaginationState.currentPage = 1;
+    }
 
-  if (!tableBody || !paginationEl || !infoEl) {
-    return;
-  }
-
-  const visibleRows = getMatchingReservationRows(tableBody);
-  const total = visibleRows.length;
-  const pageCount = Math.max(1, Math.ceil(total / RESERVATION_ROWS_PER_PAGE));
-
-  if (reservationCurrentPage > pageCount) {
-    reservationCurrentPage = pageCount;
-  }
-  if (reservationCurrentPage < 1) {
-    reservationCurrentPage = 1;
-  }
-
-  const start = (reservationCurrentPage - 1) * RESERVATION_ROWS_PER_PAGE;
-  const end = Math.min(start + RESERVATION_ROWS_PER_PAGE, total);
-
-  const allReal = getRealReservationRows(tableBody);
-  allReal.forEach((row) => {
-    row.style.display = "none";
-  });
-
-  visibleRows.forEach((row, index) => {
-    row.style.display = index >= start && index < end ? "" : "none";
-  });
-
-  if (total === 0) {
-    infoEl.innerHTML =
-      "Showing <strong>0–0</strong> of <strong>0</strong> reservations";
-    paginationEl.style.display = "none";
-  } else {
-    const from = start + 1;
-    const to = end;
-    infoEl.innerHTML =
-      "Showing <strong>" +
-      from +
-      "–" +
-      to +
-      "</strong> of <strong>" +
-      total +
-      "</strong> reservations";
-    paginationEl.style.display = "";
-  }
-
-  renderReservationPaginationButtons(paginationEl, pageCount);
+    return renderReservationPagination();
 }
+
+function resetReservationPagination() {return updateReservationPagination({reset: true,});}
 
 function initReservationPagination() {
-  if (reservationPaginationInitialized) {
-    return;
-  }
+    const tableBody = document.getElementById(
+      "reservationTableBody"
+    );
 
-  const tableBody = document.getElementById("reservationTableBody");
-  const searchInput = document.getElementById("reservationSearch");
-  const statusFilter = document.getElementById("reservationStatusFilter");
-  const dateFilter = document.getElementById("reservationDateFilter");
-  const refreshBtn = document.getElementById("refreshReservations");
+    const pagination = document.getElementById(
+      "reservationPagination"
+    );
 
-  if (
-    !tableBody ||
-    !searchInput ||
-    !statusFilter ||
-    !dateFilter ||
-    !refreshBtn
-  ) {
-    return;
-  }
+    const info = document.getElementById(
+      "reservationPaginationInfo"
+    );
 
-  reservationPaginationInitialized = true;
+    if (!tableBody || !pagination) {
+        return false;
+    }
 
-  searchInput.addEventListener("input", updateReservationPagination);
-  statusFilter.addEventListener("change", updateReservationPagination);
-  dateFilter.addEventListener("change", updateReservationPagination);
+    if (reservationPaginationState?.tableBody === tableBody) {
+        return updateReservationPagination();
+    }
 
-  refreshBtn.addEventListener("click", () => {
-    reservationCurrentPage = 1;
-    updateReservationPagination();
-  });
+    reservationPaginationState = {tableBody, pagination, info, currentPage: 1,};
+    tableBody.dataset.reservationPaginationInitialized = "true";
 
-  const observer = new MutationObserver(updateReservationPagination);
-  observer.observe(tableBody, {
-    childList: true,
-    subtree: true,
-    characterData: true,
-  });
-
-  updateReservationPagination();
+    return renderReservationPagination();
 }
 
-if (document.readyState === "loading") {
-  document.addEventListener("DOMContentLoaded", initReservationPagination);
-} else {
-  initReservationPagination();
-}
+document.addEventListener("DOMContentLoaded", () => {
+    initReservationPagination();
+  }
+);

@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use App\Models\Reservation;
 
 class Vehicle extends Model
 {
@@ -23,5 +24,10 @@ class Vehicle extends Model
      public function drivers()
     {
         return $this->hasMany(Driver::class, 'assigned_vehicle_id');
+    }
+
+    public function reservations()
+    {
+        return $this->hasMany(Reservation::class);
     }
 }

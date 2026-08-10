@@ -74,7 +74,6 @@ function closeEditDriverModal(modal) {
 
 async function loadEditDriverVehicleOptions(currentVehicleId = "") {
     const select = document.getElementById("editDriverAssignedVehicle");
-
     if (!select) return;
 
     try {
@@ -83,14 +82,14 @@ async function loadEditDriverVehicleOptions(currentVehicleId = "") {
                 "Accept": "application/json"
             }
         });
-
         if (!response.ok) {
             throw new Error(
                 `Failed to load vehicles: ${response.status}`
             );
         }
 
-        const vehicles = await response.json();
+        const data = await response.json();
+        const vehicles = data.vehicles ?? data;
 
         const options = [
             {
@@ -100,22 +99,34 @@ async function loadEditDriverVehicleOptions(currentVehicleId = "") {
         ];
 
         vehicles.forEach(vehicle => {
+
+            const vehicleId = String(vehicle.id);
+            /*
+             * Skip vehicles that already have a driver,
+             * except the driver's current assigned vehicle.
+             */
+            if (
+                vehicle.drivers &&
+                vehicle.drivers.length > 0 &&
+                vehicleId !== String(currentVehicleId)
+            ) {
+                return;
+            }
             const brand = vehicle.brand ?? "";
             const model = vehicle.model ?? "";
             const type = vehicle.vehicle_type ?? "";
-
-            const vehicleName =
-                `${brand} ${model}`.trim();
+            const vehicleName = `${brand} ${model}`.trim();
 
             options.push({
                 label: `${vehicleName} - ${type}`,
-                value: String(vehicle.id)
+                value: vehicleId
             });
         });
 
         /*
-         * Add the driver's current vehicle
-         * even though it is already assigned.
+         * If the current vehicle is not included in /fleet/available
+         * (for example, because its status is no longer Available),
+         * fetch it separately and add it.
          */
         if (
             currentVehicleId &&
@@ -131,18 +142,13 @@ async function loadEditDriverVehicleOptions(currentVehicleId = "") {
                 });
 
             if (currentResponse.ok) {
-                const currentData =
-                    await currentResponse.json();
-
+                const currentData =await currentResponse.json();
                 const vehicle = currentData.vehicle;
-
                 if (vehicle) {
                     const brand = vehicle.brand ?? "";
                     const model = vehicle.model ?? "";
                     const type = vehicle.vehicle_type ?? "";
-
-                    const vehicleName =
-                        `${brand} ${model}`.trim();
+                    const vehicleName = `${brand} ${model}`.trim();
 
                     options.push({
                         label: `${vehicleName} - ${type}`,
@@ -152,13 +158,8 @@ async function loadEditDriverVehicleOptions(currentVehicleId = "") {
             }
         }
 
-        setDriverSelectOptions(
-            select,
-            options
-        );
-
-        select.value =
-            currentVehicleId
+        setDriverSelectOptions(select, options);
+        select.value = currentVehicleId
                 ? String(currentVehicleId)
                 : "";
 
@@ -424,20 +425,16 @@ function initEditDriverModal() {
 
     try {
         const response = await fetch(`/drivers/${driverId}`, {
-
             method: "POST",
-
             headers: {
                 "X-CSRF-TOKEN": document
                     .querySelector('meta[name="csrf-token"]').content,
                 "Accept": "application/json"
             },
-
             body: (() => {
                 formData.append("_method", "PUT");
                 return formData;
             })()
-
         });
 
         const data = await response.json();
@@ -447,16 +444,18 @@ function initEditDriverModal() {
             return;
 
         }
-
         if (data.success) {
-
             loadDrivers();
+
+            if (typeof loadDriverVehicleOptions === "function") {
+                await loadDriverVehicleOptions();
+            }
+
             form.reset();
             closeEditDriverModal(modal);
+
             window.showToast(data.message, "success");
-
         }
-
     }
     catch (error) {
         console.error(error);

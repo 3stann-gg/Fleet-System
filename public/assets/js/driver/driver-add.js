@@ -1,5 +1,5 @@
 /* ==========================================
-   Add Driver :)
+   Add Driver 
 ========================================== */
 
 function setDriverFieldValidationMessage(field) {

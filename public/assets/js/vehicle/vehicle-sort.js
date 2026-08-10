@@ -44,3 +44,7 @@ function initVehicleSorting() {
     });
   });
 }
+
+document.addEventListener("DOMContentLoaded", () => {
+    initVehicleSorting();
+});

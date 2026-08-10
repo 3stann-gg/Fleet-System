@@ -257,12 +257,6 @@
                   <i class="ph ph-caret-left"></i>
                 </button>
 
-                <button class="active">1</button>
-
-                <button>2</button>
-
-                <button>3</button>
-
                 <button>
                   <i class="ph ph-caret-right"></i>
                 </button>

@@ -93,21 +93,23 @@ async function loadDriverVehicleOptions() {
 
         const data = await response.json();
         const vehicles = data.vehicles ?? data;
-
         const options = [
             {
                 label: "Select Assigned Vehicle",
                 value: ""
             }
         ];
-
         vehicles.forEach(vehicle => {
+
+            // Skip vehicles that already have a driver
+            if (vehicle.drivers && vehicle.drivers.length > 0) {
+                return;
+            }
+
             const brand = vehicle.brand ?? "";
             const model = vehicle.model ?? "";
             const type = vehicle.vehicle_type ?? "";
-
             const vehicleName = `${brand} ${model}`.trim();
-
             options.push({
                 label: `${vehicleName} - ${type}`,
                 value: vehicle.id
@@ -118,7 +120,6 @@ async function loadDriverVehicleOptions() {
 
     } catch (error) {
         console.error("DRIVER VEHICLE DROPDOWN ERROR:", error);
-
         setDriverSelectOptions(select, [
             {
                 label: "Unable to load vehicles",

@@ -1,5 +1,5 @@
 /* ==========================================
-   View Driver Modal :)
+   View Driver Modal 
 ========================================== */
 
 function setViewDriverText(modal, id, value) {

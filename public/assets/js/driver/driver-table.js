@@ -7,25 +7,19 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 function loadDrivers() {
-
     fetch("/drivers")
-
         .then(response => response.json())
         .then(drivers => {
             renderDriverTable(drivers);
-
             if (typeof updateDriverStats === "function") {
                 updateDriverStats();
             }
-
         })
-
         .catch(error => console.error(error));
 
 }
 
 function getDriverStatusClass(status) {
-
     const value = (status || "")
         .trim()
         .toLowerCase()
@@ -49,11 +43,9 @@ function getDriverInitials(firstName, lastName) {
 }
 
 function renderDriverTable(drivers) {
-
     if (typeof applyDriverFilters === "function") {
         applyDriverFilters();
     }
-
     if (typeof refreshDriverPagination === "function") {
         refreshDriverPagination();
     }
@@ -183,7 +175,6 @@ function renderDriverTable(drivers) {
     if (typeof refreshDriverBulkState === "function") {
         refreshDriverBulkState();
     }
-
     else if (typeof initDriverPagination === "function") {
         initDriverPagination();
     }

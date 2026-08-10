@@ -31,7 +31,7 @@
                 </div>
 
                 <div class="stat-content">
-                  <h3 id="totalReservations">128</h3>
+                  <h3 id="totalReservations">0</h3>
 
                   <p>Total Reservations</p>
                 </div>
@@ -43,7 +43,7 @@
                 </div>
 
                 <div class="stat-content">
-                  <h3 id="pendingReservations">23</h3>
+                  <h3 id="pendingReservations">0</h3>
 
                   <p>Pending</p>
                 </div>
@@ -55,7 +55,7 @@
                 </div>
 
                 <div class="stat-content">
-                  <h3 id="approvedReservations">45</h3>
+                  <h3 id="approvedReservations">0</h3>
 
                   <p>Approved</p>
                 </div>
@@ -67,7 +67,7 @@
                 </div>
 
                 <div class="stat-content">
-                  <h3 id="completedReservations">60</h3>
+                  <h3 id="completedReservations">0</h3>
 
                   <p>Completed</p>
                 </div>
@@ -270,395 +270,7 @@
                   </thead>
 
                   <tbody id="reservationTableBody">
-                    <tr data-schedule-date="2026-07-15">
-                      <td>
-                        <input
-                          type="checkbox"
-                          class="reservation-checkbox"
-                          aria-label="Select RES-2026-001"
-                        />
-                      </td>
-
-                      <td>
-                        <span class="reservation-number">RES-2026-001</span>
-                      </td>
-
-                      <td>
-                        <div class="patient-info">
-                          <div class="patient-avatar">JD</div>
-
-                          <div>
-                            <div class="patient-name">Juan Dela Cruz</div>
-
-                            <small>Emergency Transport</small>
-                          </div>
-                        </div>
-                      </td>
-
-                      <td>
-                        <span class="reservation-vehicle">Ambulance-01</span>
-                      </td>
-
-                      <td>
-                        <span class="reservation-driver">Maria Santos</span>
-                      </td>
-
-                      <td>
-                        <span class="reservation-pickup">ER - Ward 3A</span>
-                      </td>
-
-                      <td>
-                        <span class="reservation-destination">Imaging Center</span>
-                      </td>
-
-                      <td>
-                        <span class="reservation-schedule">Jul 15, 2026 09:30</span>
-                      </td>
-
-                      <td>
-                        <span class="status-badge trip">Approved</span>
-                      </td>
-
-                      <td>
-                        <div class="action-buttons">
-                          <button
-                            type="button"
-                            class="action-btn view-reservation"
-                            aria-label="View RES-2026-001"
-                          >
-                            <i class="ph ph-eye"></i>
-                          </button>
-
-                          <button
-                            type="button"
-                            class="action-btn edit-reservation"
-                            aria-label="Edit RES-2026-001"
-                          >
-                            <i class="ph ph-pencil-simple"></i>
-                          </button>
-
-                          <button
-                            type="button"
-                            class="action-btn delete-reservation"
-                            aria-label="Delete RES-2026-001"
-                          >
-                            <i class="ph ph-trash"></i>
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-
-                    <tr data-schedule-date="2026-07-15">
-                      <td>
-                        <input
-                          type="checkbox"
-                          class="reservation-checkbox"
-                          aria-label="Select RES-2026-002"
-                        />
-                      </td>
-
-                      <td>
-                        <span class="reservation-number">RES-2026-002</span>
-                      </td>
-
-                      <td>
-                        <div class="patient-info">
-                          <div class="patient-avatar">MR</div>
-
-                          <div>
-                            <div class="patient-name">Maria Reyes</div>
-
-                            <small>Patient Transfer</small>
-                          </div>
-                        </div>
-                      </td>
-
-                      <td>
-                        <span class="reservation-vehicle">Patient Van-02</span>
-                      </td>
-
-                      <td>
-                        <span class="reservation-driver">Juan Dela Cruz</span>
-                      </td>
-
-                      <td>
-                        <span class="reservation-pickup">Room 412</span>
-                      </td>
-
-                      <td>
-                        <span class="reservation-destination">Cardiology</span>
-                      </td>
-
-                      <td>
-                        <span class="reservation-schedule">Jul 15, 2026 11:00</span>
-                      </td>
-
-                      <td>
-                        <span class="status-badge pending">Pending</span>
-                      </td>
-
-                      <td>
-                        <div class="action-buttons">
-                          <button
-                            type="button"
-                            class="action-btn view-reservation"
-                            aria-label="View RES-2026-002"
-                          >
-                            <i class="ph ph-eye"></i>
-                          </button>
-
-                          <button
-                            type="button"
-                            class="action-btn edit-reservation"
-                            aria-label="Edit RES-2026-002"
-                          >
-                            <i class="ph ph-pencil-simple"></i>
-                          </button>
-
-                          <button
-                            type="button"
-                            class="action-btn delete-reservation"
-                            aria-label="Delete RES-2026-002"
-                          >
-                            <i class="ph ph-trash"></i>
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-
-                    <tr data-schedule-date="2026-07-16">
-                      <td>
-                        <input
-                          type="checkbox"
-                          class="reservation-checkbox"
-                          aria-label="Select RES-2026-003"
-                        />
-                      </td>
-
-                      <td>
-                        <span class="reservation-number">RES-2026-003</span>
-                      </td>
-
-                      <td>
-                        <div class="patient-info">
-                          <div class="patient-avatar">CM</div>
-
-                          <div>
-                            <div class="patient-name">Carlo Mendoza</div>
-
-                            <small>Scheduled Appointment</small>
-                          </div>
-                        </div>
-                      </td>
-
-                      <td>
-                        <span class="reservation-vehicle">SUV-03</span>
-                      </td>
-
-                      <td>
-                        <span class="reservation-driver">Ana Gonzales</span>
-                      </td>
-
-                      <td>
-                        <span class="reservation-pickup">Main Lobby</span>
-                      </td>
-
-                      <td>
-                        <span class="reservation-destination">Rehabilitation Center</span>
-                      </td>
-
-                      <td>
-                        <span class="reservation-schedule">Jul 16, 2026 08:15</span>
-                      </td>
-
-                      <td>
-                        <span class="status-badge scheduled">Scheduled</span>
-                      </td>
-
-                      <td>
-                        <div class="action-buttons">
-                          <button
-                            type="button"
-                            class="action-btn view-reservation"
-                            aria-label="View RES-2026-003"
-                          >
-                            <i class="ph ph-eye"></i>
-                          </button>
-
-                          <button
-                            type="button"
-                            class="action-btn edit-reservation"
-                            aria-label="Edit RES-2026-003"
-                          >
-                            <i class="ph ph-pencil-simple"></i>
-                          </button>
-
-                          <button
-                            type="button"
-                            class="action-btn delete-reservation"
-                            aria-label="Delete RES-2026-003"
-                          >
-                            <i class="ph ph-trash"></i>
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-
-                    <tr data-schedule-date="2026-07-14">
-                      <td>
-                        <input
-                          type="checkbox"
-                          class="reservation-checkbox"
-                          aria-label="Select RES-2026-004"
-                        />
-                      </td>
-
-                      <td>
-                        <span class="reservation-number">RES-2026-004</span>
-                      </td>
-
-                      <td>
-                        <div class="patient-info">
-                          <div class="patient-avatar">LP</div>
-
-                          <div>
-                            <div class="patient-name">Liza Pascual</div>
-
-                            <small>Discharge Follow-up</small>
-                          </div>
-                        </div>
-                      </td>
-
-                      <td>
-                        <span class="reservation-vehicle">Car-04</span>
-                      </td>
-
-                      <td>
-                        <span class="reservation-driver">Roberto Banaag</span>
-                      </td>
-
-                      <td>
-                        <span class="reservation-pickup">Ward 5B</span>
-                      </td>
-
-                      <td>
-                        <span class="reservation-destination">Home - Brgy. San Jose</span>
-                      </td>
-
-                      <td>
-                        <span class="reservation-schedule">Jul 14, 2026 14:45</span>
-                      </td>
-
-                      <td>
-                        <span class="status-badge completed">Completed</span>
-                      </td>
-
-                      <td>
-                        <div class="action-buttons">
-                          <button
-                            type="button"
-                            class="action-btn view-reservation"
-                            aria-label="View RES-2026-004"
-                          >
-                            <i class="ph ph-eye"></i>
-                          </button>
-
-                          <button
-                            type="button"
-                            class="action-btn edit-reservation"
-                            aria-label="Edit RES-2026-004"
-                          >
-                            <i class="ph ph-pencil-simple"></i>
-                          </button>
-
-                          <button
-                            type="button"
-                            class="action-btn delete-reservation"
-                            aria-label="Delete RES-2026-004"
-                          >
-                            <i class="ph ph-trash"></i>
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-
-                    <tr data-schedule-date="2026-07-15">
-                      <td>
-                        <input
-                          type="checkbox"
-                          class="reservation-checkbox"
-                          aria-label="Select RES-2026-005"
-                        />
-                      </td>
-
-                      <td>
-                        <span class="reservation-number">RES-2026-005</span>
-                      </td>
-
-                      <td>
-                        <div class="patient-info">
-                          <div class="patient-avatar">ET</div>
-
-                          <div>
-                            <div class="patient-name">Elena Torres</div>
-
-                            <small>Laboratory Pickup</small>
-                          </div>
-                        </div>
-                      </td>
-
-                      <td>
-                        <span class="reservation-vehicle">Van-05</span>
-                      </td>
-
-                      <td>
-                        <span class="reservation-driver">Unassigned</span>
-                      </td>
-
-                      <td>
-                        <span class="reservation-pickup">ER - Gate 2</span>
-                      </td>
-
-                      <td>
-                        <span class="reservation-destination">Pathology Lab</span>
-                      </td>
-
-                      <td>
-                        <span class="reservation-schedule">Jul 15, 2026 16:00</span>
-                      </td>
-
-                      <td>
-                        <span class="status-badge cancelled">Cancelled</span>
-                      </td>
-
-                      <td>
-                        <div class="action-buttons">
-                          <button
-                            type="button"
-                            class="action-btn view-reservation"
-                            aria-label="View RES-2026-005"
-                          >
-                            <i class="ph ph-eye"></i>
-                          </button>
-
-                          <button
-                            type="button"
-                            class="action-btn edit-reservation"
-                            aria-label="Edit RES-2026-005"
-                          >
-                            <i class="ph ph-pencil-simple"></i>
-                          </button>
-
-                          <button
-                            type="button"
-                            class="action-btn delete-reservation"
-                            aria-label="Delete RES-2026-005"
-                          >
-                            <i class="ph ph-trash"></i>
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
+                    
                   </tbody>
                 </table>
               </div>
@@ -667,21 +279,13 @@
             <!-- Pagination -->
             <div class="table-footer">
               <div id="reservationPaginationInfo">
-                Showing <strong>1–5</strong> of <strong>128</strong> reservations
+                Showing <strong>0–0</strong> of <strong>0</strong> reservations
               </div>
 
               <div class="pagination" id="reservationPagination">
                 <button type="button" aria-label="Previous page">
                   <i class="ph ph-caret-left"></i>
                 </button>
-
-                <button type="button" class="active" aria-label="Page 1">
-                  1
-                </button>
-
-                <button type="button" aria-label="Page 2">2</button>
-
-                <button type="button" aria-label="Page 3">3</button>
 
                 <button type="button" aria-label="Next page">
                   <i class="ph ph-caret-right"></i>
@@ -691,10 +295,10 @@
           </div>
         </section>
 
-    <div id="add-reservation-modal"></div>
-    <div id="view-reservation-modal"></div>
-    <div id="edit-reservation-modal"></div>
-    <div id="delete-reservation-modal"></div>
+    @include('components.reservation.add-reservation-modal')
+    @include('components.reservation.view-reservation-modal')
+    @include('components.reservation.edit-reservation-modal')
+    @include('components.reservation.delete-reservation-modal')
 
     <!-- Export dependencies -->
     <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
@@ -711,6 +315,7 @@
     <script src="{{ asset('assets/js/reservation/reservation-edit.js') }}"></script>
     <script src="{{ asset('assets/js/reservation/reservation-delete.js') }}"></script>
     <script src="{{ asset('assets/js/reservation/reservation-filter.js') }}"></script>
+    <script src="{{ asset('assets/js/reservation/reservation-table.js') }}"></script>
     <script src="{{ asset('assets/js/reservation/reservation-stats.js') }}"></script>
     <script src="{{ asset('assets/js/reservation/reservation-pagination.js') }}"></script>
     <script src="{{ asset('assets/js/reservation/reservation-sort.js') }}"></script>

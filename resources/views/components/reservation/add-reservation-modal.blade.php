@@ -1,6 +1,6 @@
 <div
-  class="modal-overlay"
   id="addReservationModal"
+  class="modal-overlay"
   role="dialog"
   aria-modal="true"
   aria-labelledby="addReservationModalTitle"
@@ -62,24 +62,16 @@
           <div class="form-group">
             <label for="reservationVehicle">Vehicle *</label>
             <select id="reservationVehicle" required>
-              <option value="">Select Vehicle</option>
-              <option value="Ambulance 01">Ambulance 01</option>
-              <option value="Patient Van 02">Patient Van 02</option>
-              <option value="Service Vehicle 01">Service Vehicle 01</option>
-              <option value="Unassigned">Unassigned</option>
+              
             </select>
           </div>
 
           <div class="form-group">
             <label for="reservationDriver">Driver *</label>
             <select id="reservationDriver" required>
-              <option value="">Select Driver</option>
-              <option value="Juan Dela Cruz">Juan Dela Cruz</option>
-              <option value="Maria Reyes">Maria Reyes</option>
-              <option value="Carlos Mendoza">Carlos Mendoza</option>
-              <option value="Unassigned">Unassigned</option>
+                <option value="">Select Vehicle First</option>
             </select>
-          </div>
+          </div>  
 
           <div class="form-group">
             <label for="reservationPickup">Pickup Location *</label>

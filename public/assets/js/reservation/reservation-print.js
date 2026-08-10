@@ -129,12 +129,13 @@ function initReservationPrint() {
       printWindow.document.write(html);
       printWindow.document.close();
 
-      printWindow.onafterprint = () => {
-        printWindow.close();
+      printWindow.onload = () => {
+          printWindow.focus();
+          printWindow.print();
       };
 
-      printWindow.onfocus = () => {
-        printWindow.print();
+      printWindow.onafterprint = () => {
+          printWindow.close();
       };
 
       printWindow.print();

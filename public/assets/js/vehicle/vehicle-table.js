@@ -1,5 +1,5 @@
 /* ==========================================
-   Vehicle Table
+   Vehicle Table :)
 ========================================== */
 
 document.addEventListener("DOMContentLoaded", () => {

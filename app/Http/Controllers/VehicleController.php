@@ -257,7 +257,8 @@ class VehicleController extends Controller
 
     public function available()
     {
-        $vehicles = Vehicle::whereDoesntHave('drivers')
+        $vehicles = Vehicle::with('drivers')
+            ->where('status', 'Available')
             ->orderBy('brand')
             ->orderBy('model')
             ->get([
@@ -265,6 +266,7 @@ class VehicleController extends Controller
                 'brand',
                 'model',
                 'vehicle_type',
+                'status',
             ]);
 
         return response()->json($vehicles);

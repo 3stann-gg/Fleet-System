@@ -1,26 +1,87 @@
+/* ==========================================
+Reservation Export
+========================================== */
+
 let reservationExportInitialized = false;
 
-function initReservationExport() {
-  if (reservationExportInitialized) return;
+function getReservationExportRows() {
+  const tableBody = document.getElementById("reservationTableBody");
+    if (!tableBody) {
+        return [];
+    }
 
-  const exportButton = document.getElementById("exportReservations");
-  if (!exportButton) return;
+    return Array.from(
+        tableBody.querySelectorAll("tr")
+    ).filter((row) => {
+      const isHelperRow =
+        row.classList.contains("reservation-no-results") ||
+        row.classList.contains("helper-row") ||
+        row.classList.contains("empty-state") ||
+        row.dataset.helperRow === "true";
 
-  reservationExportInitialized = true;
-
-  exportButton.addEventListener("click", () => {
-    try {
-      if (typeof XLSX === "undefined") {
-        if (typeof showToast === "function") {
-          showToast("Excel export library is unavailable.", "error");
-        }
-        return;
+      if (isHelperRow) {
+        return false;
       }
 
-      const tableBody = document.getElementById("reservationTableBody");
-      if (!tableBody) return;
+      const isRealRow =
+        row.querySelector(".reservation-number") ||
+        row.querySelector(".reservation-checkbox");
 
-      const rows = Array.from(tableBody.querySelectorAll("tr"));
+      if (!isRealRow) {
+            return false;
+      }
+
+
+      if (
+        row.dataset.reservationMatchesFilter === "false"
+      ) {
+        return false;
+      }
+
+        return true;
+    });
+}
+
+function getReservationExportText(row, selector) {
+  const element = row.querySelector(selector);
+
+  return element
+    ? element.textContent.trim()
+    : "";
+}
+
+function getReservationExportData(row, key) {
+  const value = row.dataset[key];
+
+  return value && value.trim()
+    ? value.trim()
+    : "Not provided";
+}
+
+function initReservationExport() {
+  if (reservationExportInitialized) {
+    return;
+  }
+
+  const exportButton = document.getElementById("exportReservations");
+
+  if (!exportButton) {
+    return;
+  }
+
+  reservationExportInitialized = true;
+  exportButton.addEventListener("click", () => {
+    try {
+      if (typeof XLSX === "undefined" || !XLSX.utils) {
+        if (typeof window.showToast === "function") {
+          window.showToast(
+            "Excel export library is unavailable.",
+            "error"
+          );
+        }
+
+        return;
+      }
 
       const headers = [
         "Reservation Number",
@@ -38,106 +99,119 @@ function initReservationExport() {
       ];
 
       const data = [];
+      const rows = getReservationExportRows();
 
       rows.forEach((row) => {
-        if (
-          row.id === "reservation-no-results" ||
-          row.classList.contains("reservation-no-results")
-        ) {
-          return;
-        }
-
-        const isReal =
-          row.querySelector(".reservation-number") ||
-          row.querySelector(".reservation-checkbox");
-
-        if (!isReal) {
-          return;
-        }
-
-        if (row.dataset.reservationMatchesFilter === "false") {
-          return;
-        }
-
-        const getText = (selector) => {
-          const el = row.querySelector(selector);
-          return el ? el.textContent.trim() : "";
-        };
-
-        const getDataset = (key) => {
-          const value = row.dataset[key];
-          return value ? value.trim() : "Not provided";
-        };
-
-        const schedule = getText(".reservation-schedule");
-        const status = getText(".status-badge");
-
         data.push([
-          getText(".reservation-number"),
-          getText(".patient-name"),
-          getDataset("requestType"),
-          getText(".reservation-vehicle"),
-          getText(".reservation-driver"),
-          getText(".reservation-pickup"),
-          getText(".reservation-destination"),
-          schedule || "Not provided",
-          getDataset("priority"),
-          status || "Not provided",
-          getDataset("contact"),
-          getDataset("notes"),
+          getReservationExportText(row, ".reservation-number"),
+          getReservationExportText(row, ".patient-name"),
+          getReservationExportData(row, "requestType"),
+          getReservationExportText(row, ".reservation-vehicle"),
+          getReservationExportText(row, ".reservation-driver"),
+          getReservationExportText(row, ".reservation-pickup"),
+          getReservationExportText(row, ".reservation-destination"),
+          getReservationExportText(row, ".reservation-schedule") || "Not provided",
+          getReservationExportData(row, "priority"),
+          getReservationExportText(row, ".status-badge") || "Not provided",
+          getReservationExportData(row, "contactNumber"),
+          getReservationExportData(row, "notes"),
         ]);
       });
 
-      const worksheet = XLSX.utils.aoa_to_sheet([headers, ...data]);
+      if (data.length === 0) {
+        if (typeof window.showToast === "function") {
+          window.showToast(
+            "There are no reservations to export.",
+            "error"
+          );
+        }
+
+        return;
+      }
+
+      const worksheet = XLSX.utils.aoa_to_sheet([
+        headers,
+        ...data
+      ]);
 
       const workbook = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(workbook, worksheet, "Reservations");
+      XLSX.utils.book_append_sheet(
+        workbook,
+        worksheet,
+        "Reservations"
+      );
 
-      XLSX.writeFile(workbook, "HIMS_Reservation_Report.xlsx");
+      XLSX.writeFile(
+        workbook,
+        "HIMS_Reservation_Report.xlsx"
+      );
 
-      if (typeof showToast === "function") {
-        showToast("Reservation report exported to Excel successfully.", "success");
+      if (typeof window.showToast === "function") {
+        window.showToast(
+          "Reservation report exported to Excel successfully.",
+          "success"
+        );
+       }
+
+      } catch (error) {
+        console.error(
+          "RESERVATION EXCEL EXPORT ERROR:",
+          error
+        );
+        
+        if (typeof window.showToast === "function") {
+        window.showToast(
+          "Failed to export reservation report.",
+          "error"
+          );
+        }
       }
-    } catch (error) {
-      if (typeof showToast === "function") {
-        showToast("Excel export library is unavailable.", "error");
-      }
-    }
-  });
-}
-
-if (document.readyState === "loading") {
-  document.addEventListener("DOMContentLoaded", initReservationExport);
-} else {
-  initReservationExport();
+    });
 }
 
 let reservationPDFExportInitialized = false;
 
 function initReservationPDFExport() {
-  if (reservationPDFExportInitialized) return;
+  if (reservationPDFExportInitialized) {
+      return;
+  }
 
   const pdfButton = document.getElementById("exportReservationPDF");
-  if (!pdfButton) return;
+    if (!pdfButton) {
+        return;
+    }
 
   reservationPDFExportInitialized = true;
-
   pdfButton.addEventListener("click", () => {
+
     try {
-      if (typeof window.jspdf === "undefined" || typeof window.jspdf.jsPDF === "undefined") {
-        if (typeof showToast === "function") {
-          showToast("PDF export library is unavailable.", "error");
+      if (
+        typeof window.jspdf === "undefined" ||
+        typeof window.jspdf.jsPDF === "undefined"
+      ) {
+        if (typeof window.showToast === "function") {
+          window.showToast(
+             "PDF export library is unavailable.",
+              "error"
+           );
         }
+
         return;
       }
 
       const { jsPDF } = window.jspdf;
-      const doc = new jsPDF({ orientation: "landscape" });
+      const doc = new jsPDF({orientation: "landscape",});
 
-      const tableBody = document.getElementById("reservationTableBody");
-      if (!tableBody) return;
+      if (typeof doc.autoTable !== "function") {
+        if (typeof window.showToast === "function") {
+          window.showToast(
+            "PDF table export library is unavailable.",
+            "error"
+          );
+        }
 
-      const rows = Array.from(tableBody.querySelectorAll("tr"));
+        return;
+      }
 
       const headers = [
         "Reservation No.",
@@ -153,86 +227,100 @@ function initReservationPDFExport() {
       ];
 
       const data = [];
+      const rows = getReservationExportRows();
 
       rows.forEach((row) => {
-        if (
-          row.id === "reservation-no-results" ||
-          row.classList.contains("reservation-no-results")
-        ) {
-          return;
-        }
-
-        const isReal =
-          row.querySelector(".reservation-number") ||
-          row.querySelector(".reservation-checkbox");
-
-        if (!isReal) {
-          return;
-        }
-
-        if (row.dataset.reservationMatchesFilter === "false") {
-          return;
-        }
-
-        const getText = (selector) => {
-          const el = row.querySelector(selector);
-          return el ? el.textContent.trim() : "";
-        };
-
-        const getDataset = (key) => {
-          const value = row.dataset[key];
-          return value ? value.trim() : "Not provided";
-        };
-
-        const schedule = getText(".reservation-schedule");
-        const status = getText(".status-badge");
-
         data.push([
-          getText(".reservation-number"),
-          getText(".patient-name"),
-          getDataset("requestType"),
-          getText(".reservation-vehicle"),
-          getText(".reservation-driver"),
-          getText(".reservation-pickup"),
-          getText(".reservation-destination"),
-          schedule || "Not provided",
-          getDataset("priority"),
-          status || "Not provided",
+          getReservationExportText(row, ".reservation-number"),
+          getReservationExportText(row, ".patient-name"),
+          getReservationExportData(row, "requestType"),
+          getReservationExportText(row, ".reservation-vehicle"),
+          getReservationExportText(row, ".reservation-driver"),
+          getReservationExportText(row, ".reservation-pickup"),
+          getReservationExportText(row, ".reservation-destination"),
+          getReservationExportText(row, ".reservation-schedule") || "Not provided",
+          getReservationExportData(row, "priority"),
+          getReservationExportText(row, ".status-badge") || "Not provided",
         ]);
       });
 
+      if (data.length === 0) {
+        if (typeof window.showToast === "function") {
+          window.showToast(
+            "There are no reservations to export.",
+            "error"
+          );
+        }
+
+        return;
+       }
+
       const generatedDate = new Date().toLocaleString();
+        doc.setFontSize(16);
+        doc.text("Hospital Information Management System",
+          14,
+          15
+        );
+        doc.setFontSize(12);
+        doc.text("Fleet & Transportation Management",
+          14,
+          22
+        );
+        doc.text("Reservation Report",
+          14,
+          29
+        );
+        doc.setFontSize(9);
+        doc.text("Generated: " + generatedDate,
+          14,
+          36
+        );
+        doc.autoTable({
+          head: [headers],
+          body: data,
+          startY: 42,
+          theme: "grid",
+          styles: {fontSize: 7,},
+          headStyles: {fillColor: [41, 128, 185],},
+        });
 
-      doc.setFontSize(16);
-      doc.text("Hospital Information Management System", 14, 15);
-      doc.setFontSize(12);
-      doc.text("Fleet & Transportation Management", 14, 22);
-      doc.text("Reservation Report", 14, 29);
-      doc.text("Generated: " + generatedDate, 14, 36);
+        doc.save(
+          "HIMS_Reservation_Report.pdf"
+        );
 
-      doc.autoTable({
-        head: [headers],
-        body: data,
-        startY: 42,
-        theme: "grid",
-        headStyles: { fillColor: [41, 128, 185] },
-      });
+        if (typeof window.showToast === "function") {
+          window.showToast(
+            "Reservation report exported to PDF successfully.",
+            "success"
+          );
+        }
 
-      doc.save("HIMS_Reservation_Report.pdf");
+        } catch (error) {
+            console.error(
+              "RESERVATION PDF EXPORT ERROR:", error
+            );
 
-      if (typeof showToast === "function") {
-        showToast("Reservation report exported to PDF successfully.", "success");
-      }
-    } catch (error) {
-      if (typeof showToast === "function") {
-        showToast("PDF export library is unavailable.", "error");
-      }
-    }
-  });
+            if (typeof window.showToast === "function") {
+                window.showToast(
+                  "Failed to export reservation report.", "error"
+                );
+            }
+        }
+    });
 }
 
+
 if (document.readyState === "loading") {
-  document.addEventListener("DOMContentLoaded", initReservationPDFExport);
+    document.addEventListener(
+        "DOMContentLoaded",
+        initReservationExport
+    );
+    document.addEventListener(
+        "DOMContentLoaded",
+        initReservationPDFExport
+    );
+
 } else {
-  initReservationPDFExport();
+    initReservationExport();
+    initReservationPDFExport();
 }
