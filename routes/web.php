@@ -5,6 +5,7 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\VehicleController;
 use App\Http\Controllers\DriverController;
 use App\Http\Controllers\ReservationController;
+use App\Http\Controllers\DispatchController;
 
 Route::get('/', function () {
     return view('welcome');
@@ -21,6 +22,7 @@ Route::middleware('auth')->group(function () {
 });
 
 require __DIR__.'/auth.php';
+
 
 // ***VEHICLE MODULE***
 Route::get('/fleet/search', [VehicleController::class, 'index']);
@@ -49,7 +51,6 @@ Route::delete('/fleet/{vehicle}', [VehicleController::class, 'destroy'])
 
 // ***RESERVATION MODULE***
 //Route::view('/reservation', 'reservation.index')->name('reservation');
-
 Route::get('/reservation/stats', [ReservationController::class, 'stats'])
     ->name('reservation.stats');
 
@@ -59,7 +60,28 @@ Route::delete('/reservation/bulk-delete', [ReservationController::class, 'bulkDe
 Route::resource('reservation', ReservationController::class);
 
 
-Route::view('/dispatch', 'dispatch.index')->name('dispatch');
+// *** DISPATCH MODULE ***
+Route::get('/dispatch', [DispatchController::class, 'index'])
+    ->name('dispatch');
+
+Route::get('/dispatch/available-reservations', [DispatchController::class, 'availableReservations'])
+    ->name('dispatch.availableReservations');
+
+Route::post('/dispatch', [DispatchController::class, 'store'])
+    ->name('dispatch.store');
+
+Route::delete('/dispatch/bulk-delete', [DispatchController::class, 'bulkDelete'])
+    ->name('dispatch.bulkDelete');
+
+Route::get('/dispatch/{dispatch}', [DispatchController::class, 'show'])
+    ->name('dispatch.show');
+
+Route::put('/dispatch/{dispatch}', [DispatchController::class, 'update'])
+    ->name('dispatch.update');
+
+Route::delete('/dispatch/{dispatch}', [DispatchController::class, 'destroy'])
+    ->name('dispatch.destroy');
+
 
 // ***DRIVER MODULE***
 Route::delete('/drivers/bulk-delete', [DriverController::class, 'bulkDelete'])

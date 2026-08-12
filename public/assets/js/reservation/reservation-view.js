@@ -62,7 +62,9 @@ function initViewReservationModal() {
         const vehicle = reservation.vehicle;
         const driver = reservation.driver;
         const vehicleName = vehicle
-            ? `${vehicle.brand} ${vehicle.model}`
+            ? `${[vehicle.brand, vehicle.model]
+                  .filter(Boolean)
+                  .join(" ")} - ${vehicle.vehicle_type ?? ""}`
             : null;
         const driverName = driver
             ? `${driver.first_name} ${driver.last_name}`
@@ -161,17 +163,30 @@ function initViewReservationModal() {
 
     document.getElementById("editReservationFromViewBtn")
         ?.addEventListener("click", () => {
-              const reservation =
-                  modal.currentReservation;
+            const reservation = modal.currentReservation;
 
-              if (!reservation || typeof openEditReservationModal !== "function") {
-                  return;
-              }
+            if (
+                !reservation ||
+                typeof openEditReservationModal !== "function"
+            ) {
+                return;
+            }
 
-              closeReservationModal(modal);
-              openEditReservationModal(reservation);
-          }
-        );
+            const row = document.querySelector(
+                `#reservationTableBody tr[data-id="${reservation.id}"]`,
+            );
+
+            if (!row) {
+                window.showToast(
+                    "Reservation record could not be found.",
+                    "error",
+                );
+                return;
+            }
+
+            closeReservationModal(modal);
+            openEditReservationModal(row);
+        });
 
     modal.addEventListener("click", (event) => {
         if (event.target === modal) {

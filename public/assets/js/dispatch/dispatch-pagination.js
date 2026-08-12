@@ -54,6 +54,16 @@ function buildDispatchPaginationControls(paginationEl, totalPages) {
   paginationEl.appendChild(nextBtn);
 }
 
+function refreshDispatchPagination({ reset = false } = {}) {
+    if (reset) {
+        dispatchCurrentPage = 1;
+    }
+
+    updateDispatchPagination();
+
+    return true;
+}
+
 function initDispatchPagination() {
   if (dispatchPaginationInitialized) {
     return;
@@ -111,75 +121,112 @@ function initDispatchPagination() {
 }
 
 function updateDispatchPagination() {
-  const tableBody = document.getElementById("dispatchTableBody");
-  const paginationEl = document.getElementById("dispatchPagination");
-  const infoEl = document.getElementById("dispatchPaginationInfo");
+    const tableBody = document.getElementById("dispatchTableBody");
+    const paginationEl = document.getElementById("dispatchPagination");
+    const infoEl = document.getElementById("dispatchPaginationInfo");
 
-  if (!tableBody || !paginationEl || !infoEl) {
-    return;
-  }
+    if (!tableBody || !paginationEl || !infoEl) {
+        return;
+    }
 
-  const matchingRows = getMatchingDispatchRows(tableBody);
-  const totalMatching = matchingRows.length;
-  const totalPages = getTotalDispatchPages(totalMatching);
+    const allRows = Array.from(tableBody.querySelectorAll("tr")).filter(
+        (row) => {
+            if (row.classList.contains("dispatch-no-results")) {
+                return false;
+            }
 
-  if (dispatchCurrentPage > totalPages) {
-    dispatchCurrentPage = totalPages;
-  }
-  if (dispatchCurrentPage < 1) {
-    dispatchCurrentPage = 1;
-  }
+            return (
+                row.querySelector(".dispatch-number") !== null ||
+                row.querySelector(".dispatch-checkbox") !== null
+            );
+        },
+    );
 
-  if (totalMatching === 0) {
-    paginationEl.style.display = "none";
-    infoEl.innerHTML =
-      "Showing <strong>0–0</strong> of <strong>0</strong> dispatches";
+    const matchingRows = allRows.filter((row) => {
+        return row.dataset.dispatchMatchesFilter !== "false";
+    });
+
+    const totalMatching = matchingRows.length;
+    const totalPages = getTotalDispatchPages(totalMatching);
+
+    allRows.forEach((row) => {
+        if (row.dataset.dispatchMatchesFilter === "false") {
+            row.style.display = "none";
+        }
+    });
+
+    if (dispatchCurrentPage > totalPages) {
+        dispatchCurrentPage = totalPages;
+    }
+
+    if (dispatchCurrentPage < 1) {
+        dispatchCurrentPage = 1;
+    }
+
+    if (totalMatching === 0) {
+        paginationEl.style.display = "none";
+
+        infoEl.innerHTML =
+            "Showing <strong>0–0</strong> of <strong>0</strong> dispatches";
+
+        allRows.forEach((row) => {
+            row.style.display = "none";
+        });
+
+        return;
+    }
+
+    paginationEl.style.display = "";
+
+    const start = (dispatchCurrentPage - 1) * DISPATCH_ROWS_PER_PAGE;
+    const end = Math.min(start + DISPATCH_ROWS_PER_PAGE, totalMatching);
 
     matchingRows.forEach((row) => {
-      row.style.display = "none";
+        row.style.display = "none";
     });
 
-    return;
-  }
-
-  paginationEl.style.display = "";
-
-  const start = (dispatchCurrentPage - 1) * DISPATCH_ROWS_PER_PAGE;
-  const end = Math.min(start + DISPATCH_ROWS_PER_PAGE, totalMatching);
-
-  matchingRows.forEach((row, index) => {
-    row.style.display = index >= start && index < end ? "" : "none";
-  });
-
-  infoEl.innerHTML =
-    "Showing <strong>" +
-    (start + 1) +
-    "–" +
-    end +
-    "</strong> of <strong>" +
-    totalMatching +
-    "</strong> dispatches";
-
-  buildDispatchPaginationControls(paginationEl, totalPages);
-
-  const prevBtn = paginationEl.querySelector('[data-dispatch-pagination-action="prev"]');
-  const nextBtn = paginationEl.querySelector('[data-dispatch-pagination-action="next"]');
-
-  if (prevBtn) {
-    prevBtn.disabled = dispatchCurrentPage === 1;
-  }
-  if (nextBtn) {
-    nextBtn.disabled = dispatchCurrentPage === totalPages;
-  }
-
-  paginationEl
-    .querySelectorAll('[data-dispatch-pagination-action="page"]')
-    .forEach((pageBtn) => {
-      const page = Number(pageBtn.dataset.dispatchPage);
-      if (page === dispatchCurrentPage) {
-        pageBtn.classList.add("active");
-      } else {
-        pageBtn.classList.remove("active");
-      }
+    matchingRows.forEach((row, index) => {
+        if (index >= start && index < end) {
+            row.style.display = "";
+        }
     });
+
+    infoEl.innerHTML =
+        "Showing <strong>" +
+        (start + 1) +
+        "–" +
+        end +
+        "</strong> of <strong>" +
+        totalMatching +
+        "</strong> dispatches";
+
+    buildDispatchPaginationControls(paginationEl, totalPages);
+
+
+    const prevBtn = paginationEl.querySelector(
+        '[data-dispatch-pagination-action="prev"]',
+    );
+    const nextBtn = paginationEl.querySelector(
+        '[data-dispatch-pagination-action="next"]',
+    );
+
+    if (prevBtn) {
+        prevBtn.disabled = dispatchCurrentPage === 1;
+    }
+
+    if (nextBtn) {
+        nextBtn.disabled = dispatchCurrentPage === totalPages;
+    }
+
+    paginationEl
+        .querySelectorAll('[data-dispatch-pagination-action="page"]')
+        .forEach((pageBtn) => {
+            const page = Number(pageBtn.dataset.dispatchPage);
+
+            if (page === dispatchCurrentPage) {
+                pageBtn.classList.add("active");
+            } else {
+                pageBtn.classList.remove("active");
+            }
+        });
 }

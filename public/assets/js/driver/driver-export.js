@@ -46,30 +46,18 @@ function getDriverReportOptionalValue(row, key) {
 function getDriverReportData(row) {
     return {
         name: `${row.dataset.firstName} ${row.dataset.lastName}`.trim(),
-        employeeId:
-            "DRV-" + String(row.dataset.id).padStart(3, "0"),
-        licenseNumber:
-            row.dataset.licenseNumber,
-        licenseClass:
-            row.dataset.licenseClass,
-        assignedVehicle:
-            row.dataset.vehicle,
-        status:
-            row.dataset.status,
-        contact:
-            row.dataset.contactNumber,
-        licenseExpiry:
-            getDriverReportOptionalValue(row, "licenseExpiry"),
-        email:
-            getDriverReportOptionalValue(row, "email"),
-        experience:
-            getDriverReportOptionalValue(row, "experience"),
-        address:
-            getDriverReportOptionalValue(row, "address"),
-        emergencyContact:
-            getDriverReportOptionalValue(row, "emergencyContact"),
-        notes:
-            getDriverReportOptionalValue(row, "notes"),
+        employeeId: "DRV-" + String(row.dataset.id).padStart(3, "0"),
+        licenseNumber: row.dataset.licenseNumber,
+        licenseClass: row.dataset.licenseClass,
+        assignedVehicle: row.dataset.vehicle?.trim() || "Not provided",
+        status: row.dataset.status,
+        contact: row.dataset.contactNumber,
+        licenseExpiry: getDriverReportOptionalValue(row, "licenseExpiry"),
+        email: getDriverReportOptionalValue(row, "email"),
+        experience: getDriverReportOptionalValue(row, "experience"),
+        address: getDriverReportOptionalValue(row, "address"),
+        emergencyContact: getDriverReportOptionalValue(row, "emergencyContact"),
+        notes: getDriverReportOptionalValue(row, "notes"),
     };
 }
 
@@ -139,6 +127,22 @@ function initDriverExport() {
     try {
       const workbook = xlsx.utils.book_new();
       const worksheet = xlsx.utils.aoa_to_sheet(data);
+
+      worksheet["!cols"] = [
+          { wch: 22 }, // Driver Name
+          { wch: 14 }, // Employee ID
+          { wch: 18 }, // License Number
+          { wch: 15 }, // License Class
+          { wch: 25 }, // Assigned Vehicle
+          { wch: 14 }, // Status
+          { wch: 16 }, // Contact
+          { wch: 16 }, // License Expiry
+          { wch: 28 }, // Email
+          { wch: 14 }, // Experience
+          { wch: 30 }, // Address
+          { wch: 24 }, // Emergency Contact
+          { wch: 30 }, // Notes
+      ];
 
       xlsx.utils.book_append_sheet(workbook, worksheet, "Drivers");
       xlsx.writeFile(workbook, "HIMS_Driver_Report.xlsx");

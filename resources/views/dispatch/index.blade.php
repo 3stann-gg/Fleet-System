@@ -31,7 +31,7 @@
                 </div>
 
                 <div class="stat-content">
-                  <h3 id="totalDispatches">89</h3>
+                  <h3 id="totalDispatches">0</h3>
 
                   <p>Total Dispatches</p>
                 </div>
@@ -43,9 +43,9 @@
                 </div>
 
                 <div class="stat-content">
-                  <h3 id="pendingDispatches">12</h3>
+                  <h3 id="assignedDispatches">0</h3>
 
-                  <p>Pending Dispatch</p>
+                  <p>Assigned Dispatch</p>
                 </div>
               </div>
 
@@ -55,7 +55,7 @@
                 </div>
 
                 <div class="stat-content">
-                  <h3 id="activeDispatches">18</h3>
+                  <h3 id="activeDispatches">0</h3>
 
                   <p>Active Trips</p>
                 </div>
@@ -67,7 +67,7 @@
                 </div>
 
                 <div class="stat-content">
-                  <h3 id="completedDispatches">59</h3>
+                  <h3 id="completedDispatches">0</h3>
 
                   <p>Completed Trips</p>
                 </div>
@@ -226,7 +226,7 @@
               </div>
 
               <div class="table-responsive">
-                <table class="fleet-table">
+                <table id="dispatchTable" class="fleet-table">
                   <thead>
                     <tr>
                       <th>
@@ -284,489 +284,7 @@
                   </thead>
 
                   <tbody id="dispatchTableBody">
-                    <tr
-                      data-pickup="Emergency Room"
-                      data-destination="Imaging Center"
-                      data-schedule-date="2026-07-20"
-                      data-schedule-time="9:00 AM"
-                      data-priority="Emergency"
-                      data-contact="+63 917 555 0101"
-                      data-notes="Critical patient transfer"
-                    >
-                      <td>
-                        <input
-                          type="checkbox"
-                          class="dispatch-checkbox"
-                          aria-label="Select DSP-2026-001"
-                        />
-                      </td>
-
-                      <td>
-                        <span class="dispatch-number">DSP-2026-001</span>
-                      </td>
-
-                      <td>
-                        <span class="dispatch-reservation-number"
-                          >RES-2026-001</span
-                        >
-                      </td>
-
-                      <td>
-                        <div class="dispatch-patient-info">
-                          <div class="dispatch-patient-name">
-                            Juan Dela Cruz
-                          </div>
-
-                          <div class="dispatch-request-type">
-                            Emergency Transfer
-                          </div>
-                        </div>
-                      </td>
-
-                      <td>
-                        <span class="dispatch-vehicle">Ambulance 01</span>
-                      </td>
-
-                      <td>
-                        <span class="dispatch-driver">Maria Santos</span>
-                      </td>
-
-                      <td>
-                        <span class="dispatch-route"
-                          >Emergency Room → Imaging Center</span
-                        >
-                      </td>
-
-                      <td>
-                        <span class="dispatch-schedule"
-                          >Jul 20, 2026, 9:00 AM</span
-                        >
-                      </td>
-
-                      <td>
-                        <span class="dispatch-priority">Emergency</span>
-                      </td>
-
-                      <td>
-                        <span class="status-badge trip">En Route</span>
-                      </td>
-
-                      <td>
-                        <div class="action-buttons">
-                          <button
-                            type="button"
-                            class="action-btn view-dispatch"
-                            aria-label="View DSP-2026-001"
-                          >
-                            <i class="ph ph-eye"></i>
-                          </button>
-
-                          <button
-                            type="button"
-                            class="action-btn edit-dispatch"
-                            aria-label="Edit DSP-2026-001"
-                          >
-                            <i class="ph ph-pencil-simple"></i>
-                          </button>
-
-                          <button
-                            type="button"
-                            class="action-btn delete-dispatch"
-                            aria-label="Delete DSP-2026-001"
-                          >
-                            <i class="ph ph-trash"></i>
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-
-                    <tr
-                      data-pickup="Room 412"
-                      data-destination="Cardiology"
-                      data-schedule-date="2026-07-20"
-                      data-schedule-time="10:30 AM"
-                      data-priority="High"
-                      data-contact="+63 917 555 0144"
-                      data-notes="Wheelchair assistance required"
-                    >
-                      <td>
-                        <input
-                          type="checkbox"
-                          class="dispatch-checkbox"
-                          aria-label="Select DSP-2026-002"
-                        />
-                      </td>
-
-                      <td>
-                        <span class="dispatch-number">DSP-2026-002</span>
-                      </td>
-
-                      <td>
-                        <span class="dispatch-reservation-number"
-                          >RES-2026-002</span
-                        >
-                      </td>
-
-                      <td>
-                        <div class="dispatch-patient-info">
-                          <div class="dispatch-patient-name">
-                            Maria Reyes
-                          </div>
-
-                          <div class="dispatch-request-type">
-                            Patient Transport
-                          </div>
-                        </div>
-                      </td>
-
-                      <td>
-                        <span class="dispatch-vehicle">Patient Van-02</span>
-                      </td>
-
-                      <td>
-                        <span class="dispatch-driver">Juan Dela Cruz</span>
-                      </td>
-
-                      <td>
-                        <span class="dispatch-route"
-                          >Room 412 → Cardiology</span
-                        >
-                      </td>
-
-                      <td>
-                        <span class="dispatch-schedule"
-                          >Jul 20, 2026, 10:30 AM</span
-                        >
-                      </td>
-
-                      <td>
-                        <span class="dispatch-priority">High</span>
-                      </td>
-
-                      <td>
-                        <span class="status-badge scheduled"
-                          >Assigned</span
-                        >
-                      </td>
-
-                      <td>
-                        <div class="action-buttons">
-                          <button
-                            type="button"
-                            class="action-btn view-dispatch"
-                            aria-label="View DSP-2026-002"
-                          >
-                            <i class="ph ph-eye"></i>
-                          </button>
-
-                          <button
-                            type="button"
-                            class="action-btn edit-dispatch"
-                            aria-label="Edit DSP-2026-002"
-                          >
-                            <i class="ph ph-pencil-simple"></i>
-                          </button>
-
-                          <button
-                            type="button"
-                            class="action-btn delete-dispatch"
-                            aria-label="Delete DSP-2026-002"
-                          >
-                            <i class="ph ph-trash"></i>
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-
-                    <tr
-                      data-pickup="Main Lobby"
-                      data-destination="Rehabilitation Center"
-                      data-schedule-date="2026-07-21"
-                      data-schedule-time="08:15 AM"
-                      data-priority="Normal"
-                      data-contact="+63 917 555 0218"
-                      data-notes="Regular appointment transport"
-                    >
-                      <td>
-                        <input
-                          type="checkbox"
-                          class="dispatch-checkbox"
-                          aria-label="Select DSP-2026-003"
-                        />
-                      </td>
-
-                      <td>
-                        <span class="dispatch-number">DSP-2026-003</span>
-                      </td>
-
-                      <td>
-                        <span class="dispatch-reservation-number"
-                          >RES-2026-003</span
-                        >
-                      </td>
-
-                      <td>
-                        <div class="dispatch-patient-info">
-                          <div class="dispatch-patient-name">
-                            Carlo Mendoza
-                          </div>
-
-                          <div class="dispatch-request-type">
-                            Medical Appointment
-                          </div>
-                        </div>
-                      </td>
-
-                      <td>
-                        <span class="dispatch-vehicle">SUV-03</span>
-                      </td>
-
-                      <td>
-                        <span class="dispatch-driver">Ana Gonzales</span>
-                      </td>
-
-                      <td>
-                        <span class="dispatch-route"
-                          >Main Lobby → Rehabilitation Center</span
-                        >
-                      </td>
-
-                      <td>
-                        <span class="dispatch-schedule"
-                          >Jul 21, 2026, 08:15 AM</span
-                        >
-                      </td>
-
-                      <td>
-                        <span class="dispatch-priority">Normal</span>
-                      </td>
-
-                      <td>
-                        <span class="status-badge pending">Pending</span>
-                      </td>
-
-                      <td>
-                        <div class="action-buttons">
-                          <button
-                            type="button"
-                            class="action-btn view-dispatch"
-                            aria-label="View DSP-2026-003"
-                          >
-                            <i class="ph ph-eye"></i>
-                          </button>
-
-                          <button
-                            type="button"
-                            class="action-btn edit-dispatch"
-                            aria-label="Edit DSP-2026-003"
-                          >
-                            <i class="ph ph-pencil-simple"></i>
-                          </button>
-
-                          <button
-                            type="button"
-                            class="action-btn delete-dispatch"
-                            aria-label="Delete DSP-2026-003"
-                          >
-                            <i class="ph ph-trash"></i>
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-
-                    <tr
-                      data-pickup="Ward 5B"
-                      data-destination="Home - Brgy. San Jose"
-                      data-schedule-date="2026-07-19"
-                      data-schedule-time="02:45 PM"
-                      data-priority="Low"
-                      data-contact="+63 917 555 0312"
-                      data-notes="Discharge follow-up"
-                    >
-                      <td>
-                        <input
-                          type="checkbox"
-                          class="dispatch-checkbox"
-                          aria-label="Select DSP-2026-004"
-                        />
-                      </td>
-
-                      <td>
-                        <span class="dispatch-number">DSP-2026-004</span>
-                      </td>
-
-                      <td>
-                        <span class="dispatch-reservation-number"
-                          >RES-2026-004</span
-                        >
-                      </td>
-
-                      <td>
-                        <div class="dispatch-patient-info">
-                          <div class="dispatch-patient-name">
-                            Liza Pascual
-                          </div>
-
-                          <div class="dispatch-request-type">
-                            Discharge Follow-up
-                          </div>
-                        </div>
-                      </td>
-
-                      <td>
-                        <span class="dispatch-vehicle">Car-04</span>
-                      </td>
-
-                      <td>
-                        <span class="dispatch-driver">Roberto Banaag</span>
-                      </td>
-
-                      <td>
-                        <span class="dispatch-route"
-                          >Ward 5B → Home - Brgy. San Jose</span
-                        >
-                      </td>
-
-                      <td>
-                        <span class="dispatch-schedule"
-                          >Jul 19, 2026, 02:45 PM</span
-                        >
-                      </td>
-
-                      <td>
-                        <span class="dispatch-priority">Low</span>
-                      </td>
-
-                      <td>
-                        <span class="status-badge completed"
-                          >Completed</span
-                        >
-                      </td>
-
-                      <td>
-                        <div class="action-buttons">
-                          <button
-                            type="button"
-                            class="action-btn view-dispatch"
-                            aria-label="View DSP-2026-004"
-                          >
-                            <i class="ph ph-eye"></i>
-                          </button>
-
-                          <button
-                            type="button"
-                            class="action-btn edit-dispatch"
-                            aria-label="Edit DSP-2026-004"
-                          >
-                            <i class="ph ph-pencil-simple"></i>
-                          </button>
-
-                          <button
-                            type="button"
-                            class="action-btn delete-dispatch"
-                            aria-label="Delete DSP-2026-004"
-                          >
-                            <i class="ph ph-trash"></i>
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-
-                    <tr
-                      data-pickup="ER - Gate 2"
-                      data-destination="Pathology Lab"
-                      data-schedule-date="2026-07-20"
-                      data-schedule-time="04:00 PM"
-                      data-priority="Normal"
-                      data-contact=""
-                      data-notes=""
-                    >
-                      <td>
-                        <input
-                          type="checkbox"
-                          class="dispatch-checkbox"
-                          aria-label="Select DSP-2026-005"
-                        />
-                      </td>
-
-                      <td>
-                        <span class="dispatch-number">DSP-2026-005</span>
-                      </td>
-
-                      <td>
-                        <span class="dispatch-reservation-number"
-                          >RES-2026-005</span
-                        >
-                      </td>
-
-                      <td>
-                        <div class="dispatch-patient-info">
-                          <div class="dispatch-patient-name">
-                            Elena Torres
-                          </div>
-
-                          <div class="dispatch-request-type">
-                            Supply Delivery
-                          </div>
-                        </div>
-                      </td>
-
-                      <td>
-                        <span class="dispatch-vehicle">Van-05</span>
-                      </td>
-
-                      <td>
-                        <span class="dispatch-driver">Unassigned</span>
-                      </td>
-
-                      <td>
-                        <span class="dispatch-route"
-                          >ER - Gate 2 → Pathology Lab</span
-                        >
-                      </td>
-
-                      <td>
-                        <span class="dispatch-schedule"
-                          >Jul 20, 2026, 04:00 PM</span
-                        >
-                      </td>
-
-                      <td>
-                        <span class="dispatch-priority">Normal</span>
-                      </td>
-
-                      <td>
-                        <span class="status-badge approved">Arrived</span>
-                      </td>
-
-                      <td>
-                        <div class="action-buttons">
-                          <button
-                            type="button"
-                            class="action-btn view-dispatch"
-                            aria-label="View DSP-2026-005"
-                          >
-                            <i class="ph ph-eye"></i>
-                          </button>
-
-                          <button
-                            type="button"
-                            class="action-btn edit-dispatch"
-                            aria-label="Edit DSP-2026-005"
-                          >
-                            <i class="ph ph-pencil-simple"></i>
-                          </button>
-
-                          <button
-                            type="button"
-                            class="action-btn delete-dispatch"
-                            aria-label="Delete DSP-2026-005"
-                          >
-                            <i class="ph ph-trash"></i>
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
+                    
                   </tbody>
                 </table>
               </div>
@@ -775,21 +293,13 @@
             <!-- Pagination -->
             <div class="table-footer">
               <div id="dispatchPaginationInfo">
-                Showing <strong>1–5</strong> of <strong>89</strong> dispatches
+                Showing <strong>0–0</strong> of <strong>0</strong> dispatches
               </div>
 
               <div class="pagination" id="dispatchPagination">
                 <button type="button" aria-label="Previous page">
                   <i class="ph ph-caret-left"></i>
                 </button>
-
-                <button type="button" class="active" aria-label="Page 1">
-                  1
-                </button>
-
-                <button type="button" aria-label="Page 2">2</button>
-
-                <button type="button" aria-label="Page 3">3</button>
 
                 <button type="button" aria-label="Next page">
                   <i class="ph ph-caret-right"></i>

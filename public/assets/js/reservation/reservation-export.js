@@ -134,6 +134,21 @@ function initReservationExport() {
         ...data
       ]);
 
+      worksheet["!cols"] = [
+          { wch: 20 }, // Reservation Number
+          { wch: 24 }, // Patient Name
+          { wch: 18 }, // Request Type
+          { wch: 25 }, // Vehicle
+          { wch: 22 }, // Driver
+          { wch: 28 }, // Pickup Location
+          { wch: 28 }, // Destination
+          { wch: 24 }, // Schedule
+          { wch: 14 }, // Priority
+          { wch: 14 }, // Status
+          { wch: 18 }, // Contact Number
+          { wch: 30 }, // Notes
+      ];
+
       const workbook = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(
         workbook,

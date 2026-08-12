@@ -1,5 +1,5 @@
 /* ==========================================
-   Driver Table
+   Driver Table 
 ========================================== */
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -180,3 +180,4 @@ function renderDriverTable(drivers) {
     }
 
 }
+

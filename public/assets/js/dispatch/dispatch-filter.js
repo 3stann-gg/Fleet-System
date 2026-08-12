@@ -1,192 +1,301 @@
-let dispatchFilterInitialized = false;
+/* ==========================================
+   Dispatch Search and Filters
+========================================== */
 
-const DISPATCH_NO_RESULTS_CLASS = "dispatch-no-results";
+let dispatchSearchState = null;
 
-function getRealDispatchRows(tableBody) {
-  return Array.from(tableBody.querySelectorAll("tr")).filter((row) => {
-    return (
-      row.querySelector(".dispatch-number") ||
-      row.querySelector(".dispatch-checkbox")
-    );
-  });
+function getDispatchSearchText(row, selector) {
+    const element = selector ? row.querySelector(selector) : null;
+
+    return element?.textContent?.trim() || "";
 }
 
-function removeDispatchNoResults(tableBody) {
-  const helper = tableBody.querySelector("tr." + DISPATCH_NO_RESULTS_CLASS);
-  if (helper) {
-    helper.remove();
-  }
-}
-
-function addDispatchNoResults(tableBody) {
-  if (tableBody.querySelector("tr." + DISPATCH_NO_RESULTS_CLASS)) {
-    return;
-  }
-
-  const tr = document.createElement("tr");
-  tr.className = DISPATCH_NO_RESULTS_CLASS;
-
-  const td = document.createElement("td");
-  td.setAttribute("colspan", "11");
-  td.textContent = "No dispatch records found.";
-
-  tr.appendChild(td);
-  tableBody.appendChild(tr);
-}
-
-function applyDispatchFilters() {
-  const tableBody = document.getElementById("dispatchTableBody");
-  if (!tableBody) {
-    return;
-  }
-
-  const searchInput = document.getElementById("dispatchSearch");
-  const statusFilter = document.getElementById("dispatchStatusFilter");
-  const priorityFilter = document.getElementById("dispatchPriorityFilter");
-  const dateFilter = document.getElementById("dispatchDateFilter");
-
-  const searchTerm = (searchInput?.value || "").trim().toLowerCase();
-  const statusValue = statusFilter?.value || "all";
-  const priorityValue = priorityFilter?.value || "all";
-  const dateValue = (dateFilter?.value || "").trim();
-
-  const rows = getRealDispatchRows(tableBody);
-
-  let matchCount = 0;
-
-  rows.forEach((row) => {
-    const dispatchNumber =
-      row.querySelector(".dispatch-number")?.textContent?.trim() || "";
-    const reservationNumber =
-      row.querySelector(".dispatch-reservation-number")?.textContent?.trim() ||
-      "";
-    const patientName =
-      row.querySelector(".dispatch-patient-name")?.textContent?.trim() || "";
-    const requestType =
-      row.querySelector(".dispatch-request-type")?.textContent?.trim() ||
-      row.dataset.requestType ||
-      "";
-    const vehicle =
-      row.querySelector(".dispatch-vehicle")?.textContent?.trim() || "";
-    const driver =
-      row.querySelector(".dispatch-driver")?.textContent?.trim() || "";
-    const pickup = row.dataset.pickup || "";
-    const destination = row.dataset.destination || "";
-
-    const searchHaystack = [
-      dispatchNumber,
-      reservationNumber,
-      patientName,
-      requestType,
-      vehicle,
-      driver,
-      pickup,
-      destination,
-    ]
-      .join(" ")
-      .toLowerCase();
-
-    const matchesSearch =
-      searchTerm === "" || searchHaystack.includes(searchTerm);
-
-    const statusBadge = row.querySelector(".status-badge");
-    const rowStatus = statusBadge?.textContent?.trim() || "";
-    const matchesStatus =
-      statusValue === "all" || rowStatus === statusValue;
-
-    const rowPriority =
-      row.querySelector(".dispatch-priority")?.textContent?.trim() ||
-      row.dataset.priority ||
-      "";
-    const matchesPriority =
-      priorityValue === "all" || rowPriority === priorityValue;
-
-    const rowDate = (row.dataset.scheduleDate || "").trim();
-    const matchesDate = dateValue === "" || rowDate === dateValue;
-
-    const matches =
-      matchesSearch && matchesStatus && matchesPriority && matchesDate;
-
-    row.dataset.dispatchMatchesFilter = matches ? "true" : "false";
-
-    if (matches) {
-      matchCount++;
-      row.style.display = "";
-    } else {
-      row.style.display = "none";
+function getDispatchFilterLabel(select) {
+    if (!select || select.value === "all") {
+        return "";
     }
-  });
 
-  if (matchCount === 0) {
-    addDispatchNoResults(tableBody);
-  } else {
-    removeDispatchNoResults(tableBody);
-  }
+    const option = select.options[select.selectedIndex];
+    const value = option ? option.textContent : select.value;
 
-  if (typeof updateDispatchPagination === "function") {
-    updateDispatchPagination();
-  }
+    return value.trim().toLowerCase();
 }
 
-function initDispatchFilters() {
-  if (dispatchFilterInitialized) {
-    return;
-  }
-  dispatchFilterInitialized = true;
+function getDispatchDataRows(tableBody) {
+    if (!tableBody) {
+        return [];
+    }
 
-  const searchInput = document.getElementById("dispatchSearch");
-  const statusFilter = document.getElementById("dispatchStatusFilter");
-  const priorityFilter = document.getElementById("dispatchPriorityFilter");
-  const dateFilter = document.getElementById("dispatchDateFilter");
-  const refreshBtn = document.getElementById("refreshDispatches");
+    return Array.from(tableBody.querySelectorAll("tr")).filter((row) => {
+        const isHelperRow =
+            row.classList.contains("dispatch-no-results") ||
+            row.classList.contains("helper-row") ||
+            row.classList.contains("empty-state") ||
+            row.dataset.helperRow === "true";
 
-  if (searchInput) {
-    searchInput.addEventListener("input", applyDispatchFilters);
-  }
-
-  if (statusFilter) {
-    statusFilter.addEventListener("change", applyDispatchFilters);
-  }
-
-  if (priorityFilter) {
-    priorityFilter.addEventListener("change", applyDispatchFilters);
-  }
-
-  if (dateFilter) {
-    dateFilter.addEventListener("change", applyDispatchFilters);
-  }
-
-  if (refreshBtn) {
-    refreshBtn.addEventListener("click", () => {
-      if (searchInput) {
-        searchInput.value = "";
-      }
-      if (statusFilter) {
-        statusFilter.value = "all";
-      }
-      if (priorityFilter) {
-        priorityFilter.value = "all";
-      }
-      if (dateFilter) {
-        dateFilter.value = "";
-      }
-
-      const tableBody = document.getElementById("dispatchTableBody");
-      if (tableBody) {
-        getRealDispatchRows(tableBody).forEach((row) => {
-          row.dataset.dispatchMatchesFilter = "true";
-          row.style.display = "";
-        });
-        removeDispatchNoResults(tableBody);
-      }
-
-      if (typeof updateDispatchPagination === "function") {
-        updateDispatchPagination();
-      }
-
-      if (typeof updateDispatchStatistics === "function") {
-        updateDispatchStatistics();
-      }
+        return (
+            !isHelperRow &&
+            Boolean(
+                row.querySelector(".dispatch-number") ||
+                row.querySelector(".dispatch-checkbox"),
+            )
+        );
     });
-  }
 }
+
+function updateDispatchNoResultsRow(tableBody, shouldShow) {
+    if (!tableBody) {
+        return;
+    }
+
+    const existingRow = tableBody.querySelector(".dispatch-no-results");
+
+    if (!shouldShow) {
+        existingRow?.remove();
+        return;
+    }
+
+    if (existingRow) {
+        return;
+    }
+
+    const row = document.createElement("tr");
+    const cell = document.createElement("td");
+
+    row.className = "dispatch-no-results";
+
+    cell.colSpan = 11;
+    cell.className = "text-center";
+    cell.textContent = "No dispatch records found.";
+
+    row.appendChild(cell);
+    tableBody.appendChild(row);
+}
+
+function renderDispatchFilterRows(matchingRows) {
+    if (!dispatchSearchState) {
+        return;
+    }
+
+    const matchingRowSet = new Set(matchingRows);
+
+    getDispatchDataRows(dispatchSearchState.tableBody).forEach((row) => {
+        row.style.display = matchingRowSet.has(row) ? "" : "none";
+    });
+
+    updateDispatchNoResultsRow(
+        dispatchSearchState.tableBody,
+        matchingRows.length === 0,
+    );
+}
+
+function applyDispatchFilters({ resetPage = false } = {}) {
+    if (!dispatchSearchState) {
+        return [];
+    }
+
+    const { tableBody, searchInput, statusFilter, priorityFilter, dateFilter } =
+        dispatchSearchState;
+    const searchQuery = (searchInput?.value || "").trim().toLowerCase();
+    const statusValue = getDispatchFilterLabel(statusFilter);
+    const priorityValue = getDispatchFilterLabel(priorityFilter);
+    const dateValue = (dateFilter?.value || "").trim();
+    const matchingRows = [];
+
+    getDispatchDataRows(tableBody).forEach((row) => {
+        const dispatchNumber = getDispatchSearchText(row, ".dispatch-number");
+        const reservationNumber = getDispatchSearchText(
+            row,
+            ".dispatch-reservation-number",
+        );
+        const patientName = getDispatchSearchText(
+            row,
+            ".dispatch-patient-name",
+        );
+        const requestType =
+            getDispatchSearchText(row, ".dispatch-request-type") ||
+            row.dataset.requestType ||
+            "";
+        const vehicle = getDispatchSearchText(row, ".dispatch-vehicle");
+        const driver = getDispatchSearchText(row, ".dispatch-driver");
+        const pickup = row.dataset.pickup || "";
+        const destination = row.dataset.destination || "";
+        const searchableText = [
+            dispatchNumber,
+            reservationNumber,
+            patientName,
+            requestType,
+            vehicle,
+            driver,
+            pickup,
+            destination,
+        ]
+            .join(" ")
+            .toLowerCase();
+
+        const rowStatus = getDispatchSearchText(
+            row,
+            ".status-badge",
+        ).toLowerCase();
+
+        const rowPriority =
+            getDispatchSearchText(row, ".dispatch-priority").toLowerCase() ||
+            (row.dataset.priority || "").toLowerCase();
+        const rowDate = (row.dataset.scheduleDate || "").trim();
+        const matchesSearch =
+            !searchQuery || searchableText.includes(searchQuery);
+        const matchesStatus = !statusValue || rowStatus === statusValue;
+        const matchesPriority = !priorityValue || rowPriority === priorityValue;
+        const matchesDate = !dateValue || rowDate === dateValue;
+        const isMatch =
+            matchesSearch && matchesStatus && matchesPriority && matchesDate;
+
+        row.dataset.dispatchMatchesFilter = String(isMatch);
+
+        if (isMatch) {
+            matchingRows.push(row);
+        }
+    });
+
+    updateDispatchNoResultsRow(tableBody, matchingRows.length === 0);
+
+    /*
+     * Let pagination handle the actual
+     * visible page.
+     */
+    if (typeof updateDispatchPagination === "function") {
+        if (typeof refreshDispatchPagination === "function") {
+            refreshDispatchPagination({
+                reset: resetPage,
+            });
+        } else {
+            if (resetPage) {
+                dispatchCurrentPage = 1;
+            }
+
+            updateDispatchPagination();
+        }
+
+        return matchingRows;
+    }
+
+    renderDispatchFilterRows(matchingRows);
+
+    return matchingRows;
+}
+
+function initDispatchSearch() {
+    const tableBody = document.getElementById("dispatchTableBody");
+    const searchInput = document.getElementById("dispatchSearch");
+    const statusFilter = document.getElementById("dispatchStatusFilter");
+    const priorityFilter = document.getElementById("dispatchPriorityFilter");
+    const dateFilter = document.getElementById("dispatchDateFilter");
+    const refreshButton = document.getElementById("refreshDispatches");
+
+    if (!tableBody || tableBody.dataset.dispatchSearchInitialized === "true") {
+        return;
+    }
+
+    tableBody.dataset.dispatchSearchInitialized = "true";
+
+    dispatchSearchState = {
+        tableBody,
+        searchInput,
+        statusFilter,
+        priorityFilter,
+        dateFilter,
+    };
+
+    /*
+     * Observe table changes.
+     *
+     * Important for:
+     * - Add dispatch
+     * - Edit dispatch
+     * - Delete dispatch
+     * - Bulk delete
+     * - Reloaded table rows
+     */
+    const isNoResultsMutation = (node) => {
+        const element =
+            node.nodeType === Node.ELEMENT_NODE ? node : node.parentElement;
+
+        return Boolean(element?.closest(".dispatch-no-results"));
+    };
+
+    const observer =
+        typeof MutationObserver === "function"
+            ? new MutationObserver((mutations) => {
+                  const hasDispatchRowChange = mutations.some((mutation) => {
+                      if (isNoResultsMutation(mutation.target)) {
+                          return false;
+                      }
+
+                      return [
+                          ...mutation.addedNodes,
+                          ...mutation.removedNodes,
+                      ].some((node) => !isNoResultsMutation(node));
+                  });
+
+                  if (hasDispatchRowChange) {
+                      applyDispatchFilters();
+                  }
+              })
+            : null;
+
+    observer?.observe(tableBody, {
+        childList: true,
+        subtree: true,
+    });
+    searchInput?.addEventListener("input", () => {
+        applyDispatchFilters({
+            resetPage: true,
+        });
+    });
+    statusFilter?.addEventListener("change", () => {
+        applyDispatchFilters({
+            resetPage: true,
+        });
+    });
+    priorityFilter?.addEventListener("change", () => {
+        applyDispatchFilters({
+            resetPage: true,
+        });
+    });
+    dateFilter?.addEventListener("change", () => {
+        applyDispatchFilters({
+            resetPage: true,
+        });
+    });
+
+    refreshButton?.addEventListener("click", () => {
+        if (searchInput) {
+            searchInput.value = "";
+        }
+        if (statusFilter) {
+            statusFilter.value = "all";
+        }
+        if (priorityFilter) {
+            priorityFilter.value = "all";
+        }
+        if (dateFilter) {
+            dateFilter.value = "";
+        }
+
+        applyDispatchFilters({
+            resetPage: true,
+        });
+
+        if (typeof updateDispatchStatistics === "function") {
+            updateDispatchStatistics();
+        }
+    });
+
+    applyDispatchFilters({
+        resetPage: true,
+    });
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+    initDispatchSearch();
+});

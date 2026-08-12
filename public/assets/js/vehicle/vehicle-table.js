@@ -107,6 +107,7 @@ function renderVehicleTable(vehicles) {
                 data-capacity="${vehicle.capacity ?? ""}"
                 data-fuel-type="${vehicle.fuel_type ?? ""}"
                 data-last-service="${vehicle.last_service ?? ""}"
+                data-notes="${vehicle.notes ?? ""}"
             >
 
                 <td>

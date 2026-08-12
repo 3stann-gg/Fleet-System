@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use App\Models\Vehicle;
 use App\Models\Driver;
+use App\Models\Dispatch;
 
 class Reservation extends Model
 {
@@ -35,5 +36,10 @@ class Reservation extends Model
     public function driver()
     {
         return $this->belongsTo(Driver::class);
+    }
+
+    public function dispatch()
+    {
+        return $this->hasOne(Dispatch::class);
     }
 }

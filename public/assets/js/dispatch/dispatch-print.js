@@ -42,17 +42,23 @@ function buildDispatchPrintHTML() {
     .map((row) => {
       const dispatchNumber = readPrintValue(row, ".dispatch-number");
       const reservationNumber = readPrintValue(
-        row,
-        ".dispatch-reservation-number"
+          row,
+          ".dispatch-reservation-number",
       );
       const patientName = readPrintValue(row, ".dispatch-patient-name");
-      const requestType = readPrintValue(row, ".dispatch-request-type", "requestType");
+      const requestType = readPrintValue(
+          row,
+          ".dispatch-request-type",
+          "requestType",
+      );
       const vehicle = readPrintValue(row, ".dispatch-vehicle");
       const driver = readPrintValue(row, ".dispatch-driver");
-      const pickup = row.dataset.pickup ? row.dataset.pickup.trim() : "Not provided";
+      const pickup = row.dataset.pickup
+          ? row.dataset.pickup.trim()
+          : "Not provided";
       const destination = row.dataset.destination
-        ? row.dataset.destination.trim()
-        : "Not provided";
+          ? row.dataset.destination.trim()
+          : "Not provided";
       const schedule = readPrintValue(row, ".dispatch-schedule");
       const priority = readPrintValue(row, ".dispatch-priority", "priority");
       const status = readPrintValue(row, ".status-badge");
@@ -78,14 +84,39 @@ function buildDispatchPrintHTML() {
 <head>
   <title>Dispatch Report</title>
   <style>
-    body { font-family: Arial, sans-serif; margin: 20px; color: #000; }
+    @page {
+    size: landscape;
+    margin: 12mm;
+    }
+    body {
+        font-family: Arial, sans-serif;
+        margin: 0;
+        color: #000;
+    }
     h1 { font-size: 18px; margin: 0 0 4px 0; }
     h2 { font-size: 14px; font-weight: normal; margin: 0 0 4px 0; }
     h3 { font-size: 14px; margin: 0 0 8px 0; }
     .timestamp { font-size: 12px; color: #333; margin-bottom: 16px; }
-    table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 12px; }
-    th, td { border: 1px solid #999; padding: 6px 8px; text-align: left; vertical-align: top; }
-    th { background-color: #f2f2f2; font-weight: bold; }
+    table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 10px;
+        margin-top: 12px;
+        table-layout: fixed;
+    }
+    th,
+    td {
+        border: 1px solid #999;
+        padding: 5px 6px;
+        text-align: left;
+        vertical-align: top;
+        word-break: break-word;
+    }
+
+    th {
+        background-color: #f2f2f2;
+        font-weight: bold;
+    }
     tr:nth-child(even) { background-color: #fafafa; }
   </style>
 </head>
@@ -172,3 +203,7 @@ function initDispatchPrint() {
     printBtn.addEventListener("click", openDispatchPrintWindow);
   }
 }
+
+document.addEventListener("DOMContentLoaded", () => {
+    initDispatchPrint();
+});

@@ -49,7 +49,6 @@ function formatReservationSchedule(date, time) {
     if (!date && !time) {
         return "";
     }
-
     if (date && time) {
         const dateObj = new Date(
             `${date}T${time}`
@@ -97,7 +96,9 @@ function renderReservationTable(reservations) {
         const driver = reservation.driver;
 
         const vehicleName = vehicle
-            ? `${vehicle.brand} ${vehicle.model}`
+            ? `${[vehicle.brand, vehicle.model]
+                  .filter(Boolean)
+                  .join(" ")} - ${vehicle.vehicle_type ?? ""}`
             : "Unassigned";
 
         const driverName = driver
@@ -144,7 +145,6 @@ function renderReservationTable(reservations) {
 
                 <td>
                     <div class="patient-info">
-
                         <div class="patient-name">
                             ${reservation.patient_name ?? ""}
                         </div>
@@ -152,7 +152,6 @@ function renderReservationTable(reservations) {
                         <small>
                             ${reservation.request_type ?? ""}
                         </small>
-
                     </div>
                 </td>
 
