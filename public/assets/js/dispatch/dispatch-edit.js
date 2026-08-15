@@ -62,7 +62,7 @@ function updateEditDispatchStatusOptions(currentStatus) {
 
     const allowedTransitions = {
         Assigned: ["En Route", "Cancelled"],
-        "En Route": ["Assigned", "Arrived", "Cancelled"],
+        "En Route": ["Arrived", "Cancelled"],
         Arrived: ["Completed"],
         Completed: [],
         Cancelled: [],

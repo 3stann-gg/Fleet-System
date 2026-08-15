@@ -1,242 +1,324 @@
+/* ==========================================
+   Maintenance View
+========================================== */
+
 let viewMaintenanceInitialized = false;
 
 const viewMaintenanceModal = {
-  currentRow: null,
+    currentRow: null,
+    currentMaintenanceId: null,
+    currentMaintenance: null,
 };
 
 function getMaintenanceRecordIdFromRow(row) {
-  if (!row) {
-    return "";
-  }
+    if (!row) {
+        return "";
+    }
 
-  const fromDataset = (row.dataset.maintenanceId || "").trim();
-  if (fromDataset) {
-    return fromDataset;
-  }
+    const id = (row.dataset.id || "").trim();
 
-  const numberCell = row.querySelector(".maintenance-number");
-  return numberCell ? numberCell.textContent.trim() : "";
+    if (!id || !/^\d+$/.test(id)) {
+        return "";
+    }
+
+    return id;
 }
 
-function resolveMaintenanceRowById(recordId) {
-  const id = (recordId || "").trim();
-  if (!id) {
-    return null;
-  }
+async function openEditMaintenanceFromView() {
+    const viewModal = document.getElementById("viewMaintenanceModal");
+    const maintenanceId =
+        viewMaintenanceModal.currentMaintenanceId ||
+        viewModal?.dataset.maintenanceId ||
+        "";
+    const row = viewMaintenanceModal.currentRow;
+    const maintenance = viewMaintenanceModal.currentMaintenance;
 
-  const rows = document.querySelectorAll("#maintenanceTableBody tr[data-maintenance-id]");
+    if (!maintenanceId || !/^\d+$/.test(String(maintenanceId))) {
+        if (typeof showToast === "function") {
+            showToast("Invalid maintenance record ID.", "error");
+        }
 
-  for (const row of rows) {
-    if ((row.dataset.maintenanceId || "").trim() === id) {
-      return row;
+        return;
     }
-  }
 
-  const numberCells = document.querySelectorAll(
-    "#maintenanceTableBody tr .maintenance-number",
-  );
+    if (!row || !document.body.contains(row)) {
+        if (typeof showToast === "function") {
+            showToast("Maintenance record is no longer available.", "error");
+        }
 
-  for (const cell of numberCells) {
-    if (cell.textContent.trim() === id) {
-      return cell.closest("tr");
+        return;
     }
-  }
 
-  return null;
+    if (typeof openEditMaintenanceModal !== "function") {
+        return;
+    }
+
+    const opened = openEditMaintenanceModal(row, maintenanceId, maintenance);
+
+    if (opened) {
+        closeViewMaintenanceModal();
+    }
 }
 
-/**
- * Close View Details and open Edit for the same maintenance record.
- * @param {string} [recordId]
- */
-function openEditMaintenanceFromView(recordId) {
-  const viewModal = document.getElementById("viewMaintenanceModal");
-  const storedId =
-    (recordId || "").trim() ||
-    (viewModal?.dataset.maintenanceId || "").trim() ||
-    getMaintenanceRecordIdFromRow(viewMaintenanceModal.currentRow);
+async function openViewMaintenanceModal(row) {
+    const modal = document.getElementById("viewMaintenanceModal");
 
-  let row = viewMaintenanceModal.currentRow;
-
-  if (!row || !document.body.contains(row)) {
-    row = resolveMaintenanceRowById(storedId);
-  }
-
-  if (!row || !document.body.contains(row)) {
-    if (typeof showToast === "function") {
-      showToast("Maintenance record is no longer available.", "error");
-    } else {
-      console.error("Edit from View: maintenance record not found", storedId);
+    if (!modal || !row) {
+        return;
     }
-    return;
-  }
 
-  if (typeof openEditMaintenanceModal !== "function") {
-    console.error("Edit from View: openEditMaintenanceModal is not available");
-    return;
-  }
+    const maintenanceId = getMaintenanceRecordIdFromRow(row);
 
-  closeViewMaintenanceModal();
+    if (!maintenanceId) {
+        console.error("Invalid maintenance database ID:", row.dataset.id);
 
-  const opened = openEditMaintenanceModal(row);
+        if (typeof showToast === "function") {
+            showToast("Invalid maintenance record ID.", "error");
+        }
 
-  if (!opened && typeof showToast === "function") {
-    showToast("Unable to open Edit Maintenance.", "error");
-  }
+        return;
+    }
+
+    try {
+        const response = await fetch(`/maintenance/${maintenanceId}`, {
+            headers: {
+                Accept: "application/json",
+            },
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(
+                data.message || "Failed to load maintenance details.",
+            );
+        }
+
+        const maintenance = data.maintenance;
+
+        if (!maintenance) {
+            throw new Error("Maintenance record not found.");
+        }
+
+        viewMaintenanceModal.currentRow = row;
+        viewMaintenanceModal.currentMaintenanceId = String(maintenance.id);
+        viewMaintenanceModal.currentMaintenance = maintenance;
+
+        modal.dataset.maintenanceId = String(maintenance.id);
+
+        const editFromViewBtn = document.getElementById(
+            "editMaintenanceFromViewBtn",
+        );
+
+        if (editFromViewBtn) {
+            editFromViewBtn.dataset.maintenanceId = String(maintenance.id);
+        }
+
+        const vehicle = maintenance.vehicle;
+        const vehicleText = vehicle
+            ? [
+                  [vehicle.brand, vehicle.model].filter(Boolean).join(" "),
+
+                  vehicle.vehicle_type,
+              ]
+                  .filter(Boolean)
+                  .join(" - ")
+            : "Unassigned";
+
+        const setText = (id, value, fallback = "Not provided") => {
+            const element = document.getElementById(id);
+
+            if (!element) {
+                return;
+            }
+
+            element.textContent =
+                value !== null &&
+                value !== undefined &&
+                String(value).trim() !== ""
+                    ? value
+                    : fallback;
+        };
+
+        setText("viewMaintenanceNumber", maintenance.maintenance_number);
+        setText("viewMaintenanceVehicle", vehicleText, "Unassigned");
+        setText("viewMaintenanceServiceType", maintenance.maintenance_type);
+        setText("viewMaintenanceTechnician", maintenance.technician);
+        setText(
+            "viewMaintenanceScheduledDate",
+            formatMaintenanceViewDate(maintenance.maintenance_date),
+        );
+        setText(
+            "viewMaintenanceCompletionDate",
+            maintenance.completion_date
+                ? formatMaintenanceViewDate(maintenance.completion_date)
+                : "Not completed",
+        );
+        setText(
+            "viewMaintenanceCost",
+            formatMaintenanceViewCost(maintenance.cost),
+        );
+        setText("viewMaintenancePriority", maintenance.priority);
+        setText("viewMaintenanceOdometer", maintenance.odometer);
+        setText("viewMaintenanceDescription", maintenance.description);
+        setText("viewMaintenancePartsUsed", maintenance.parts_used);
+        setText("viewMaintenanceNotes", maintenance.notes);
+
+        const status = maintenance.status || "";
+
+        const statusMap = {
+            Scheduled: "scheduled",
+            "In Progress": "trip",
+            Completed: "completed",
+            Cancelled: "cancelled",
+        };
+
+        const statusElement = document.getElementById("viewMaintenanceStatus");
+
+        if (statusElement) {
+            statusElement.className =
+                "status-badge " + (statusMap[status] || "out");
+
+            statusElement.textContent = status || "Not provided";
+        }
+
+        modal.classList.add("show");
+        document.body.style.overflow = "hidden";
+    } catch (error) {
+        console.error("Maintenance view error:", error);
+
+        if (typeof showToast === "function") {
+            showToast(
+                error.message || "Failed to load maintenance details.",
+                "error",
+            );
+        }
+    }
 }
 
-function initViewMaintenanceModal() {
-  if (viewMaintenanceInitialized) {
-    return;
-  }
-
-  const modal = document.getElementById("viewMaintenanceModal");
-  const container = document.getElementById("view-maintenance-modal");
-
-  if (!modal || !container) {
-    viewMaintenanceInitialized = true;
-    return;
-  }
-
-  document.addEventListener("click", (event) => {
-    const openBtn = event.target.closest(".action-btn.view-maintenance");
-
-    if (openBtn) {
-      const row = openBtn.closest("tr");
-
-      if (row) {
-        openViewMaintenanceModal(row);
-      }
-
-      return;
+function formatMaintenanceViewDate(date) {
+    if (!date) {
+        return "Not provided";
     }
 
-    const editFromViewBtn = event.target.closest("#editMaintenanceFromViewBtn");
+    const parsed = new Date(date);
 
-    if (editFromViewBtn) {
-      event.preventDefault();
-      openEditMaintenanceFromView(
-        editFromViewBtn.dataset.maintenanceId || modal.dataset.maintenanceId,
-      );
-      return;
+    if (isNaN(parsed.getTime())) {
+        return "Not provided";
     }
 
-    if (event.target.closest("#closeViewMaintenanceModal")) {
-      closeViewMaintenanceModal();
-      return;
-    }
-
-    if (event.target.closest("#closeViewMaintenanceBtn")) {
-      closeViewMaintenanceModal();
-      return;
-    }
-
-    if (event.target === modal) {
-      closeViewMaintenanceModal();
-      return;
-    }
-  });
-
-  document.addEventListener("keydown", (event) => {
-    if (event.key === "Escape" && modal.classList.contains("show")) {
-      closeViewMaintenanceModal();
-    }
-  });
-
-  viewMaintenanceInitialized = true;
+    return parsed.toLocaleDateString(undefined, {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+    });
 }
 
-function openViewMaintenanceModal(row) {
-  const modal = document.getElementById("viewMaintenanceModal");
-
-  if (!modal) {
-    return;
-  }
-
-  viewMaintenanceModal.currentRow = row;
-
-  const recordId = getMaintenanceRecordIdFromRow(row);
-  modal.dataset.maintenanceId = recordId;
-
-  const editFromViewBtn = document.getElementById("editMaintenanceFromViewBtn");
-  if (editFromViewBtn) {
-    editFromViewBtn.dataset.maintenanceId = recordId;
-  }
-
-  const getText = (selector, fallback = "Not provided") => {
-    const el = row.querySelector(selector);
-    return el ? el.textContent.trim() : fallback;
-  };
-
-  const getData = (key, fallback = "Not provided") => {
-    const val = row.dataset[key];
-    return val && val.trim() !== "" ? val.trim() : fallback;
-  };
-
-  const number = getText(".maintenance-number");
-  const vehicle = getText(".maintenance-vehicle");
-  const serviceType = getText(".maintenance-service-type");
-  const technician = getText(".maintenance-technician");
-  const scheduledDate = getText(".maintenance-scheduled-date");
-  const completionDate = getText(".maintenance-completion-date");
-  const cost = getText(".maintenance-cost");
-  const priority = getText(".maintenance-priority") !== "Not provided"
-    ? getText(".maintenance-priority")
-    : getData("priority");
-  const statusText = getText(".status-badge");
-
-  const statusMap = {
-    "Scheduled": "scheduled",
-    "In Progress": "trip",
-    "Completed": "completed",
-    "Cancelled": "cancelled"
-  };
-  const statusClass = statusMap[statusText] || "scheduled";
-
-  const statusEl = document.getElementById("viewMaintenanceStatus");
-  if (statusEl) {
-    statusEl.className = "status-badge " + statusClass;
-    statusEl.textContent = statusText;
-  }
-
-  const setText = (id, value) => {
-    const el = document.getElementById(id);
-    if (el) {
-      el.textContent = value;
+function formatMaintenanceViewCost(cost) {
+    if (cost === null || cost === undefined || cost === "") {
+        return "₱0.00";
     }
-  };
 
-  setText("viewMaintenanceNumber", number);
-  setText("viewMaintenanceVehicle", vehicle);
-  setText("viewMaintenancePriority", priority);
-  setText("viewMaintenanceServiceType", serviceType);
-  setText("viewMaintenanceTechnician", technician);
-  setText("viewMaintenanceScheduledDate", scheduledDate);
-  setText("viewMaintenanceCompletionDate", completionDate);
-  setText("viewMaintenanceCost", cost);
-  setText("viewMaintenanceOdometer", getData("odometer"));
-  setText("viewMaintenanceDescription", getData("description"));
-  setText("viewMaintenancePartsUsed", getData("partsUsed"));
-  setText("viewMaintenanceNotes", getData("notes"));
+    const value = Number(cost);
 
-  modal.classList.add("show");
-  document.body.style.overflow = "hidden";
+    if (isNaN(value)) {
+        return "₱0.00";
+    }
+
+    return (
+        "₱" +
+        value.toLocaleString(undefined, {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2,
+        })
+    );
 }
 
 function closeViewMaintenanceModal() {
-  const modal = document.getElementById("viewMaintenanceModal");
+    const modal = document.getElementById("viewMaintenanceModal");
 
-  if (!modal) {
-    return;
-  }
+    if (!modal) {
+        return; 
+    }
 
-  modal.classList.remove("show");
-  document.body.style.overflow = "";
-  viewMaintenanceModal.currentRow = null;
-  delete modal.dataset.maintenanceId;
+    modal.classList.remove("show");
 
-  const editFromViewBtn = document.getElementById("editMaintenanceFromViewBtn");
-  if (editFromViewBtn) {
-    delete editFromViewBtn.dataset.maintenanceId;
-  }
+    document.body.style.overflow = "";
+
+    modal.currentMaintenanceId = null;
+
+    delete modal.dataset.maintenanceId;
+
+    viewMaintenanceModal.currentRow = null;
+    viewMaintenanceModal.currentMaintenanceId = null;
+    viewMaintenanceModal.currentMaintenance = null;
+
+    const editFromViewBtn = document.getElementById(
+        "editMaintenanceFromViewBtn",
+    );
+
+    if (editFromViewBtn) {
+        delete editFromViewBtn.dataset.maintenanceId;
+    }
 }
+
+function initViewMaintenanceModal() {
+    if (viewMaintenanceInitialized) {
+        return;
+    }
+
+    const modal = document.getElementById("viewMaintenanceModal");
+
+    if (!modal) {
+        return;
+    }
+
+    viewMaintenanceInitialized = true;
+
+    document.addEventListener("click", (event) => {
+        const viewBtn = event.target.closest(".action-btn.view-maintenance");
+
+        if (viewBtn) {
+            const row = viewBtn.closest("tr");
+
+            if (row) {
+                openViewMaintenanceModal(row);
+            }
+
+            return;
+        }
+
+        const editFromViewBtn = event.target.closest(
+            "#editMaintenanceFromViewBtn",
+        );
+
+        if (editFromViewBtn) {
+            event.preventDefault();
+
+            openEditMaintenanceFromView();
+
+            return;
+        }
+        if (event.target.closest("#closeViewMaintenanceModal")) {
+            closeViewMaintenanceModal();
+            return;
+        }
+        if (event.target.closest("#closeViewMaintenanceBtn")) {
+            closeViewMaintenanceModal();
+            return;
+        }
+        if (event.target === modal) {
+            closeViewMaintenanceModal();
+        }
+    });
+
+    document.addEventListener("keydown", (event) => {
+        if (event.key === "Escape" && modal.classList.contains("show")) {
+            closeViewMaintenanceModal();
+        }
+    });
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+    initViewMaintenanceModal();
+});

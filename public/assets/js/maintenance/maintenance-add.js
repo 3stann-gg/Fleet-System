@@ -1,261 +1,498 @@
-function createMaintenanceRow(form) {
-  const get = (id) => {
-    const el = form.querySelector("#" + id);
-    return el ? el.value : "";
-  };
+/* ==========================================
+   Maintenance Add
+========================================== */
 
-  const number = get("maintenanceNumber");
-  const vehicle = get("maintenanceVehicle");
-  const serviceType = get("maintenanceServiceType");
-  const technician = get("maintenanceTechnician");
-  const scheduledDateRaw = get("maintenanceScheduledDate");
-  const completionDateRaw = get("maintenanceCompletionDate");
-  const costRaw = get("maintenanceCost");
-  const priority = get("maintenancePriority");
-  const status = get("maintenanceStatus");
-  const odometer = get("maintenanceOdometer");
-  const description = get("maintenanceDescription");
-  const partsUsed = get("maintenancePartsUsed");
-  const notes = get("maintenanceNotes");
+let availableMaintenanceVehicles = [];
+let maintenanceAddInitialized = false;
 
-  function formatDate(raw) {
-    if (!raw) {
-      return "";
+async function loadAvailableMaintenanceVehicles() {
+    const select = document.getElementById("maintenanceVehicle");
+
+    if (!select) {
+        return;
     }
 
-    const date = new Date(raw);
-    if (isNaN(date.getTime())) {
-      return "";
+    select.innerHTML = '<option value="">Loading vehicles...</option>';
+
+    try {
+        const response = await fetch("/maintenance/available-vehicles", {
+            headers: {
+                Accept: "application/json",
+            },
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(
+                data.message || "Failed to load available vehicles.",
+            );
+        }
+
+        availableMaintenanceVehicles = data.vehicles || [];
+
+        populateMaintenanceVehicleSelect(availableMaintenanceVehicles);
+    } catch (error) {
+        console.error("Maintenance vehicle load error:", error);
+
+        select.innerHTML = '<option value="">Failed to load vehicles</option>';
+
+        if (typeof showToast === "function") {
+            showToast("Failed to load available vehicles.", "error");
+        }
     }
-
-    return date.toLocaleDateString(undefined, {
-      year: "numeric",
-      month: "short",
-      day: "numeric"
-    });
-  }
-
-  const scheduledDisplay = formatDate(scheduledDateRaw);
-  let completionDisplay = formatDate(completionDateRaw);
-  if (!completionDisplay) {
-    completionDisplay = "Not completed";
-  }
-
-  let costDisplay = "₱0.00";
-  if (costRaw !== "" && costRaw != null) {
-    const costValue = parseFloat(costRaw);
-    if (!isNaN(costValue)) {
-      costDisplay = "₱" + costValue.toLocaleString(undefined, {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2
-      });
-    }
-  }
-
-  const statusMap = {
-    "Scheduled": "scheduled",
-    "In Progress": "trip",
-    "Completed": "completed",
-    "Cancelled": "cancelled"
-  };
-  const statusClass = statusMap[status] || "scheduled";
-
-  const tr = document.createElement("tr");
-  tr.dataset.maintenanceId = number;
-  tr.dataset.scheduledDate = scheduledDateRaw;
-  tr.dataset.completionDate = completionDateRaw;
-  tr.dataset.priority = priority;
-  tr.dataset.odometer = odometer;
-  tr.dataset.description = description;
-  tr.dataset.partsUsed = partsUsed;
-  tr.dataset.notes = notes;
-  tr.dataset.cost = costRaw;
-
-  function makeCell() {
-    return document.createElement("td");
-  }
-
-  function makeSpan(className, text) {
-    const span = document.createElement("span");
-    span.className = className;
-    span.textContent = text;
-    return span;
-  }
-
-  // 1. Checkbox
-  const checkboxTd = makeCell();
-  const checkbox = document.createElement("input");
-  checkbox.type = "checkbox";
-  checkbox.className = "maintenance-checkbox";
-  checkbox.dataset.maintenanceId = number;
-  checkbox.setAttribute("aria-label", "Select " + number);
-  checkbox.checked = false;
-  checkboxTd.appendChild(checkbox);
-
-  // 2. Maintenance No.
-  const numberTd = makeCell();
-  numberTd.appendChild(makeSpan("maintenance-number", number));
-
-  // 3. Vehicle
-  const vehicleTd = makeCell();
-  vehicleTd.appendChild(makeSpan("maintenance-vehicle", vehicle));
-
-  // 4. Service Type
-  const serviceTd = makeCell();
-  serviceTd.appendChild(makeSpan("maintenance-service-type", serviceType));
-
-  // 5. Technician / Workshop
-  const technicianTd = makeCell();
-  technicianTd.appendChild(makeSpan("maintenance-technician", technician));
-
-  // 6. Scheduled Date
-  const scheduledTd = makeCell();
-  scheduledTd.appendChild(makeSpan("maintenance-scheduled-date", scheduledDisplay));
-
-  // 7. Completion Date
-  const completionTd = makeCell();
-  completionTd.appendChild(makeSpan("maintenance-completion-date", completionDisplay));
-
-  // 8. Cost
-  const costTd = makeCell();
-  costTd.appendChild(makeSpan("maintenance-cost", costDisplay));
-
-  // 9. Priority
-  const priorityTd = makeCell();
-  priorityTd.appendChild(makeSpan("maintenance-priority", priority));
-
-  // 10. Status
-  const statusTd = makeCell();
-  const statusBadge = document.createElement("span");
-  statusBadge.className = "status-badge " + statusClass;
-  statusBadge.textContent = status;
-  statusTd.appendChild(statusBadge);
-
-  // 11. Actions
-  const actionsTd = makeCell();
-  const actionsWrapper = document.createElement("div");
-  actionsWrapper.className = "action-buttons";
-
-  const viewBtn = document.createElement("button");
-  viewBtn.type = "button";
-  viewBtn.className = "action-btn view-maintenance";
-  viewBtn.setAttribute("aria-label", "View " + number);
-  const viewIcon = document.createElement("i");
-  viewIcon.className = "ph ph-eye";
-  viewBtn.appendChild(viewIcon);
-
-  const editBtn = document.createElement("button");
-  editBtn.type = "button";
-  editBtn.className = "action-btn edit-maintenance";
-  editBtn.setAttribute("aria-label", "Edit " + number);
-  const editIcon = document.createElement("i");
-  editIcon.className = "ph ph-pencil-simple";
-  editBtn.appendChild(editIcon);
-
-  const deleteBtn = document.createElement("button");
-  deleteBtn.type = "button";
-  deleteBtn.className = "action-btn delete-maintenance";
-  deleteBtn.setAttribute("aria-label", "Delete " + number);
-  const deleteIcon = document.createElement("i");
-  deleteIcon.className = "ph ph-trash";
-  deleteBtn.appendChild(deleteIcon);
-
-  actionsWrapper.appendChild(viewBtn);
-  actionsWrapper.appendChild(editBtn);
-  actionsWrapper.appendChild(deleteBtn);
-  actionsTd.appendChild(actionsWrapper);
-
-  tr.appendChild(checkboxTd);
-  tr.appendChild(numberTd);
-  tr.appendChild(vehicleTd);
-  tr.appendChild(serviceTd);
-  tr.appendChild(technicianTd);
-  tr.appendChild(scheduledTd);
-  tr.appendChild(completionTd);
-  tr.appendChild(costTd);
-  tr.appendChild(priorityTd);
-  tr.appendChild(statusTd);
-  tr.appendChild(actionsTd);
-
-  return tr;
 }
+
+function populateMaintenanceVehicleSelect(vehicles) {
+    const select = document.getElementById("maintenanceVehicle");
+
+    if (!select) {
+        return;
+    }
+
+    select.innerHTML = '<option value="">Select Vehicle</option>';
+
+    vehicles.forEach((vehicle) => {
+        const option = document.createElement("option");
+
+        option.value = vehicle.id;
+
+        const vehicleName = [vehicle.brand, vehicle.model]
+            .filter(Boolean)
+            .join(" ");
+
+        const vehicleType = vehicle.vehicle_type || "";
+
+        option.textContent = [vehicleName, vehicleType]
+            .filter(Boolean)
+            .join(" - ");
+
+        select.appendChild(option);
+    });
+}
+
+function createMaintenanceRow(form, savedMaintenance = null) {
+    const get = (id) => {
+        const el = form.querySelector("#" + id);
+        return el ? el.value : "";
+    };
+
+    const number =
+        savedMaintenance?.maintenance_number ?? get("maintenanceNumber");
+    const vehicleId = savedMaintenance?.vehicle_id ?? get("maintenanceVehicle");
+    const serviceType =
+        savedMaintenance?.maintenance_type ?? get("maintenanceServiceType");
+    const technician =
+        savedMaintenance?.technician ?? get("maintenanceTechnician");
+    const scheduledDateRaw =
+        savedMaintenance?.maintenance_date ?? get("maintenanceScheduledDate");
+    const completionDateRaw =
+        savedMaintenance?.completion_date ?? get("maintenanceCompletionDate");
+    const costRaw = savedMaintenance?.cost ?? get("maintenanceCost");
+    const priority = savedMaintenance?.priority ?? get("maintenancePriority");
+    const status = savedMaintenance?.status ?? get("maintenanceStatus");
+    const odometer = savedMaintenance?.odometer ?? get("maintenanceOdometer");
+    const description =
+        savedMaintenance?.description ?? get("maintenanceDescription");
+    const partsUsed =
+        savedMaintenance?.parts_used ?? get("maintenancePartsUsed");
+    const notes = savedMaintenance?.notes ?? get("maintenanceNotes");
+
+    function formatDate(raw) {
+        if (!raw) {
+            return "";
+        }
+
+        const date = new Date(raw);
+
+        if (isNaN(date.getTime())) {
+            return "";
+        }
+
+        return date.toLocaleDateString(undefined, {
+            year: "numeric",
+            month: "short",
+            day: "numeric",
+        });
+    }
+
+    let vehicleName = "Unassigned";
+
+    if (savedMaintenance?.vehicle) {
+        const vehicle = savedMaintenance.vehicle;
+
+        vehicleName = [
+            [vehicle.brand, vehicle.model].filter(Boolean).join(" "),
+
+            vehicle.vehicle_type,
+        ]
+            .filter(Boolean)
+            .join(" - ");
+    } else {
+        const vehicleSelect = form.querySelector("#maintenanceVehicle");
+        const selectedOption = vehicleSelect?.selectedOptions?.[0];
+
+        vehicleName = selectedOption?.textContent?.trim() || "Unassigned";
+    }
+
+    const scheduledDisplay = formatDate(scheduledDateRaw);
+
+    let completionDisplay = formatDate(completionDateRaw);
+
+    if (!completionDisplay) {
+        completionDisplay = "Not completed";
+    }
+
+    let costDisplay = "₱0.00";
+
+    if (costRaw !== "" && costRaw !== null && costRaw !== undefined) {
+        const costValue = parseFloat(costRaw);
+
+        if (!isNaN(costValue)) {
+            costDisplay =
+                "₱" +
+                costValue.toLocaleString(undefined, {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                });
+        }
+    }
+
+    const statusMap = {
+        Scheduled: "scheduled",
+        "In Progress": "trip",
+        Completed: "completed",
+        Cancelled: "cancelled",
+    };
+
+    const statusClass = statusMap[status] || "scheduled";
+
+    const tr = document.createElement("tr");
+
+    tr.dataset.id = savedMaintenance?.id ?? "";
+    tr.dataset.maintenanceId = savedMaintenance?.id ?? "";
+    tr.dataset.vehicleId = vehicleId ?? "";
+    tr.dataset.scheduledDate = scheduledDateRaw ?? "";
+    tr.dataset.completionDate = completionDateRaw ?? "";
+    tr.dataset.priority = priority ?? "";
+    tr.dataset.odometer = odometer ?? "";
+    tr.dataset.description = description ?? "";
+    tr.dataset.partsUsed = partsUsed ?? "";
+    tr.dataset.notes = notes ?? "";
+    tr.dataset.cost = costRaw ?? "";
+    tr.dataset.status = status ?? "";
+    tr.dataset.maintenanceMatchesFilter = "true";
+
+    function makeCell() {
+        return document.createElement("td");
+    }
+
+    function makeSpan(className, text) {
+        const span = document.createElement("span");
+
+        span.className = className;
+        span.textContent = text ?? "";
+
+        return span;
+    }
+
+    /* 1. Checkbox */
+    const checkboxTd = makeCell();
+
+    const checkbox = document.createElement("input");
+
+    checkbox.type = "checkbox";
+    checkbox.className = "maintenance-checkbox";
+    checkbox.dataset.maintenanceId = savedMaintenance?.id ?? "";
+    checkbox.dataset.id = savedMaintenance?.id ?? "";
+    checkbox.setAttribute("aria-label", "Select " + number);
+    checkbox.checked = false;
+    checkboxTd.appendChild(checkbox);
+
+    /* 2. Maintenance Number */
+    const numberTd = makeCell();
+
+    numberTd.appendChild(makeSpan("maintenance-number", number));
+
+    /* 3. Vehicle */
+    const vehicleTd = makeCell();
+
+    vehicleTd.appendChild(makeSpan("maintenance-vehicle", vehicleName));
+
+    /* 4. Service Type */
+    const serviceTd = makeCell();
+
+    serviceTd.appendChild(makeSpan("maintenance-service-type", serviceType));
+
+    /* 5. Technician / Workshop */
+    const technicianTd = makeCell();
+
+    technicianTd.appendChild(makeSpan("maintenance-technician", technician));
+
+    /* 6. Scheduled Date */
+    const scheduledTd = makeCell();
+
+    scheduledTd.appendChild(
+        makeSpan("maintenance-scheduled-date", scheduledDisplay),
+    );
+
+    /* 7. Completion Date */
+    const completionTd = makeCell();
+
+    completionTd.appendChild(
+        makeSpan("maintenance-completion-date", completionDisplay),
+    );
+
+    /* 8. Cost */
+    const costTd = makeCell();
+
+    costTd.appendChild(makeSpan("maintenance-cost", costDisplay));
+
+    /* 9. Priority */
+    const priorityTd = makeCell();
+
+    priorityTd.appendChild(makeSpan("maintenance-priority", priority));
+
+    /* 10. Status */
+    const statusTd = makeCell();
+    const statusBadge = document.createElement("span");
+
+    statusBadge.className = "status-badge " + statusClass;
+    statusBadge.textContent = status;
+    statusTd.appendChild(statusBadge);
+
+    /* 11. Actions */
+    const actionsTd = makeCell();
+    const actionsWrapper = document.createElement("div");
+
+    actionsWrapper.className = "action-buttons";
+
+    const viewBtn = document.createElement("button");
+
+    viewBtn.type = "button";
+    viewBtn.className = "action-btn view-maintenance";
+    viewBtn.dataset.id = savedMaintenance?.id ?? "";
+    viewBtn.setAttribute("aria-label", "View " + number);
+
+    const viewIcon = document.createElement("i");
+
+    viewIcon.className = "ph ph-eye";
+    viewBtn.appendChild(viewIcon);
+
+    const editBtn = document.createElement("button");
+
+    editBtn.type = "button";
+    editBtn.className = "action-btn edit-maintenance";
+    editBtn.dataset.id = savedMaintenance?.id ?? "";
+    editBtn.setAttribute("aria-label", "Edit " + number);
+
+    const editIcon = document.createElement("i");
+
+    editIcon.className = "ph ph-pencil-simple";
+    editBtn.appendChild(editIcon);
+
+    const deleteBtn = document.createElement("button");
+
+    deleteBtn.type = "button";
+    deleteBtn.className = "action-btn delete-maintenance";
+    deleteBtn.dataset.id = savedMaintenance?.id ?? "";
+    deleteBtn.setAttribute("aria-label", "Delete " + number);
+
+    const deleteIcon = document.createElement("i");
+
+    deleteIcon.className = "ph ph-trash";
+    deleteBtn.appendChild(deleteIcon);
+
+    actionsWrapper.appendChild(viewBtn);
+    actionsWrapper.appendChild(editBtn);
+    actionsWrapper.appendChild(deleteBtn);
+    actionsTd.appendChild(actionsWrapper);
+
+    tr.appendChild(checkboxTd);
+    tr.appendChild(numberTd);
+    tr.appendChild(vehicleTd);
+    tr.appendChild(serviceTd);
+    tr.appendChild(technicianTd);
+    tr.appendChild(scheduledTd);
+    tr.appendChild(completionTd);
+    tr.appendChild(costTd);
+    tr.appendChild(priorityTd);
+    tr.appendChild(statusTd);
+    tr.appendChild(actionsTd);
+
+    return tr;
+}
+
+async function saveMaintenance(form) {
+    const values = {
+        maintenance_number:
+            document.getElementById("maintenanceNumber")?.value.trim() || "",
+        vehicle_id: document.getElementById("maintenanceVehicle")?.value || "",
+        maintenance_type:
+            document.getElementById("maintenanceServiceType")?.value || "",
+        technician:
+            document.getElementById("maintenanceTechnician")?.value.trim() ||
+            "",
+        maintenance_date:
+            document.getElementById("maintenanceScheduledDate")?.value || "",
+        completion_date:
+            document.getElementById("maintenanceCompletionDate")?.value || null,
+        cost: document.getElementById("maintenanceCost")?.value || 0,
+        priority: document.getElementById("maintenancePriority")?.value || "",
+        status: document.getElementById("maintenanceStatus")?.value || "",
+        odometer: document.getElementById("maintenanceOdometer")?.value || null,
+        description:
+            document.getElementById("maintenanceDescription")?.value.trim() ||
+            "",
+        parts_used:
+            document.getElementById("maintenancePartsUsed")?.value.trim() ||
+            null,
+        notes:
+            document.getElementById("maintenanceNotes")?.value.trim() || null,
+    };
+
+    const response = await fetch("/maintenance", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+            "X-CSRF-TOKEN": document
+                .querySelector('meta[name="csrf-token"]')
+                ?.getAttribute("content"),
+        },
+
+        body: JSON.stringify(values),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+        console.error("Maintenance save error:", data);
+
+        const firstError = data.errors
+            ? Object.values(data.errors).flat()[0]
+            : null;
+
+        throw new Error(
+            firstError ||
+                data.message ||
+                "Failed to create maintenance record.",
+        );
+    }
+
+    return data.maintenance;
+}
+
 
 function initMaintenanceAdd() {
-  if (typeof initMaintenanceModal !== "function") {
-    return;
-  }
-
-  const form = document.getElementById("maintenanceForm");
-  const tableBody = document.getElementById("maintenanceTableBody");
-
-  if (!form) {
-    return;
-  }
-
-  if (typeof createMaintenanceRow !== "function") {
-    return;
-  }
-
-  if (typeof validateMaintenanceForm !== "function") {
-    return;
-  }
-
-  if (!tableBody) {
-    return;
-  }
-
-  if (form.dataset.maintenanceAddInitialized) {
-    return;
-  }
-
-  form.dataset.maintenanceAddInitialized = "true";
-
-  form.addEventListener("submit", function (event) {
-    event.preventDefault();
-
-    if (!validateMaintenanceForm(form)) {
-      return;
+    if (maintenanceAddInitialized) {
+        return;
+    }
+    if (typeof initMaintenanceModal !== "function") {
+        return;
     }
 
-    const row = createMaintenanceRow(form);
-    if (!row) {
-      return;
+    const form = document.getElementById("maintenanceForm");
+    const tableBody = document.getElementById("maintenanceTableBody");
+
+    if (!form || !tableBody) {
+        return;
+    }
+    if (typeof validateMaintenanceForm !== "function") {
+        return;
     }
 
-    tableBody.prepend(row);
+    maintenanceAddInitialized = true;
 
-    form.reset();
+    loadAvailableMaintenanceVehicles();
 
-    const invalidFields = form.querySelectorAll(".is-invalid");
-    invalidFields.forEach(function (field) {
-      field.classList.remove("is-invalid");
+    form.querySelectorAll("input, select, textarea").forEach((input) => {
+        input.addEventListener("input", () => {
+            input.classList.remove("is-invalid");
+        });
+        input.addEventListener("change", () => {
+            input.classList.remove("is-invalid");
+        });
     });
 
-    const fieldErrors = form.querySelectorAll(".field-error");
-    fieldErrors.forEach(function (errorEl) {
-      errorEl.textContent = "";
-      errorEl.style.display = "none";
+    form.addEventListener("submit", async (event) => {
+        event.preventDefault();
+
+        if (!validateMaintenanceForm(form)) {
+            return;
+        }
+
+        const saveButton = document.getElementById("saveMaintenanceBtn");
+
+        if (saveButton) {
+            saveButton.disabled = true;
+
+            saveButton.textContent = "Saving...";
+        }
+
+        try {
+            const maintenance = await saveMaintenance(form);
+
+            if (typeof loadMaintenances === "function") {
+                await loadMaintenances();
+            } else {
+                throw new Error("Maintenance table loader is unavailable.");
+            }
+
+            await loadAvailableMaintenanceVehicles();
+
+            form.reset();
+            form.querySelectorAll(".is-invalid").forEach((field) => {
+                field.classList.remove("is-invalid");
+            });
+            form.querySelectorAll(".field-error").forEach((errorEl) => {
+                errorEl.textContent = "";
+
+                errorEl.style.display = "none";
+            });
+
+            const modal = document.getElementById("addMaintenanceModal");
+
+            if (modal) {
+                modal.classList.remove("show");
+            }
+
+            document.body.style.overflow = "";
+
+            if (typeof updateMaintenanceStatistics === "function") {
+                updateMaintenanceStatistics();
+            }
+            if (typeof updateMaintenancePagination === "function") {
+                updateMaintenancePagination();
+            }
+            if (typeof refreshMaintenanceBulkState === "function") {
+                refreshMaintenanceBulkState();
+            }
+            if (typeof showToast === "function") {
+                showToast(
+                    "Maintenance record created successfully.",
+                    "success",
+                );
+            }
+        } catch (error) {
+            console.error("Maintenance creation error:", error);
+
+            if (typeof showToast === "function") {
+                showToast(
+                    error.message || "Failed to create maintenance record.",
+                    "error",
+                );
+            }
+        } finally {
+            if (saveButton) {
+                saveButton.disabled = false;
+
+                saveButton.textContent = "Save Maintenance";
+            }
+        }
     });
-
-    const modal = document.getElementById("addMaintenanceModal");
-    if (modal) {
-      modal.classList.remove("show");
-    }
-
-    document.body.style.overflow = "";
-
-    if (typeof refreshMaintenanceTable === "function") {
-      refreshMaintenanceTable({
-        resetPage: false,
-        refreshStatistics: true,
-        reason: "add",
-      });
-    } else if (typeof updateMaintenanceStatistics === "function") {
-      updateMaintenanceStatistics();
-    }
-
-    if (typeof showToast === "function") {
-      showToast("Maintenance record created successfully.", "success");
-    }
-  });
 }
+
+document.addEventListener("DOMContentLoaded", () => {
+    initMaintenanceAdd();
+});

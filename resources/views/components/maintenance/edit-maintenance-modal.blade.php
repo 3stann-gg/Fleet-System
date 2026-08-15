@@ -40,11 +40,6 @@
             <label for="editMaintenanceVehicle">Vehicle *</label>
             <select id="editMaintenanceVehicle" required>
               <option value="">Select Vehicle</option>
-              <option value="Ambulance 01">Ambulance 01</option>
-              <option value="Patient Van 02">Patient Van 02</option>
-              <option value="SUV 03">SUV 03</option>
-              <option value="Service Vehicle 04">Service Vehicle 04</option>
-              <option value="Van 05">Van 05</option>
             </select>
           </div>
 

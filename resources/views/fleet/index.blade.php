@@ -300,11 +300,11 @@
     <script src="{{ asset('assets/js/vehicle/vehicle-bulk.js') }}"></script>
     <script src="{{ asset('assets/js/vehicle/vehicle-filters.js') }}"></script>
     <script src="{{ asset('assets/js/vehicle/vehicle-table.js') }}"></script>
+    <script src="{{ asset('assets/js/vehicle/vehicle-stats.js') }}"></script>
     <script src="{{ asset('assets/js/vehicle/vehicle-pagination.js') }}"></script>
     <script src="{{ asset('assets/js/vehicle/vehicle-sort.js') }}"></script>
     <script src="{{ asset('assets/js/vehicle/vehicle-export.js') }}"></script>
     <script src="{{ asset('assets/js/vehicle/vehicle-print.js') }}"></script>
-    <script src="{{ asset('assets/js/vehicle/vehicle-stats.js') }}"></script>
     <script src="{{ asset('assets/js/vehicle/vehicle-view.js') }}"></script>
     <script src="{{ asset('/assets/js/vehicle/vehicle-edit.js') }}"></script>
     <script src="{{ asset('assets/js/vehicle/vehicle-delete.js') }}"></script>

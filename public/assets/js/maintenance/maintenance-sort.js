@@ -330,3 +330,7 @@ function applyMaintenanceSort() {
     refreshMaintenanceTable();
   }
 }
+
+document.addEventListener("DOMContentLoaded", () => {
+    initMaintenanceSorting();
+});

@@ -6,6 +6,7 @@ use App\Http\Controllers\VehicleController;
 use App\Http\Controllers\DriverController;
 use App\Http\Controllers\ReservationController;
 use App\Http\Controllers\DispatchController;
+use App\Http\Controllers\MaintenanceController;
 
 Route::get('/', function () {
     return view('welcome');
@@ -104,22 +105,48 @@ Route::delete('/drivers/{driver}', [DriverController::class, 'destroy'])
     ->name('drivers.destroy');
 
 
-Route::view('/maintenance', 'maintenance.index')->name('maintenance');
+// ***MAINTENANCE MODULE***
+Route::get('/maintenance', [MaintenanceController::class, 'index'])
+    ->name('maintenance');
+
+Route::get('/maintenance/available-vehicles', [MaintenanceController::class, 'availableVehicles'])
+    ->name('maintenance.availableVehicles');
+
+Route::post('/maintenance', [MaintenanceController::class, 'store'])
+    ->name('maintenance.store');
+
+Route::get('/maintenance/{maintenance}', [MaintenanceController::class, 'show'])
+    ->name('maintenance.show');
+
+Route::put('/maintenance/{maintenance}', [MaintenanceController::class, 'update'])
+    ->name('maintenance.update');
+
+Route::delete('/maintenance/bulk-delete', [MaintenanceController::class, 'bulkDelete'])
+    ->name('maintenance.bulkDelete');   
+
+Route::delete('/maintenance/{maintenance}', [MaintenanceController::class, 'destroy'])
+    ->name('maintenance.destroy');
 
 
+// ***FUEL MANAGEMENT MODULE***
 Route::view('/fuel', 'fuel.index')->name('fuel');
 
 
+// ***ROUTE PLANNING MODULE***
 Route::view('/route-planning', 'route-planning.index')->name('route-planning');
 
 
+// ***COST ANALYSIS MODULE***
 Route::view('/cost-analysis', 'cost-analysis.index')->name('cost-analysis');
 
 
+// ***REPORTS MODULE***
 Route::view('/reports', 'reports.index')->name('reports');
 
 
+// ***SETTINGS***
 Route::view('/settings', 'settings.index')->name('settings');
 
+// ***PROFILE***
 Route::view('/profile', 'profile.index')->name('profile');
 

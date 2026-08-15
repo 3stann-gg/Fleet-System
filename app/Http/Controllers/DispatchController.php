@@ -10,6 +10,82 @@ use Illuminate\Support\Facades\Validator;
 
 class DispatchController extends Controller
 {   
+    private function setTripResourcesOnEnRoute(Reservation $reservation): void
+    {
+        if ($reservation->vehicle) {
+            $reservation->vehicle->update([
+                'status' => 'On Trip',
+            ]);
+        }
+        if ($reservation->driver) {
+            $reservation->driver->update([
+                'status' => 'On Duty',
+            ]);
+        }
+    }
+
+    private function releaseTripResources(Reservation $reservation): void
+    {
+        if (
+            $reservation->vehicle &&
+            $reservation->vehicle->status === 'On Trip'
+        ) {
+            $reservation->vehicle->update([
+                'status' => 'Available',
+            ]);
+        }
+
+        if (
+            $reservation->driver &&
+            $reservation->driver->status === 'On Duty'
+        ) {
+            $reservation->driver->update([
+                'status' => 'Available',
+            ]);
+        }
+    }
+
+    private function validateTripResourcesAvailable(Reservation $reservation): void
+    {
+        $vehicle = $reservation->vehicle;
+        $driver = $reservation->driver;
+        /*
+        |--------------------------------------------------------------------------
+        | Vehicle must exist and be Available
+        |--------------------------------------------------------------------------
+        */
+        if (!$vehicle) {
+            throw new \Exception(
+                'No vehicle is assigned to this reservation.'
+            );
+        }
+        if ($vehicle->status !== 'Available') {
+            throw new \Exception(
+                "Vehicle {$vehicle->brand} {$vehicle->model} is currently {$vehicle->status} and cannot start the trip."
+            );
+        }
+        /*
+        |--------------------------------------------------------------------------
+        | Driver must exist and be Available
+        |--------------------------------------------------------------------------
+        */
+        if (!$driver) {
+            throw new \Exception(
+                'No driver is assigned to this reservation.'
+            );
+        }
+        if ($driver->status !== 'Available') {
+            $driverName = trim(
+                ($driver->first_name ?? '') . ' ' .
+                ($driver->last_name ?? '')
+            );
+
+            throw new \Exception(
+                "Driver {$driverName} is currently {$driver->status} and cannot start the trip."
+            );
+        }
+    }
+
     /**
      * Display a listing of dispatches.
      */
@@ -203,7 +279,6 @@ class DispatchController extends Controller
                     'max:50',
                     'unique:dispatch,dispatch_number,' . $dispatch->id,
                 ],
-
                 'trip_status' => [
                     'required',
                     'string',
@@ -224,37 +299,36 @@ class DispatchController extends Controller
         try {
 
             $result = DB::transaction(function () use (
-                $request,
                 $validator,
                 $dispatch
             ) {
                 /*
                 |--------------------------------------------------------------------------
-                | Lock Dispatch
+                | Lock Dispatch + Reservation
                 |--------------------------------------------------------------------------
                 */
                 $dispatch = Dispatch::lockForUpdate()
-                    ->with('reservation')
+                    ->with([
+                        'reservation.vehicle',
+                        'reservation.driver',
+                    ])
                     ->findOrFail($dispatch->id);
 
                 $reservation = $dispatch->reservation;
-                /*
-                |--------------------------------------------------------------------------
-                | Reservation Must Exist
-                |--------------------------------------------------------------------------
-                */
+
                 if (!$reservation) {
                     throw new \Exception(
                         'Reservation associated with this dispatch was not found.'
                     );
                 }
+
                 /*
                 |--------------------------------------------------------------------------
                 | Dispatch Status Lifecycle
                 |--------------------------------------------------------------------------
                 |
-                | Assigned > En Route > Arrived > Completed 
-                
+                | Assigned → En Route → Arrived → Completed
+                |
                 | Assigned / En Route → Cancelled
                 |
                 */
@@ -264,6 +338,7 @@ class DispatchController extends Controller
                         'Cancelled',
                     ],
                     'En Route' => [
+                        //'Assigned',
                         'Arrived',
                         'Cancelled',
                     ],
@@ -273,6 +348,7 @@ class DispatchController extends Controller
                     'Completed' => [],
                     'Cancelled' => [],
                 ];
+
                 $currentStatus = $dispatch->trip_status;
                 $newStatus = $validator->validated()['trip_status'];
                 /*
@@ -287,7 +363,6 @@ class DispatchController extends Controller
                         $allowedTransitions[$currentStatus] ?? []
                     )
                 ) {
-
                     throw new \Exception(
                         "Cannot change dispatch status from {$currentStatus} to {$newStatus}."
                     );
@@ -305,34 +380,65 @@ class DispatchController extends Controller
                 ]);
                 /*
                 |--------------------------------------------------------------------------
-                | Synchronize Reservation Status
+                | Synchronize Vehicle + Driver + Reservation
                 |--------------------------------------------------------------------------
                 */
-                if ($newStatus === 'Completed') {
+
+                if ($newStatus === 'En Route') {
                     /*
                     |--------------------------------------------------------------------------
-                    | Dispatch Completed → Reservation Completed
+                    | Validate Vehicle + Driver Availability
                     |--------------------------------------------------------------------------
+                    */
+                    $this->validateTripResourcesAvailable(
+                        $reservation
+                    );
+                    /*
+                    |--------------------------------------------------------------------------
+                    | Start Trip
+                    |--------------------------------------------------------------------------
+                    | Vehicle: Available → On Trip
+                    | Driver: Available → On Duty
+                    |--------------------------------------------------------------------------
+                    */
+                    $this->setTripResourcesOnEnRoute(
+                        $reservation
+                    );
+                } elseif ($newStatus === 'Completed') {
+                    /*
+                    | Trip completed.
+                    |
+                    | Reservation: Scheduled → Completed
+                    | Vehicle: On Trip → Available
+                    | Driver: On Duty → Available
                     */
                     $reservation->update([
                         'status' => 'Completed',
                     ]);
 
+                    $this->releaseTripResources(
+                        $reservation
+                    );
+
                 } elseif ($newStatus === 'Cancelled') {
-
                     /*
-                    |--------------------------------------------------------------------------
-                    | Dispatch Cancelled → Reservation Cancelled
-                    |--------------------------------------------------------------------------
+                    | Reservation becomes Cancelled.
+                    |
+                    | If the trip had already started,
+                    | release the vehicle and driver.
                     */
-
                     $reservation->update([
                         'status' => 'Cancelled',
                     ]);
+
+                    $this->releaseTripResources(
+                        $reservation
+                    );
                 }
+
                 /*
                 |--------------------------------------------------------------------------
-                | Load Updated Relationships
+                | Reload Relationships
                 |--------------------------------------------------------------------------
                 */
                 $dispatch->load([
@@ -348,7 +454,6 @@ class DispatchController extends Controller
                 'message' => 'Dispatch updated successfully.',
                 'dispatch' => $result,
             ]);
-
 
         } catch (\Exception $e) {
 

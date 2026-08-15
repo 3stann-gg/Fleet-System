@@ -1,5 +1,5 @@
 /* ==========================================
-   Dispatch Table :))
+   Dispatch Table :)
 ========================================== */
 
 document.addEventListener("DOMContentLoaded", () => {
