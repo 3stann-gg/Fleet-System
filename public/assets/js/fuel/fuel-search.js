@@ -1,304 +1,335 @@
 /* ==========================================
-   Fuel Search + Filters + Table Pipeline
-   Single entry: refreshFuelTable(options)
+   Fuel Search and Filters
 ========================================== */
 
-const FUEL_TABLE_COLUMN_COUNT = 13;
-
 let fuelSearchState = null;
-let isRefreshingFuelTable = false;
-let fuelNextOriginalOrder = 0;
 
-function isFuelTableRefreshing() {
-  return isRefreshingFuelTable;
+function getFuelSearchText(row, columnIndex, selector) {
+    const selectedElement = selector ? row.querySelector(selector) : null;
+    const cell = row.children && row.children[columnIndex];
+    const value = selectedElement
+        ? selectedElement.textContent
+        : cell?.textContent;
+
+    return value ? value.trim() : "";
+}
+
+function getFuelFilterLabel(select) {
+    if (!select || select.value === "all") {
+        return "";
+    }
+
+    const option = select.options[select.selectedIndex];
+    const value = option ? option.textContent : select.value;
+
+    return value.trim().toLowerCase();
 }
 
 function getFuelDataRows(tableBody) {
-  if (!tableBody) return [];
+    if (!tableBody) {
+        return [];
+    }
 
-  return Array.from(tableBody.children).filter((row) => {
-    if (row.tagName !== "TR") return false;
+    return Array.from(tableBody.querySelectorAll("tr")).filter((row) => {
+        const isHelperRow =
+            row.classList.contains("fuel-no-results") ||
+            row.classList.contains("helper-row") ||
+            row.classList.contains("empty-state") ||
+            row.dataset.helperRow === "true";
 
-    const isHelper =
-      row.classList.contains("fuel-no-results") ||
-      row.classList.contains("helper-row") ||
-      row.classList.contains("empty-state") ||
-      row.dataset.helperRow === "true";
-
-    if (isHelper) return false;
-
-    return Boolean(
-      row.querySelector(".fuel-number") ||
-        row.querySelector(".fuel-checkbox") ||
-        row.dataset.fuelId ||
-        row.dataset.fuelNumber,
-    );
-  });
-}
-
-function getFuelCellText(row, selector) {
-  const el = row.querySelector(selector);
-  return el ? el.textContent.trim() : "";
-}
-
-function ensureFuelOriginalOrder(row) {
-  if (
-    row.dataset.fuelSortIndex == null ||
-    row.dataset.fuelSortIndex === ""
-  ) {
-    row.dataset.fuelSortIndex = String(fuelNextOriginalOrder);
-    fuelNextOriginalOrder += 1;
-  }
-  return Number(row.dataset.fuelSortIndex) || 0;
-}
-
-function buildFuelRowMeta(row) {
-  const number = getFuelCellText(row, ".fuel-number");
-  const dateDisplay = getFuelCellText(row, ".fuel-date");
-  const vehicle = getFuelCellText(row, ".fuel-vehicle");
-  const plate = getFuelCellText(row, ".fuel-plate");
-  const driver = getFuelCellText(row, ".fuel-driver");
-  const fuelType = getFuelCellText(row, ".fuel-type");
-  const quantityDisplay = getFuelCellText(row, ".fuel-quantity");
-  const totalCostDisplay = getFuelCellText(row, ".fuel-total-cost");
-  const odometerDisplay = getFuelCellText(row, ".fuel-odometer");
-  const station = getFuelCellText(row, ".fuel-station");
-
-  const refuelDate = (row.dataset.refuelDate || "").trim();
-  const quantity = (row.dataset.quantity || "").trim();
-  const totalCost = (row.dataset.totalCost || "").trim();
-  const odometer = (row.dataset.odometer || "").trim();
-  const receipt = (row.dataset.receipt || "").trim();
-
-  const searchableText = [
-    number,
-    dateDisplay,
-    vehicle,
-    plate,
-    driver,
-    fuelType,
-    quantityDisplay,
-    totalCostDisplay,
-    odometerDisplay,
-    station,
-    receipt,
-    row.dataset.notes,
-    row.dataset.payment,
-    refuelDate,
-  ]
-    .map((v) => (v ? String(v).trim() : ""))
-    .join(" ")
-    .toLowerCase()
-    .replace(/\s+/g, " ")
-    .trim();
-
-  return {
-    row,
-    originalOrder: ensureFuelOriginalOrder(row),
-    searchableText,
-    number,
-    vehicle: vehicle.toLowerCase(),
-    vehicleRaw: vehicle,
-    fuelType: fuelType.toLowerCase(),
-    fuelTypeRaw: fuelType,
-    refuelDate,
-    quantity,
-    totalCost,
-    odometer,
-    plate,
-    driver,
-    station,
-  };
-}
-
-function getFuelFilterSelectValue(select) {
-  if (!select) return "";
-  const value = (select.value || "").trim();
-  if (!value || value.toLowerCase() === "all") return "";
-  return value.toLowerCase();
+        return (
+            !isHelperRow &&
+            Boolean(
+                row.querySelector(".fuel-number") ||
+                row.querySelector(".fuel-checkbox"),
+            )
+        );
+    });
 }
 
 function updateFuelNoResultsRow(tableBody, shouldShow) {
-  if (!tableBody) return;
+    if (!tableBody) {
+        return;
+    }
 
-  const existing = tableBody.querySelector(".fuel-no-results");
-  if (!shouldShow) {
-    existing?.remove();
-    return;
-  }
-  if (existing) return;
+    const existingRow = tableBody.querySelector(".fuel-no-results");
 
-  const row = document.createElement("tr");
-  const cell = document.createElement("td");
-  row.className = "fuel-no-results";
-  row.dataset.helperRow = "true";
-  cell.colSpan = FUEL_TABLE_COLUMN_COUNT;
-  cell.textContent = "No fuel records found.";
-  row.appendChild(cell);
-  tableBody.appendChild(row);
+    if (!shouldShow) {
+        existingRow?.remove();
+        return;
+    }
+
+    if (existingRow) {
+        return;
+    }
+
+    const row = document.createElement("tr");
+    const cell = document.createElement("td");
+
+    row.className = "fuel-no-results";
+    row.dataset.helperRow = "true";
+    cell.colSpan = 13;
+    cell.className = "text-center";
+    cell.textContent = "No fuel records found.";
+
+    row.appendChild(cell);
+
+    tableBody.appendChild(row);
 }
 
-function ensureFuelSearchState() {
-  const tableBody = document.getElementById("fuelTableBody");
-  if (!tableBody) return null;
+function renderFuelFilterRows(matchingRows) {
+    if (!fuelSearchState) {
+        return;
+    }
 
-  if (fuelSearchState?.tableBody === tableBody) {
-    return fuelSearchState;
-  }
+    const matchingRowSet = new Set(matchingRows);
 
-  fuelSearchState = {
-    tableBody,
-    searchInput: document.getElementById("fuelSearch"),
-    vehicleFilter: document.getElementById("fuelVehicleFilter"),
-    typeFilter: document.getElementById("fuelTypeFilter"),
-    dateFilter: document.getElementById("fuelDateFilter"),
-  };
+    getFuelDataRows(fuelSearchState.tableBody).forEach((row) => {
+        row.style.display = matchingRowSet.has(row) ? "" : "none";
+    });
 
-  return fuelSearchState;
+    updateFuelNoResultsRow(
+        fuelSearchState.tableBody,
+        matchingRows.length === 0,
+    );
 }
 
-/**
- * Single Fuel table pipeline.
- * @param {{ resetPage?: boolean, refreshStatistics?: boolean, reason?: string }} [options]
- */
-function refreshFuelTable(options = {}) {
-  if (isRefreshingFuelTable) {
-    return [];
-  }
+function populateFuelVehicleFilter() {
+    const filter = document.getElementById("fuelVehicleFilter");
 
-  const resetPage = options.resetPage === true;
-  const refreshStatistics = options.refreshStatistics === true;
+    const tableBody = document.getElementById("fuelTableBody");
 
-  isRefreshingFuelTable = true;
+    if (!filter || !tableBody) {
+        return;
+    }
 
-  try {
-    const state = ensureFuelSearchState();
-    if (!state?.tableBody) return [];
+    const currentValue = filter.value || "all";
+
+    const vehicles = new Set();
+
+    getFuelDataRows(tableBody).forEach((row) => {
+        const vehicle = row.querySelector(".fuel-vehicle")?.textContent?.trim();
+
+        if (vehicle) {
+            vehicles.add(vehicle);
+        }
+    });
+
+    filter.innerHTML = '<option value="all">All Vehicles</option>';
+
+    Array.from(vehicles)
+        .sort((a, b) =>
+            a.localeCompare(b, undefined, {
+                sensitivity: "base",
+                numeric: true,
+            }),
+        )
+        .forEach((vehicle) => {
+            const option = document.createElement("option");
+
+            option.value = vehicle;
+
+            option.textContent = vehicle;
+
+            filter.appendChild(option);
+        });
+
+    const exists = Array.from(filter.options).some(
+        (option) => option.value === currentValue,
+    );
+
+    filter.value = exists ? currentValue : "all";
+}
+
+function applyFuelFilters({ resetPage = false } = {}) {
+    if (!fuelSearchState) {
+        return [];
+    }
 
     const { tableBody, searchInput, vehicleFilter, typeFilter, dateFilter } =
-      state;
-
+        fuelSearchState;
     const searchQuery = (searchInput?.value || "").trim().toLowerCase();
-    const vehicleValue = getFuelFilterSelectValue(vehicleFilter);
-    const typeValue = getFuelFilterSelectValue(typeFilter);
+    const vehicleValue = getFuelFilterLabel(vehicleFilter);
+    const typeValue = getFuelFilterLabel(typeFilter);
     const dateValue = (dateFilter?.value || "").trim();
+    const matchingRows = [];
 
-    const allRows = getFuelDataRows(tableBody);
-    const metas = allRows.map(buildFuelRowMeta);
-    const matchingMetas = [];
-    const nonMatchingMetas = [];
+    getFuelDataRows(tableBody).forEach((row) => {
+        const number = getFuelSearchText(row, 1, ".fuel-number");
+        const date = getFuelSearchText(row, 2, ".fuel-date");
+        const vehicle = getFuelSearchText(row, 3, ".fuel-vehicle");
+        const plate = getFuelSearchText(row, 4, ".fuel-plate");
+        const driver = getFuelSearchText(row, 5, ".fuel-driver");
+        const fuelType = getFuelSearchText(row, 6, ".fuel-type");
+        const quantity = getFuelSearchText(row, 7, ".fuel-quantity");
+        const costPerLiter = getFuelSearchText(row, 8, ".fuel-cost-per-liter");
+        const totalCost = getFuelSearchText(row, 9, ".fuel-total-cost");
+        const odometer = getFuelSearchText(row, 10, ".fuel-odometer");
+        const station = getFuelSearchText(row, 11, ".fuel-station");
+        const receipt = (row.dataset.receipt || "").trim();
+        const payment = (row.dataset.payment || "").trim();
+        const notes = (row.dataset.notes || "").trim();
+        const refuelDate = (row.dataset.refuelDate || "").trim();
 
-    metas.forEach((meta) => {
-      const matchesSearch =
-        !searchQuery || meta.searchableText.includes(searchQuery);
-      const matchesVehicle =
-        !vehicleValue || meta.vehicle === vehicleValue;
-      const matchesType = !typeValue || meta.fuelType === typeValue;
-      const matchesDate = !dateValue || meta.refuelDate === dateValue;
-      const isMatch =
-        matchesSearch && matchesVehicle && matchesType && matchesDate;
+        const searchableText = [
+            number,
+            date,
+            refuelDate,
+            vehicle,
+            plate,
+            driver,
+            fuelType,
+            quantity,
+            costPerLiter,
+            totalCost,
+            odometer,
+            station,
+            receipt,
+            payment,
+            notes,
+        ]
+            .join(" ")
+            .toLowerCase();
 
-      meta.row.dataset.matchesFilter = String(isMatch);
 
-      if (isMatch) {
-        matchingMetas.push(meta);
-      } else {
-        nonMatchingMetas.push(meta);
-      }
+        const matchesSearch =
+            !searchQuery || searchableText.includes(searchQuery);
+        const matchesVehicle =
+            !vehicleValue || vehicle.toLowerCase() === vehicleValue;
+        const matchesType = !typeValue || fuelType.toLowerCase() === typeValue;
+        const matchesDate = !dateValue || refuelDate === dateValue;
+        const isMatch =
+            matchesSearch && matchesVehicle && matchesType && matchesDate;
+        row.dataset.fuelMatchesFilter = String(isMatch);
+        row.dataset.matchesFilter = String(isMatch);
+
+        if (isMatch) {
+            matchingRows.push(row);
+        }
     });
 
-    if (typeof sortFuelRowMetas === "function") {
-      sortFuelRowMetas(matchingMetas, nonMatchingMetas);
-    } else {
-      const byOriginal = (a, b) => a.originalOrder - b.originalOrder;
-      matchingMetas.sort(byOriginal);
-      nonMatchingMetas.sort(byOriginal);
+    if (typeof sortFuelRows === "function") {
+        sortFuelRows(matchingRows);
     }
 
-    if (typeof applyFuelRowOrder === "function") {
-      applyFuelRowOrder(tableBody, matchingMetas, nonMatchingMetas);
-    }
+    updateFuelNoResultsRow(tableBody, matchingRows.length === 0);
 
-    const matchingRows = matchingMetas.map((meta) => meta.row);
+    if (typeof refreshFuelPagination === "function") {
+        const handled = refreshFuelPagination({
+            reset: resetPage,
+            matchingRows,
+        });
+
+        if (handled) {
+            return matchingRows;
+        }
+    }
 
     if (typeof applyFuelPagination === "function") {
-      applyFuelPagination({
-        matchingRows,
-        allRows: getFuelDataRows(tableBody),
-        resetPage,
-      });
-    } else {
-      allRows.forEach((row) => {
-        row.style.display =
-          row.dataset.matchesFilter !== "false" ? "" : "none";
-      });
-      updateFuelNoResultsRow(tableBody, matchingRows.length === 0);
+        const handled = applyFuelPagination({
+            matchingRows,
+            allRows: getFuelDataRows(tableBody),
+            resetPage,
+        });
+
+        if (handled) {
+            return matchingRows;
+        }
     }
 
-    if (refreshStatistics && typeof updateFuelStatistics === "function") {
-      updateFuelStatistics();
-    }
-
-    if (typeof syncFuelSelectionUI === "function") {
-      syncFuelSelectionUI();
-    }
+    renderFuelFilterRows(matchingRows);
 
     return matchingRows;
-  } catch (error) {
-    console.error("refreshFuelTable failed:", error);
-    return [];
-  } finally {
-    queueMicrotask(() => {
-      isRefreshingFuelTable = false;
-    });
-  }
 }
 
+function refreshFuelTable(options = {}) {
+    return applyFuelFilters(options);
+}
+function applyFuelSearch(options) {
+    return applyFuelFilters(options);
+}
+function refreshFuelSearch(options) {
+    return applyFuelFilters(options);
+}
 function resetFuelFilters() {
-  const state = ensureFuelSearchState();
-  if (!state) return [];
+    if (!fuelSearchState) {
+        return [];
+    }
 
-  if (state.searchInput) state.searchInput.value = "";
-  if (state.vehicleFilter) state.vehicleFilter.value = "all";
-  if (state.typeFilter) state.typeFilter.value = "all";
-  if (state.dateFilter) state.dateFilter.value = "";
+    const { searchInput, vehicleFilter, typeFilter, dateFilter } =
+        fuelSearchState;
 
-  return refreshFuelTable({ resetPage: true });
+    if (searchInput) {
+        searchInput.value = "";
+    }
+    if (vehicleFilter) {
+        vehicleFilter.value = "all";
+    }
+    if (typeFilter) {
+        typeFilter.value = "all";
+    }
+    if (dateFilter) {
+        dateFilter.value = "";
+    }
+
+    return applyFuelFilters({
+        resetPage: true,
+    });
 }
 
 function initFuelSearch() {
-  const tableBody = document.getElementById("fuelTableBody");
-  if (!tableBody) return;
-  if (tableBody.dataset.fuelSearchInitialized === "true") return;
+    const tableBody = document.getElementById("fuelTableBody");
+    const searchInput = document.getElementById("fuelSearch");
+    const vehicleFilter = document.getElementById("fuelVehicleFilter");
+    const typeFilter = document.getElementById("fuelTypeFilter");
+    const dateFilter = document.getElementById("fuelDateFilter");
+    const refreshButton = document.getElementById("refreshFuel");
 
-  tableBody.dataset.fuelSearchInitialized = "true";
-  ensureFuelSearchState();
+    if (!tableBody || tableBody.dataset.fuelSearchInitialized === "true") {
+        return;
+    }
 
-  getFuelDataRows(tableBody).forEach((row) => {
-    ensureFuelOriginalOrder(row);
-  });
+    tableBody.dataset.fuelSearchInitialized = "true";
 
-  const { searchInput, vehicleFilter, typeFilter, dateFilter } =
-    fuelSearchState;
-  const refreshButton = document.getElementById("refreshFuel");
+    fuelSearchState = {
+        tableBody,
+        searchInput,
+        vehicleFilter,
+        typeFilter,
+        dateFilter,
+    };
 
-  searchInput?.addEventListener("input", () => {
-    refreshFuelTable({ resetPage: true });
-  });
+    searchInput?.addEventListener("input", () => {
+        applyFuelFilters({
+            resetPage: true,
+        });
+    });
+    vehicleFilter?.addEventListener("change", () => {
+        applyFuelFilters({
+            resetPage: true,
+        });
+    });
+    typeFilter?.addEventListener("change", () => {
+        applyFuelFilters({
+            resetPage: true,
+        });
+    });
+    dateFilter?.addEventListener("change", () => {
+        applyFuelFilters({
+            resetPage: true,
+        });
+    });
+    refreshButton?.addEventListener("click", () => {
+        resetFuelFilters();
+    });
 
-  vehicleFilter?.addEventListener("change", () => {
-    refreshFuelTable({ resetPage: true });
-  });
-
-  typeFilter?.addEventListener("change", () => {
-    refreshFuelTable({ resetPage: true });
-  });
-
-  dateFilter?.addEventListener("change", () => {
-    refreshFuelTable({ resetPage: true });
-  });
-
-  refreshButton?.addEventListener("click", () => {
-    resetFuelFilters();
-  });
+    applyFuelFilters();
 }
+
+function initFuelFilters() {
+    initFuelSearch();
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+    initFuelSearch();
+});

@@ -5,175 +5,268 @@
 let viewFuelInitialized = false;
 
 const viewFuelModalState = {
-  currentRow: null,
+    currentRow: null,
+    currentFuelId: null,
+    currentFuel: null,
 };
 
+
 function getFuelRecordIdFromRow(row) {
-  if (!row) return "";
-  return (
-    (row.dataset.fuelId || "").trim() ||
-    (row.dataset.fuelNumber || "").trim() ||
-    row.querySelector(".fuel-number")?.textContent?.trim() ||
-    ""
-  );
+    if (!row) {
+        return "";
+    }
+
+    const id = (row.dataset.id || row.dataset.fuelId || "").trim();
+
+    if (!id || !/^\d+$/.test(id)) {
+        return "";
+    }
+
+    return id;
 }
+
 
 function resolveFuelRowById(recordId) {
-  const id = (recordId || "").trim();
-  if (!id) return null;
+    const id = String(recordId || "").trim();
 
-  const tableBody = document.getElementById("fuelTableBody");
-  if (!tableBody) return null;
+    if (!id) {
+        return null;
+    }
 
-  const rows =
-    typeof getFuelDataRows === "function"
-      ? getFuelDataRows(tableBody)
-      : Array.from(tableBody.querySelectorAll("tr"));
+    const tableBody = document.getElementById("fuelTableBody");
 
-  return (
-    rows.find((row) => {
-      const fuelId = (row.dataset.fuelId || "").trim();
-      const number =
-        (row.dataset.fuelNumber || "").trim() ||
-        row.querySelector(".fuel-number")?.textContent?.trim() ||
-        "";
-      return fuelId === id || number === id;
-    }) || null
-  );
+    if (!tableBody) {
+        return null;
+    }
+
+    const rows =
+        typeof getFuelDataRows === "function"
+            ? getFuelDataRows(tableBody)
+            : Array.from(tableBody.querySelectorAll("tr"));
+
+    return (
+        rows.find((row) => {
+            const rowId = (row.dataset.id || row.dataset.fuelId || "").trim();
+
+            return rowId === id;
+        }) || null
+    );
 }
 
-function openViewFuelModal(row) {
-  const modal = document.getElementById("viewFuelModal");
-  if (!modal || !row) return;
+async function openViewFuelModal(row) {
+    const modal = document.getElementById("viewFuelModal");
 
-  viewFuelModalState.currentRow = row;
+    if (!modal || !row) {
+        return false;
+    }
 
-  const recordId = getFuelRecordIdFromRow(row);
-  modal.dataset.fuelId = recordId;
+    const fuelId = getFuelRecordIdFromRow(row);
 
-  const editBtn = document.getElementById("editFuelFromViewBtn");
-  if (editBtn) {
-    editBtn.dataset.fuelId = recordId;
-  }
+    if (!fuelId) {
+        console.error("Invalid fuel database ID:", row.dataset);
 
-  const getText = (selector, fallback = "Not provided") => {
-    const el = row.querySelector(selector);
-    return el ? el.textContent.trim() : fallback;
-  };
+        showToast?.("Invalid fuel record ID.", "error");
 
-  const getData = (key, fallback = "Not provided") => {
-    const val = row.dataset[key];
-    return val != null && String(val).trim() !== ""
-      ? String(val).trim()
-      : fallback;
-  };
+        return false;
+    }
 
-  const setText = (id, value) => {
-    const el = document.getElementById(id);
-    if (el) el.textContent = value;
-  };
+    try {
+        const response = await fetch(`/fuel-records/${fuelId}`, {
+            headers: {
+                Accept: "application/json",
+            },
+        });
 
-  setText("viewFuelNumber", getText(".fuel-number"));
-  setText("viewFuelVehicle", getText(".fuel-vehicle"));
-  setText("viewFuelType", getText(".fuel-type"));
-  setText("viewFuelTotalCost", getText(".fuel-total-cost"));
-  setText("viewFuelDate", getText(".fuel-date"));
-  setText("viewFuelTime", getData("refuelTime", "—"));
-  setText("viewFuelPlate", getText(".fuel-plate"));
-  setText("viewFuelDriver", getText(".fuel-driver"));
-  setText("viewFuelQuantity", getText(".fuel-quantity"));
-  setText("viewFuelCostPerLiter", getText(".fuel-cost-per-liter"));
-  setText("viewFuelOdometer", getText(".fuel-odometer"));
-  setText("viewFuelStation", getText(".fuel-station"));
-  setText("viewFuelReceipt", getData("receipt", "—"));
-  setText("viewFuelPayment", getData("payment", "—"));
-  setText("viewFuelNotes", getData("notes", "—"));
+        const data = await response.json();
 
-  modal.classList.add("show");
-  document.body.style.overflow = "hidden";
+        if (!response.ok) {
+            throw new Error(data.message || "Failed to load fuel record.");
+        }
+
+        const fuel = data.fuelLog;
+
+        if (!fuel) {
+            throw new Error("Fuel record not found.");
+        }
+
+        viewFuelModalState.currentRow = row;
+        viewFuelModalState.currentFuelId = String(fuel.id);
+        viewFuelModalState.currentFuel = fuel;
+        modal.dataset.fuelId = String(fuel.id);
+
+        const editBtn = document.getElementById("editFuelFromViewBtn");
+
+        if (editBtn) {
+            editBtn.dataset.fuelId = String(fuel.id);
+        }
+
+        const vehicle = fuel.vehicle;
+        const driver = fuel.driver;
+        const vehicleText = vehicle
+            ? [
+                  [vehicle.brand, vehicle.model].filter(Boolean).join(" "),
+
+                  vehicle.vehicle_type,
+              ]
+                  .filter(Boolean)
+                  .join(" - ")
+            : "Unassigned";
+        const driverText = driver
+            ? [driver.first_name, driver.last_name].filter(Boolean).join(" ")
+            : "Not Assigned";
+        const setText = (id, value, fallback = "Not provided") => {
+            const element = document.getElementById(id);
+
+            if (!element) {
+                return;
+            }
+
+            element.textContent =
+                value !== null &&
+                value !== undefined &&
+                String(value).trim() !== ""
+                    ? value
+                    : fallback;
+        };
+
+        setText("viewFuelNumber", fuel.fuel_number);
+        setText("viewFuelVehicle", vehicleText, "Unassigned");
+        setText("viewFuelType", fuel.fuel_type);
+        setText("viewFuelTotalCost", formatFuelCurrency(fuel.cost));
+        setText("viewFuelDate", formatFuelDisplayDate(fuel.date));
+        setText("viewFuelTime", fuel.refuel_time || "—");
+        setText("viewFuelPlate", vehicle?.plate_number, "—");
+        setText("viewFuelDriver", driverText);
+        setText("viewFuelQuantity", formatFuelQuantity(fuel.fuel_amount));
+        setText(
+            "viewFuelCostPerLiter",
+            formatFuelCurrency(fuel.cost_per_liter),
+        );
+        setText("viewFuelOdometer", formatFuelOdometer(fuel.odometer));
+        setText("viewFuelStation", fuel.fuel_station);
+        setText("viewFuelReceipt", fuel.receipt_number, "—");
+        setText("viewFuelPayment", fuel.payment_method, "—");
+        setText("viewFuelNotes", fuel.notes, "—");
+
+        
+        modal.classList.add("show");
+        document.body.style.overflow = "hidden";
+
+        return true;
+    } catch (error) {
+        console.error("FUEL VIEW ERROR:", error);
+
+        showToast?.(error.message || "Unable to load fuel record.", "error");
+
+        return false;
+    }
 }
 
 function closeViewFuelModal() {
-  const modal = document.getElementById("viewFuelModal");
-  if (!modal) return;
+    const modal = document.getElementById("viewFuelModal");
 
-  modal.classList.remove("show");
-  document.body.style.overflow = "";
-  viewFuelModalState.currentRow = null;
-  delete modal.dataset.fuelId;
+    if (!modal) {
+        return;
+    }
 
-  const editBtn = document.getElementById("editFuelFromViewBtn");
-  if (editBtn) delete editBtn.dataset.fuelId;
+    modal.classList.remove("show");
+    document.body.style.overflow = "";
+    viewFuelModalState.currentRow = null;
+    viewFuelModalState.currentFuelId = null;
+    viewFuelModalState.currentFuel = null;
+    delete modal.dataset.fuelId;
+
+    const editBtn = document.getElementById("editFuelFromViewBtn");
+
+    if (editBtn) {
+        delete editBtn.dataset.fuelId;
+    }
 }
 
-function openEditFuelFromView(recordId) {
-  const modal = document.getElementById("viewFuelModal");
-  const storedId =
-    (recordId || "").trim() ||
-    (modal?.dataset.fuelId || "").trim() ||
-    getFuelRecordIdFromRow(viewFuelModalState.currentRow);
+async function openEditFuelFromView() {
+    const modal = document.getElementById("viewFuelModal");
 
-  let row = viewFuelModalState.currentRow;
-  if (!row || !document.body.contains(row)) {
-    row = resolveFuelRowById(storedId);
-  }
+    const fuelId =
+        viewFuelModalState.currentFuelId || modal?.dataset.fuelId || "";
 
-  if (!row || !document.body.contains(row)) {
-    if (typeof showToast === "function") {
-      showToast("Fuel record is no longer available.", "error");
+    let row = viewFuelModalState.currentRow;
+
+    if (!row || !document.body.contains(row)) {
+        row = resolveFuelRowById(fuelId);
     }
-    return;
-  }
+    if (!row) {
+        showToast?.("Fuel record is no longer available.", "error");
 
-  if (typeof openEditFuelModal !== "function") {
-    console.error("openEditFuelModal is not available");
-    return;
-  }
+        return;
+    }
+    if (typeof openEditFuelModal !== "function") {
+        console.error("openEditFuelModal is not available.");
 
-  closeViewFuelModal();
-  openEditFuelModal(row);
+        return;
+    }
+
+    closeViewFuelModal();
+
+    openEditFuelModal(row);
 }
 
 function initViewFuelModal() {
-  if (viewFuelInitialized) return;
+    if (viewFuelInitialized) {
+        return;
+    }
 
-  const modal = document.getElementById("viewFuelModal");
-  if (!modal) {
+    const modal = document.getElementById("viewFuelModal");
+
+    if (!modal) {
+        return;
+    }
+
     viewFuelInitialized = true;
-    return;
-  }
 
-  document.addEventListener("click", (event) => {
-    const openBtn = event.target.closest(".action-btn.view-fuel");
-    if (openBtn) {
-      const row = openBtn.closest("tr");
-      if (row) openViewFuelModal(row);
-      return;
-    }
+    document.addEventListener("click", (event) => {
+        const viewBtn = event.target.closest(".action-btn.view-fuel");
 
-    const editFromView = event.target.closest("#editFuelFromViewBtn");
-    if (editFromView) {
-      event.preventDefault();
-      openEditFuelFromView(
-        editFromView.dataset.fuelId || modal.dataset.fuelId,
-      );
-      return;
-    }
+        if (viewBtn) {
+            const row = viewBtn.closest("tr");
 
-    if (
-      event.target.closest("#closeViewFuelModal") ||
-      event.target.closest("#closeViewFuelBtn") ||
-      event.target === modal
-    ) {
-      closeViewFuelModal();
-    }
-  });
+            if (row) {
+                openViewFuelModal(row);
+            }
 
-  document.addEventListener("keydown", (event) => {
-    if (event.key === "Escape" && modal.classList.contains("show")) {
-      closeViewFuelModal();
-    }
-  });
+            return;
+        }
 
-  viewFuelInitialized = true;
+        const editFromView = event.target.closest("#editFuelFromViewBtn");
+
+        if (editFromView) {
+            event.preventDefault();
+
+            openEditFuelFromView();
+
+            return;
+        }
+
+        if (
+            event.target.closest("#closeViewFuelModal") ||
+            event.target.closest("#closeViewFuelBtn")
+        ) {
+            closeViewFuelModal();
+
+            return;
+        }
+
+        if (event.target === modal) {
+            closeViewFuelModal();
+        }
+    });
+
+    document.addEventListener("keydown", (event) => {
+        if (event.key === "Escape" && modal.classList.contains("show")) {
+            closeViewFuelModal();
+        }
+    });
 }
+
+document.addEventListener("DOMContentLoaded", () => {
+    initViewFuelModal();
+});

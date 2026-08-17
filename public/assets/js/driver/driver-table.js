@@ -90,7 +90,7 @@ function renderDriverTable(drivers) {
                     <div class="driver-avatar">
                         ${getDriverInitials(
                             driver.first_name,
-                            driver.last_name
+                            driver.last_name,
                         )}
                     </div>
                     <div>
@@ -106,7 +106,7 @@ function renderDriverTable(drivers) {
             </td>
 
             <td>
-                DRV-${String(driver.id).padStart(3,"0")}
+                DRV-${String(driver.id).padStart(3, "0")}
             </td>
 
             <td>
@@ -118,18 +118,16 @@ function renderDriverTable(drivers) {
             </td>
 
             <td>
-                ${driver.vehicle ? `
-                    <div class="vehicle-info">
-                        <div>
-                            <div>
+                ${driver.vehicle? `
+                    <span class="fuel-vehicle">
+                            <span class="fuel-vehicle-name">
                                 ${driver.vehicle.brand ?? ""}
                                 ${driver.vehicle.model ?? ""}
-                            </div>
-                            <small>
+                            </span>
+                            <small class="fuel-vehicle-type">
                                 ${driver.vehicle.vehicle_type ?? ""}
                             </small>
-                        </div>
-                    </div>
+                    </span>
                 `: "Unassigned"}
             </td>
 

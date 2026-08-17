@@ -31,44 +31,48 @@ function getFuelPrintRows() {
 }
 
 function buildFuelPrintTableBody(rows) {
-  return rows
-    .map((row) => {
-      const record =
-        typeof getFuelExportData === "function" ? getFuelExportData(row) : {};
+    return rows
+        .map((row) => {
+            const record =
+                typeof getFuelExportData === "function"
+                    ? getFuelExportData(row)
+                    : {};
+            const vehicleDisplay = [record.vehicle, record.vehicleType]
+                .filter(Boolean)
+                .join(" - ");
+            const quantity =
+                typeof formatFuelExportQuantity === "function"
+                    ? formatFuelExportQuantity(record.quantity)
+                    : record.quantity;
+            const costPerLiter =
+                typeof formatFuelExportPdfCurrency === "function"
+                    ? formatFuelExportPdfCurrency(record.costPerLiter)
+                    : record.costPerLiter;
+            const totalCost =
+                typeof formatFuelExportPdfCurrency === "function"
+                    ? formatFuelExportPdfCurrency(record.totalCost)
+                    : record.totalCost;
+            const odometer =
+                typeof formatFuelExportOdometer === "function"
+                    ? formatFuelExportOdometer(record.odometer)
+                    : record.odometer || "";
 
-      const quantity =
-        typeof formatFuelExportQuantity === "function"
-          ? formatFuelExportQuantity(record.quantity)
-          : record.quantity;
-      const costPerLiter =
-        typeof formatFuelExportCurrency === "function"
-          ? formatFuelExportCurrency(record.costPerLiter)
-          : record.costPerLiter;
-      const totalCost =
-        typeof formatFuelExportCurrency === "function"
-          ? formatFuelExportCurrency(record.totalCost)
-          : record.totalCost;
-      const odometer =
-        typeof record.odometer === "number"
-          ? record.odometer.toLocaleString() + " km"
-          : record.odometer || "";
-
-      return `<tr>
-        <td>${escapeFuelPrintHtml(record.number)}</td>
-        <td>${escapeFuelPrintHtml(record.date)}</td>
-        <td>${escapeFuelPrintHtml(record.vehicle)}</td>
-        <td>${escapeFuelPrintHtml(record.plate)}</td>
-        <td>${escapeFuelPrintHtml(record.driver)}</td>
-        <td>${escapeFuelPrintHtml(record.fuelType)}</td>
-        <td>${escapeFuelPrintHtml(quantity)}</td>
-        <td>${escapeFuelPrintHtml(costPerLiter)}</td>
-        <td>${escapeFuelPrintHtml(totalCost)}</td>
-        <td>${escapeFuelPrintHtml(odometer)}</td>
-        <td>${escapeFuelPrintHtml(record.station)}</td>
-        <td>${escapeFuelPrintHtml(record.receipt)}</td>
-      </tr>`;
-    })
-    .join("");
+            return `<tr>
+                <td>${escapeFuelPrintHtml(record.number)}</td>
+                <td>${escapeFuelPrintHtml(record.date)}</td>
+                <td>${escapeFuelPrintHtml(vehicleDisplay)}</td>
+                <td>${escapeFuelPrintHtml(record.plate)}</td>
+                <td>${escapeFuelPrintHtml(record.driver)}</td>
+                <td>${escapeFuelPrintHtml(record.fuelType)}</td>
+                <td>${escapeFuelPrintHtml(quantity)}</td>
+                <td>${escapeFuelPrintHtml(costPerLiter)}</td>
+                <td>${escapeFuelPrintHtml(totalCost)}</td>
+                <td>${escapeFuelPrintHtml(odometer)}</td>
+                <td>${escapeFuelPrintHtml(record.station)}</td>
+                <td>${escapeFuelPrintHtml(record.receipt || "—")}</td>
+            </tr>`;
+        })
+        .join("");
 }
 
 function buildFuelPrintHtml(rows) {
@@ -86,13 +90,13 @@ function buildFuelPrintHtml(rows) {
       ? formatFuelExportQuantity(summary.totalLiters)
       : summary.totalLiters;
   const totalCost =
-    typeof formatFuelExportCurrency === "function"
-      ? formatFuelExportCurrency(summary.totalCost)
-      : summary.totalCost;
+      typeof formatFuelExportPdfCurrency === "function"
+          ? formatFuelExportPdfCurrency(summary.totalCost)
+          : summary.totalCost;
   const avgCost =
-    typeof formatFuelExportCurrency === "function"
-      ? formatFuelExportCurrency(summary.averagePerLiter) + "/L"
-      : summary.averagePerLiter;
+      typeof formatFuelExportPdfCurrency === "function"
+          ? formatFuelExportPdfCurrency(summary.averagePerLiter) + "/L"
+          : summary.averagePerLiter;
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -142,9 +146,57 @@ function buildFuelPrintHtml(rows) {
     .summary span { margin-right: 18px; white-space: nowrap; }
 
     table {
-      width: 100%;
-      border-collapse: collapse;
-      table-layout: fixed;
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+    }
+    th:nth-child(1),
+    td:nth-child(1) {
+        width: 9%;
+    }
+    th:nth-child(2),
+    td:nth-child(2) {
+        width: 7%;
+    }
+    th:nth-child(3),
+    td:nth-child(3) {
+        width: 14%;
+    }
+    th:nth-child(4),
+    td:nth-child(4) {
+        width: 8%;
+    }
+    th:nth-child(5),
+    td:nth-child(5) {
+        width: 11%;
+    }
+    th:nth-child(6),
+    td:nth-child(6) {
+        width: 9%;
+    }
+    th:nth-child(7),
+    td:nth-child(7) {
+        width: 7%;
+    }
+    th:nth-child(8),
+    td:nth-child(8) {
+        width: 8%;
+    }
+    th:nth-child(9),
+    td:nth-child(9) {
+        width: 9%;
+    }
+    th:nth-child(10),
+    td:nth-child(10) {
+        width: 8%;
+    }
+    th:nth-child(11),
+    td:nth-child(11) {
+        width: 10%;
+    }
+    th:nth-child(12),
+    td:nth-child(12) {
+        width: 10%;
     }
 
     thead { display: table-header-group; }
@@ -215,80 +267,90 @@ function buildFuelPrintHtml(rows) {
 }
 
 function printFuelRecords() {
-  if (typeof getFuelExportRows !== "function") {
-    showFuelPrintToast("Unable to prepare the print report.", "error");
-    return;
-  }
-
-  const rows = getFuelPrintRows();
-
-  if (rows.length === 0) {
-    showFuelPrintToast("No fuel records available to print.", "warning");
-    return;
-  }
-
-  let printWindow;
-
-  try {
-    printWindow = window.open(
-      "",
-      "_blank",
-      "noopener,noreferrer,width=1100,height=760",
-    );
-  } catch (error) {
-    console.error("Fuel print window failed:", error);
-    showFuelPrintToast("Unable to open the print report.", "error");
-    return;
-  }
-
-  if (!printWindow) {
-    showFuelPrintToast("Unable to open the print report.", "error");
-    return;
-  }
-
-  try {
-    const html = buildFuelPrintHtml(rows);
-    printWindow.document.open();
-    printWindow.document.write(html);
-    printWindow.document.close();
-
-    const runPrint = () => {
-      try {
-        printWindow.focus();
-        printWindow.print();
-      } catch (error) {
-        console.error("Fuel print failed:", error);
-        showFuelPrintToast("Unable to print fuel report.", "error");
-      }
-
-      const closeWindow = () => {
-        try {
-          printWindow.close();
-        } catch {
-          /* ignore */
-        }
-      };
-
-      if (typeof printWindow.addEventListener === "function") {
-        printWindow.addEventListener("afterprint", closeWindow, { once: true });
-      }
-      setTimeout(closeWindow, 1500);
-    };
-
-    if (printWindow.document.readyState === "complete") {
-      runPrint();
-    } else {
-      printWindow.onload = runPrint;
+    if (typeof getFuelExportRows !== "function") {
+        showFuelPrintToast("Unable to prepare the print report.", "error");
+        return;
     }
-  } catch (error) {
-    console.error("Fuel print failed:", error);
-    showFuelPrintToast("Unable to print fuel report.", "error");
+
+    const rows = getFuelPrintRows();
+
+    if (rows.length === 0) {
+        showFuelPrintToast("No fuel records available to print.", "warning");
+        return;
+    }
+
+    let printWindow = null;
+
     try {
-      printWindow.close();
-    } catch {
-      /* ignore */
+        printWindow = window.open(
+            "",
+            "_blank",
+            "width=1100,height=760,resizable=yes,scrollbars=yes",
+        );
+
+        if (!printWindow) {
+            showFuelPrintToast(
+                "Unable to open the print report. Please allow pop-ups for this site.",
+                "error",
+            );
+            return;
+        }
+
+        const html = buildFuelPrintHtml(rows);
+
+        printWindow.document.open();
+        printWindow.document.write(html);
+        printWindow.document.close();
+
+        const runPrint = () => {
+            setTimeout(() => {
+                try {
+                    printWindow.focus();
+                    printWindow.print();
+                } catch (error) {
+                    console.error("Fuel print dialog failed:", error);
+
+                    showFuelPrintToast("Unable to print fuel report.", "error");
+                }
+            }, 150);
+        };
+
+        if (printWindow.document.readyState === "complete") {
+            runPrint();
+        } else {
+            printWindow.onload = runPrint;
+        }
+
+        const closeWindow = () => {
+            try {
+                if (printWindow && !printWindow.closed) {
+                    printWindow.close();
+                }
+            } catch {
+                /* ignore */
+            }
+        };
+
+        if (typeof printWindow.addEventListener === "function") {
+            printWindow.addEventListener("afterprint", closeWindow, {
+                once: true,
+            });
+        }
+        
+        setTimeout(closeWindow, 10000);
+    } catch (error) {
+        console.error("Fuel print failed:", error);
+
+        showFuelPrintToast("Unable to print fuel report.", "error");
+
+        try {
+            if (printWindow && !printWindow.closed) {
+                printWindow.close();
+            }
+        } catch {
+            /* ignore */
+        }
     }
-  }
 }
 
 function initFuelPrint() {
@@ -306,3 +368,7 @@ function initFuelPrint() {
     printFuelRecords();
   });
 }
+
+document.addEventListener("DOMContentLoaded", () => {
+    initFuelPrint();
+});

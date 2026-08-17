@@ -100,11 +100,46 @@
             <label for="editVehicleFuel">Fuel Type</label>
             <select id="editVehicleFuel" name="fuel_type">
               <option value="">Select Fuel Type</option>
-              <option>Diesel</option>
-              <option>Gasoline</option>
-              <option>Electric</option>
-              <option>Hybrid</option>
+              <option value="Diesel">Diesel</option>
+              <option value="Gasoline">Gasoline</option>
+              <option value="Premium Gasoline">Premium Gasoline</option>
+              <option value="Electric">Electric</option>
+              <option value="Hybrid">Hybrid</option>
             </select>
+          </div>
+
+          <div class="form-group">
+            <label for="editVehicleTankCapacity">Tank Capacity (Liters)</label>
+            <input
+              type="number"
+              id="editVehicleTankCapacity"
+              name="tank_capacity"
+              min="0.01"
+              step="0.01"
+              placeholder="80"
+            />
+          </div>
+
+          <!--<div class="form-group">
+            <label for="editVehicleCurrentFuel">
+              Current Fuel (Liters)
+            </label>
+            <input
+              type="number"
+              id="editVehicleCurrentFuel"
+              name="current_fuel"
+              readonly
+            />
+          </div>-->
+
+          <div class="form-group">
+            <label for="editVehicleMileage">Current Mileage</label>
+            <input
+              type="number"
+              id="editVehicleMileage"
+              name="current_odometer"
+              readonly
+            />
           </div>
 
           <div class="form-group">

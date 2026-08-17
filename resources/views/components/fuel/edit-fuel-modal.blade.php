@@ -29,7 +29,7 @@
         <div class="form-grid">
           <div class="form-group">
             <label for="editFuelNumber">Fuel Record Number *</label>
-            <input type="text" id="editFuelNumber" readonly required />
+            <input type="text" id="editFuelNumber" readonly />
           </div>
 
           <div class="form-group">
@@ -43,32 +43,52 @@
           </div>
 
           <div class="form-group">
-            <label for="editFuelVehicle">Vehicle *</label>
-            <select id="editFuelVehicle" required>
-              <option value="">Select Vehicle</option>
-              <option value="Ambulance 01" data-plate="ABC-1001">Ambulance 01</option>
-              <option value="Ambulance 03" data-plate="ABC-1003">Ambulance 03</option>
-              <option value="Patient Van 02" data-plate="DEF-2002">Patient Van 02</option>
-              <option value="Service Vehicle 04" data-plate="GHI-4004">Service Vehicle 04</option>
-              <option value="Van 02" data-plate="JKL-2002">Van 02</option>
-              <option value="Van 05" data-plate="JKL-2005">Van 05</option>
-              <option value="SUV 03" data-plate="MNO-3003">SUV 03</option>
+            <label for="editFuelVehicle">
+              Vehicle
+            </label>
+
+            <select
+              id="editFuelVehicle"
+              disabled
+            >
+              <option value="">
+                Vehicle
+              </option>
             </select>
           </div>
 
           <div class="form-group">
-            <label for="editFuelPlate">Plate Number</label>
-            <input type="text" id="editFuelPlate" readonly />
+            <label for="editFuelPlate">
+              Plate Number
+            </label>
+
+            <input
+              type="text"
+              id="editFuelPlate"
+              readonly
+              placeholder="Auto-filled from vehicle"
+            />
           </div>
 
           <div class="form-group">
-            <label for="editFuelDriver">Driver *</label>
-            <input type="text" id="editFuelDriver" required />
+            <label for="editFuelDriver">
+              Driver
+            </label>
+            <input
+              type="text"
+              id="editFuelDriver"
+              readonly
+              placeholder="Assigned driver"
+            />
+            <input
+              type="hidden"
+              id="editFuelDriverId"
+            />
           </div>
 
           <div class="form-group">
             <label for="editFuelType">Fuel Type *</label>
-            <select id="editFuelType" required>
+            <select id="editFuelType" disabled required>
               <option value="">Select Fuel Type</option>
               <option value="Diesel">Diesel</option>
               <option value="Gasoline">Gasoline</option>
@@ -78,7 +98,7 @@
 
           <div class="form-group">
             <label for="editFuelQuantity">Quantity (Liters) *</label>
-            <input type="number" id="editFuelQuantity" min="0.01" step="0.01" required />
+            <input type="number" id="editFuelQuantity" min="0.01" step="0.01" readonly />
           </div>
 
           <div class="form-group">
@@ -88,12 +108,12 @@
 
           <div class="form-group">
             <label for="editFuelTotalCost">Total Cost *</label>
-            <input type="number" id="editFuelTotalCost" min="0" step="0.01" readonly required />
+            <input type="number" id="editFuelTotalCost" min="0" step="0.01" readonly />
           </div>
 
           <div class="form-group">
             <label for="editFuelOdometer">Odometer Reading *</label>
-            <input type="number" id="editFuelOdometer" min="0" step="1" required />
+            <input type="number" id="editFuelOdometer" min="0" step="1" readonly />
           </div>
 
           <div class="form-group">

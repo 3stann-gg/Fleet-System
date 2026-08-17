@@ -7,6 +7,7 @@ use App\Http\Controllers\DriverController;
 use App\Http\Controllers\ReservationController;
 use App\Http\Controllers\DispatchController;
 use App\Http\Controllers\MaintenanceController;
+use App\Http\Controllers\FuelLogController;
 
 Route::get('/', function () {
     return view('welcome');
@@ -130,6 +131,27 @@ Route::delete('/maintenance/{maintenance}', [MaintenanceController::class, 'dest
 
 // ***FUEL MANAGEMENT MODULE***
 Route::view('/fuel', 'fuel.index')->name('fuel');
+
+Route::get('/fuel-records', [FuelLogController::class, 'index'])
+    ->name('fuel.index');
+
+Route::get('/fuel-records/next-number', [FuelLogController::class, 'nextNumber'])
+    ->name('fuel.next-number');
+
+Route::post('/fuel-records', [FuelLogController::class, 'store'])
+    ->name('fuel.store');
+
+Route::delete('/fuel-records/bulk-delete', [FuelLogController::class, 'bulkDelete'])
+    ->name('fuel.bulk-delete');
+
+Route::get('/fuel-records/{fuelLog}', [FuelLogController::class, 'show'])
+    ->name('fuel.show');
+
+Route::put('/fuel-records/{fuelLog}', [FuelLogController::class, 'update'])
+    ->name('fuel.update');
+        
+Route::delete('/fuel-records/{fuelLog}', [FuelLogController::class, 'destroy'])
+    ->name('fuel.destroy');
 
 
 // ***ROUTE PLANNING MODULE***

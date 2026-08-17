@@ -46,13 +46,7 @@
             <label for="fuelVehicle">Vehicle *</label>
             <select id="fuelVehicle" required>
               <option value="">Select Vehicle</option>
-              <option value="Ambulance 01" data-plate="ABC-1001">Ambulance 01</option>
-              <option value="Ambulance 03" data-plate="ABC-1003">Ambulance 03</option>
-              <option value="Patient Van 02" data-plate="DEF-2002">Patient Van 02</option>
-              <option value="Service Vehicle 04" data-plate="GHI-4004">Service Vehicle 04</option>
-              <option value="Van 02" data-plate="JKL-2002">Van 02</option>
-              <option value="Van 05" data-plate="JKL-2005">Van 05</option>
-              <option value="SUV 03" data-plate="MNO-3003">SUV 03</option>
+            
             </select>
           </div>
 
@@ -63,12 +57,39 @@
 
           <div class="form-group">
             <label for="fuelDriver">Driver *</label>
-            <input type="text" id="fuelDriver" placeholder="Enter driver name" required />
+            <input
+              type="text"
+              id="fuelDriver"
+              placeholder="Assigned driver"
+              readonly
+              required
+            />
+            <input type="hidden" id="fuelDriverId" />
+          </div>
+
+          <div class="form-group">
+            <label for="fuelTankCapacity">Tank Capacity</label>
+            <input
+              type="text"
+              id="fuelTankCapacity"
+              readonly
+              placeholder="Auto-filled from vehicle"
+            />
+          </div>
+
+          <div class="form-group">
+            <label for="fuelCurrentFuel">Current Fuel</label>
+            <input
+              type="text"
+              id="fuelCurrentFuel"
+              readonly
+              placeholder="Auto-filled from vehicle"
+            />
           </div>
 
           <div class="form-group">
             <label for="fuelType">Fuel Type *</label>
-            <select id="fuelType" required>
+            <select id="fuelType" required disabled>
               <option value="">Select Fuel Type</option>
               <option value="Diesel">Diesel</option>
               <option value="Gasoline">Gasoline</option>

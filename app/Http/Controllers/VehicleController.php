@@ -47,6 +47,7 @@ class VehicleController extends Controller
 
         $vehicles = $query->get()->map(function ($vehicle) {
             $driver = $vehicle->drivers->first();
+
             return [
                 'id'                => $vehicle->id,
                 'plate_number'      => $vehicle->plate_number,
@@ -57,19 +58,36 @@ class VehicleController extends Controller
                 'insurance_expiry'  => $vehicle->insurance_expiry,
                 'capacity'          => $vehicle->capacity,
                 'fuel_type'         => $vehicle->fuel_type,
+                'tank_capacity'     => $vehicle->tank_capacity,
+                'current_fuel'      => $vehicle->current_fuel,
+                'current_odometer'  => $vehicle->current_odometer,
                 'status'            => $vehicle->status,
 
-                'driver_name'  => $driver
+                'driver_name' => $driver
                     ? $driver->first_name . ' ' . $driver->last_name
                     : null,
 
-                'driver_license'=> $driver?->license_number,
+                'driver_license' => $driver?->license_number,
 
                 'notes' => $vehicle->notes,
                 //'last_service' => $vehicle->last_service,
+                /*
+                |--------------------------------------------------------------------------
+                | Include assigned drivers for Fuel Management
+                |--------------------------------------------------------------------------
+                */
+                'drivers' => $vehicle->drivers->map(function ($driver) {
+                    return [
+                        'id' => $driver->id,
+                        'first_name' => $driver->first_name,
+                        'last_name' => $driver->last_name,
+                        'license_number' => $driver->license_number,
+                        'status' => $driver->status,
+                    ];
+                })->values(),
             ];
         });
-
+        
         // if AJAX request
         if ($request->expectsJson()) {
 
@@ -105,6 +123,22 @@ class VehicleController extends Controller
                 'insurance_expiry'  => 'nullable|date',
                 'capacity'          => 'required|integer',
                 'fuel_type'         => 'required',
+                'tank_capacity' => [
+                    'required',
+                    'numeric',
+                    'min:0.01',
+                ],
+                'current_fuel' => [
+                    'required',
+                    'numeric',
+                    'min:0',
+                    'lte:tank_capacity',
+                ],
+                'current_odometer' => [
+                    'required',
+                    'numeric',
+                    'min:0',
+                ],
                 'status'            => 'required',
                 'assigned_driver_id'=> 'nullable|exists:drivers,id',
                 'notes'             => 'nullable|string',
@@ -170,44 +204,106 @@ class VehicleController extends Controller
      */
     public function update(Request $request, Vehicle $vehicle)
     {
-        $validated = $request->validate([
-            'plate_number'      => 'required|unique:vehicles,plate_number,' . $vehicle->id,
-            'vehicle_type'      => 'required',
-            //'brand'             => 'required',
-            //'model'             => 'required',
-            //'purchase_date'     => 'nullable|date',
-            //'insurance_expiry'  => 'nullable|date',
-            'capacity'          => 'required|integer',
-            'fuel_type'         => 'required',
-            'status'            => 'required',
-            'assigned_driver_id'=> 'nullable|exists:drivers,id',
-            'notes'             => 'nullable|string',
-        ]);
+        $validator = Validator::make(
+            $request->all(),
+            [
+                'plate_number' => [
+                    'required',
+                    'unique:vehicles,plate_number,' . $vehicle->id,
+                ],
+                'vehicle_type' => [
+                    'required',
+                ],
+                'capacity' => [
+                    'required',
+                    'integer',
+                    'min:0',
+                ],
+                'fuel_type' => [
+                    'required',
+                    'in:Diesel,Gasoline,Premium Gasoline,Electric,Hybrid',
+                ],
+                'tank_capacity' => [
+                    'required',
+                    'numeric',
+                    'min:0.01',
+                ],
+                'status' => [
+                    'required',
+                    'in:Available,On Trip,Maintenance,Out of Service',
+                ],
+                'assigned_driver_id' => [
+                    'nullable',
+                    'exists:drivers,id',
+                ],
+                'notes' => [
+                    'nullable',
+                    'string',
+                ],
+            ]
+        );
 
-        $driverId = $validated['assigned_driver_id'] ?? null;
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Please check the vehicle information.',
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+        /*
+        |--------------------------------------------------------------------------
+        | Prevent Tank Capacity from becoming lower than Current Fuel
+        |--------------------------------------------------------------------------
+        */
+        $validated = $validator->validated();
+
+        if (
+            $validated['tank_capacity'] <
+            (float) $vehicle->current_fuel
+        ) {
+            return response()->json([
+                'success' => false,
+                'message' =>
+                    'Tank capacity cannot be lower than the vehicle\'s current fuel level.',
+            ], 422);
+        }
+
+        $driverId =
+            $validated['assigned_driver_id'] ?? null;
 
         unset($validated['assigned_driver_id']);
 
         $vehicle->update($validated);
-
-        Driver::where('assigned_vehicle_id', $vehicle->id)
-            ->update([
-                'assigned_vehicle_id' => null,
-            ]);
-
-        if ($request->filled('assigned_driver_id')) {
-
-            Driver::where('id', $request->assigned_driver_id)
+        /*
+        |--------------------------------------------------------------------------
+        | Clear Previous Driver Assignment
+        |--------------------------------------------------------------------------
+        */
+        Driver::where(
+            'assigned_vehicle_id',
+            $vehicle->id
+        )->update([
+            'assigned_vehicle_id' => null,
+        ]);
+        /*
+        |--------------------------------------------------------------------------
+        | Assign New Driver
+        |--------------------------------------------------------------------------
+        */
+        if ($driverId) {
+            Driver::where('id', $driverId)
                 ->update([
-                    'assigned_vehicle_id' => $vehicle->id,
+                    'assigned_vehicle_id' =>
+                        $vehicle->id,
                 ]);
-
         }
 
         return response()->json([
             'success' => true,
-            'message' => 'Vehicle updated successfully.',
-            'vehicle' => $vehicle->load('drivers'),
+            'message' =>
+                'Vehicle updated successfully.',
+            'vehicle' =>
+                $vehicle->fresh()->load('drivers'),
         ]);
     }
 
@@ -266,6 +362,10 @@ class VehicleController extends Controller
                 'brand',
                 'model',
                 'vehicle_type',
+                'fuel_type',
+                'tank_capacity',
+                'current_fuel',
+                'current_odometer',
                 'status',
             ]);
 

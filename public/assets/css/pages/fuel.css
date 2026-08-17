@@ -10,6 +10,19 @@
   background: var(--color-primary-soft);
 }
 
+/* Vehicle name formatting*/
+.fuel-vehicle {
+    display: inline-flex;
+    flex-direction: column;
+    gap: 2px;
+}
+.fuel-vehicle-name {
+    font-weight: 500;
+}
+.fuel-vehicle-type {
+    font-size: 12px;
+    opacity: 0.7;
+}
 
 #viewFuelModal .custom-modal {
   width: min(100% - 32px, 760px);

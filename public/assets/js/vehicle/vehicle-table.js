@@ -7,23 +7,22 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 function loadVehicles() {
-
     fetch("/fleet", {
         headers: {
-            "Accept": "application/json"
-        }
+            Accept: "application/json",
+        },
     })
-        .then(response => response.json())
-        .then(data => {
+        .then((response) => response.json())
+        .then((data) => {
             const vehicles = data.vehicles ?? data;
+
             renderVehicleTable(vehicles);
 
             if (typeof updateVehicleStats === "function") {
                 updateVehicleStats();
             }
-
         })
-        .catch(error => {
+        .catch((error) => {
             console.error("VEHICLE LOAD ERROR:", error);
         });
 }
@@ -33,6 +32,7 @@ function getVehicleStatusClass(status) {
         .trim()
         .toLowerCase()
         .replace(/[\s-]+/g, "");
+
     if (value === "available") return "available";
     if (value === "ontrip") return "trip";
     if (value === "maintenance") return "maintenance";
@@ -41,9 +41,7 @@ function getVehicleStatusClass(status) {
 }
 
 function getVehicleIcon(type) {
-
     switch (type) {
-
         case "Ambulance":
             return "ph-fill ph-ambulance";
 
@@ -71,32 +69,68 @@ function getVehicleDriverInitials(driverName) {
     return driverName
         .split(" ")
         .filter(Boolean)
-        .map(name => name.charAt(0))
+        .map((name) => name.charAt(0))
         .join("")
         .substring(0, 2)
         .toUpperCase();
 }
 
+/* ==========================================
+   Fuel Level
+========================================== */
+
+function calculateVehicleFuelLevel(currentFuel, tankCapacity) {
+    const fuel = Number(currentFuel);
+    const tank = Number(tankCapacity);
+
+    if (Number.isNaN(fuel) || Number.isNaN(tank) || tank <= 0) {
+        return null;
+    }
+
+    return Math.max(0, Math.min(100, (fuel / tank) * 100));
+}
+
+function formatVehicleFuelLevel(currentFuel, tankCapacity) {
+    const level = calculateVehicleFuelLevel(currentFuel, tankCapacity);
+
+    if (level === null) {
+        return "N/A";
+    }
+
+    return `${level.toFixed(0)}%`;
+}
+
+/* ==========================================
+   Render Table
+========================================== */
+
 function renderVehicleTable(vehicles) {
-    const tableBody =
-        document.getElementById("vehicleTableBody");
+    const tableBody = document.getElementById("vehicleTableBody");
+
     if (!tableBody) return;
 
     let html = "";
 
-    vehicles.forEach(vehicle => {
-        const badgeClass =
-            getVehicleStatusClass(vehicle.status);
-        const vehicleIcon =
-            getVehicleIcon(vehicle.vehicle_type);
-        const driverName =
-            vehicle.driver_name ?? "Not Assigned";
-        const initials =
-            getVehicleDriverInitials(driverName);
+    vehicles.forEach((vehicle) => {
+        const badgeClass = getVehicleStatusClass(vehicle.status);
+
+        const vehicleIcon = getVehicleIcon(vehicle.vehicle_type);
+
+        const driverName = vehicle.driver_name ?? "Not Assigned";
+
+        const initials = getVehicleDriverInitials(driverName);
+
+        const tankCapacity = vehicle.tank_capacity ?? "";
+
+        const currentFuel = vehicle.current_fuel ?? "";
+
+        const currentOdometer = vehicle.current_odometer ?? "";
+
+        const fuelLevel = formatVehicleFuelLevel(currentFuel, tankCapacity);
 
         html += `
             <tr
-                data-id="${vehicle.id}"
+                data-id="${vehicle.id ?? ""}"
                 data-brand="${vehicle.brand ?? ""}"
                 data-model="${vehicle.model ?? ""}"
                 data-plate-number="${vehicle.plate_number ?? ""}"
@@ -106,6 +140,10 @@ function renderVehicleTable(vehicles) {
                 data-status="${vehicle.status ?? ""}"
                 data-capacity="${vehicle.capacity ?? ""}"
                 data-fuel-type="${vehicle.fuel_type ?? ""}"
+                data-tank-capacity="${tankCapacity}"
+                data-current-fuel="${currentFuel}"
+                data-fuel-level="${fuelLevel}"
+                data-current-odometer="${currentOdometer}"
                 data-last-service="${vehicle.last_service ?? ""}"
                 data-notes="${vehicle.notes ?? ""}"
             >
@@ -114,7 +152,8 @@ function renderVehicleTable(vehicles) {
                     <input
                         type="checkbox"
                         class="vehicle-checkbox"
-                        data-id="${vehicle.id}">
+                        data-id="${vehicle.id ?? ""}"
+                    >
                 </td>
 
                 <td>
@@ -167,7 +206,16 @@ function renderVehicleTable(vehicles) {
                 </td>
 
                 <td>
-                    ${vehicle.fuel_type ?? ""}
+                    <div class="fuel-progress">
+                        <div class="fuel-progress-bar">
+                            <div
+                                class="fuel-progress-fill"
+                                style="width: ${fuelLevel === "N/A" ? 0 : fuelLevel}"
+                            ></div>
+                        </div>
+
+                        <span>${fuelLevel}</span>
+                    </div>
                 </td>
 
                 <td>

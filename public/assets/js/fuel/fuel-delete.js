@@ -1,335 +1,351 @@
 /* ==========================================
-   Fuel Delete — single + bulk confirmation
+   Fuel Delete
+   Backend-controlled deletion
 ========================================== */
 
 let deleteFuelInitialized = false;
 
 const deleteFuelModalState = {
-  currentRow: null,
-  opener: null,
-  mode: "single",
-  bulkIds: [],
+    currentRow: null,
+    opener: null,
+    mode: "single",
+    bulkIds: [],
 };
 
 function populateDeleteFuel(row) {
-  if (!row) return;
+    if (!row) {
+        return;
+    }
 
-  const number =
-    row.querySelector(".fuel-number")?.textContent?.trim() ||
-    "this fuel record";
-  const vehicle =
-    row.querySelector(".fuel-vehicle")?.textContent?.trim() || "this vehicle";
+    const number =
+        row.querySelector(".fuel-number")?.textContent?.trim() ||
+        "this fuel record";
+    const vehicle =
+        row.querySelector(".fuel-vehicle")?.textContent?.trim() ||
+        "this vehicle";
+    const title = document.getElementById("deleteFuelModalTitle");
+    const description = document.getElementById("deleteFuelModalDescription");
+    const confirmButton = document.getElementById("confirmDeleteFuel");
 
-  const title = document.getElementById("deleteFuelModalTitle");
-  const description = document.getElementById("deleteFuelModalDescription");
-  const confirmButton = document.getElementById("confirmDeleteFuel");
+    if (title) {
+        title.textContent = "Delete Fuel Record";
+    }
 
-  if (title) {
-    title.textContent = "Delete Fuel Record";
-  }
+    if (description) {
+        description.innerHTML =
+            "Are you sure you want to delete " +
+            "<strong>" +
+            number +
+            "</strong> for <strong>" +
+            vehicle +
+            "</strong>?";
+    }
 
-  if (description) {
-    description.innerHTML =
-      "Are you sure you want to delete " +
-      '<strong id="deleteFuelNumber">' +
-      number +
-      '</strong> for <strong id="deleteFuelVehicle">' +
-      vehicle +
-      "</strong>?";
-  }
-
-  if (confirmButton) {
-    confirmButton.innerHTML =
-      '<i class="ph ph-trash"></i> Delete Fuel Record';
-  }
+    if (confirmButton) {
+        confirmButton.innerHTML =
+            '<i class="ph ph-trash"></i> Delete Fuel Record';
+    }
 }
 
 function populateBulkDeleteFuel(count) {
-  const title = document.getElementById("deleteFuelModalTitle");
-  const description = document.getElementById("deleteFuelModalDescription");
-  const confirmButton = document.getElementById("confirmDeleteFuel");
-  const safeCount = Number(count) || 0;
+    const title = document.getElementById("deleteFuelModalTitle");
+    const description = document.getElementById("deleteFuelModalDescription");
+    const confirmButton = document.getElementById("confirmDeleteFuel");
+    const safeCount = Number(count) || 0;
 
-  if (title) {
-    title.textContent = "Delete Selected Fuel Records";
-  }
+    if (title) {
+        title.textContent = "Delete Selected Fuel Records";
+    }
 
-  if (description) {
-    description.textContent =
-      "Delete " +
-      safeCount +
-      " selected fuel record" +
-      (safeCount === 1 ? "" : "s") +
-      "? This action cannot be undone.";
-  }
+    if (description) {
+        description.textContent =
+            "Delete " +
+            safeCount +
+            " selected fuel record" +
+            (safeCount === 1 ? "" : "s") +
+            "?";
+    }
 
-  if (confirmButton) {
-    confirmButton.innerHTML = '<i class="ph ph-trash"></i> Delete Selected';
-  }
+    if (confirmButton) {
+        confirmButton.innerHTML = '<i class="ph ph-trash"></i> Delete Selected';
+    }
 }
 
-function deleteFuelRecord(rowOrId) {
-  const tableBody = document.getElementById("fuelTableBody");
-  if (!tableBody) return false;
 
-  let row = null;
-  let id = "";
+async function deleteFuelRecord(rowOrId) {
+    const tableBody = document.getElementById("fuelTableBody");
 
-  if (typeof rowOrId === "string") {
-    id = rowOrId.trim();
-    if (!id) return false;
-
-    row =
-      typeof resolveFuelRowById === "function"
-        ? resolveFuelRowById(id)
-        : null;
-
-    if (!row && typeof getFuelDataRows === "function") {
-      row =
-        getFuelDataRows(tableBody).find((candidate) => {
-          const candidateId =
-            (candidate.dataset.fuelId || "").trim() ||
-            candidate.querySelector(".fuel-number")?.textContent?.trim() ||
-            "";
-          return candidateId === id;
-        }) || null;
+    if (!tableBody) {
+        throw new Error("Fuel table was not found.");
     }
-  } else if (rowOrId && rowOrId.nodeType === Node.ELEMENT_NODE) {
-    row = rowOrId;
-    id =
-      (row.dataset.fuelId || "").trim() ||
-      row.querySelector(".fuel-number")?.textContent?.trim() ||
-      "";
-  }
 
-  if (!row || !row.isConnected) return false;
+    let row = null;
+    let id = "";
 
-  if (id && typeof removeFuelSelectionId === "function") {
-    removeFuelSelectionId(id);
-  }
+    if (typeof rowOrId === "string") {
+        id = rowOrId.trim();
 
-  try {
-    row.remove();
-    return true;
-  } catch (error) {
-    console.error("deleteFuelRecord failed:", error);
-    return false;
-  }
+        if (!id) {
+            throw new Error("Invalid fuel record ID.");
+        }
+
+        row =
+            typeof resolveFuelRowById === "function"
+                ? resolveFuelRowById(id)
+                : null;
+    } else if (rowOrId && rowOrId.nodeType === Node.ELEMENT_NODE) {
+        row = rowOrId;
+
+        id = (row.dataset.id || row.dataset.fuelId || "").trim();
+    }
+
+    if (!id) {
+        throw new Error("Invalid fuel record ID.");
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Backend Delete
+    |--------------------------------------------------------------------------
+    */
+
+    const response = await fetch(`/fuel-records/${id}`, {
+        method: "DELETE",
+
+        headers: {
+            Accept: "application/json",
+
+            "X-CSRF-TOKEN": document
+                .querySelector('meta[name="csrf-token"]')
+                ?.getAttribute("content"),
+        },
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+        throw new Error(data.message || "Fuel record cannot be deleted.");
+    }
+
+    return {
+        success: true,
+        row,
+        id,
+        data,
+    };
 }
 
 function openDeleteFuelModal(row, opener) {
-  const modal = document.getElementById("deleteFuelModal");
-  if (!modal || !row) return;
+    const modal = document.getElementById("deleteFuelModal");
 
-  deleteFuelModalState.mode = "single";
-  deleteFuelModalState.bulkIds = [];
-  deleteFuelModalState.currentRow = row;
-  deleteFuelModalState.opener = opener || null;
+    if (!modal || !row) {
+        return;
+    }
 
-  populateDeleteFuel(row);
-  modal.classList.add("show");
-  document.body.style.overflow = "hidden";
-  document.getElementById("cancelDeleteFuel")?.focus();
+    deleteFuelModalState.mode = "single";
+    deleteFuelModalState.bulkIds = [];
+    deleteFuelModalState.currentRow = row;
+    deleteFuelModalState.opener = opener || null;
+
+    populateDeleteFuel(row);
+
+    modal.classList.add("show");
+    document.body.style.overflow = "hidden";
+    document.getElementById("cancelDeleteFuel")?.focus();
 }
 
 function openBulkDeleteFuelModal(ids, opener) {
-  const modal = document.getElementById("deleteFuelModal");
-  if (!modal) return;
+    const modal = document.getElementById("deleteFuelModal");
 
-  const bulkIds = Array.isArray(ids)
-    ? ids.map((id) => String(id).trim()).filter(Boolean)
-    : [];
+    if (!modal) {
+        return;
+    }
 
-  if (bulkIds.length === 0) return;
+    const bulkIds = Array.isArray(ids)
+        ? ids.map((id) => String(id).trim()).filter(Boolean)
+        : [];
 
-  deleteFuelModalState.mode = "bulk";
-  deleteFuelModalState.bulkIds = bulkIds;
-  deleteFuelModalState.currentRow = null;
-  deleteFuelModalState.opener = opener || null;
+    if (bulkIds.length === 0) {
+        return;
+    }
 
-  populateBulkDeleteFuel(bulkIds.length);
-  modal.classList.add("show");
-  document.body.style.overflow = "hidden";
-  document.getElementById("cancelDeleteFuel")?.focus();
+    deleteFuelModalState.mode = "bulk";
+    deleteFuelModalState.bulkIds = bulkIds;
+    deleteFuelModalState.currentRow = null;
+    deleteFuelModalState.opener = opener || null;
+
+    populateBulkDeleteFuel(bulkIds.length);
+
+    modal.classList.add("show");
+    document.body.style.overflow = "hidden";
+    document.getElementById("cancelDeleteFuel")?.focus();
 }
+
 
 function closeDeleteFuelModal(opener) {
-  const modal = document.getElementById("deleteFuelModal");
-  if (!modal || !modal.classList.contains("show")) return;
+    const modal = document.getElementById("deleteFuelModal");
 
-  modal.classList.remove("show");
-  document.body.style.overflow = "";
-
-  const focusTarget = opener || deleteFuelModalState.opener;
-  deleteFuelModalState.currentRow = null;
-  deleteFuelModalState.bulkIds = [];
-  deleteFuelModalState.mode = "single";
-  deleteFuelModalState.opener = null;
-
-  if (focusTarget && focusTarget.isConnected) {
-    focusTarget.focus();
-  }
-}
-
-function confirmSingleFuelDelete() {
-  const row = deleteFuelModalState.currentRow;
-  const opener = deleteFuelModalState.opener;
-
-  if (!row || !row.isConnected) {
-    closeDeleteFuelModal(opener);
-    return;
-  }
-
-  const deleted = deleteFuelRecord(row);
-  closeDeleteFuelModal(opener);
-
-  if (!deleted) {
-    if (typeof showToast === "function") {
-      showToast("Unable to delete the fuel record.", "error");
+    if (!modal || !modal.classList.contains("show")) {
+        return;
     }
-    return;
-  }
 
-  if (typeof refreshFuelTable === "function") {
-    refreshFuelTable({
-      resetPage: false,
-      refreshStatistics: true,
-      reason: "delete",
-    });
-  } else if (typeof updateFuelStatistics === "function") {
-    updateFuelStatistics();
-  }
+    modal.classList.remove("show");
+    document.body.style.overflow = "";
 
-  if (typeof syncFuelSelectionUI === "function") {
-    syncFuelSelectionUI();
-  }
+    const focusTarget = opener || deleteFuelModalState.opener;
 
-  if (typeof showToast === "function") {
-    showToast("Fuel record deleted successfully.", "success");
-  }
+    deleteFuelModalState.currentRow = null;
+    deleteFuelModalState.bulkIds = [];
+    deleteFuelModalState.mode = "single";
+    deleteFuelModalState.opener = null;
+
+    if (focusTarget && focusTarget.isConnected) {
+        focusTarget.focus();
+    }
 }
 
-function confirmBulkFuelDelete() {
-  const opener = deleteFuelModalState.opener;
-  const bulkIds = Array.from(deleteFuelModalState.bulkIds || []);
-  const deleteButton = document.getElementById("deleteSelectedFuel");
+async function confirmSingleFuelDelete() {
+    const row = deleteFuelModalState.currentRow;
 
-  if (bulkIds.length === 0) {
-    closeDeleteFuelModal(opener);
-    return;
-  }
+    const opener = deleteFuelModalState.opener;
 
-  if (deleteButton) {
-    deleteButton.disabled = true;
-    deleteButton.dataset.processing = "true";
-  }
+    if (!row || !row.isConnected) {
+        closeDeleteFuelModal(opener);
+        return;
+    }
 
-  let successCount = 0;
-  let failCount = 0;
+    const confirmButton = document.getElementById("confirmDeleteFuel");
 
-  bulkIds.forEach((id) => {
+    if (confirmButton) {
+        confirmButton.disabled = true;
+        confirmButton.dataset.processing = "true";
+        confirmButton.textContent = "Deleting...";
+    }
+
     try {
-      if (deleteFuelRecord(id)) {
-        successCount += 1;
-      } else {
-        failCount += 1;
-      }
+        await deleteFuelRecord(row);
+
+        const id = (row.dataset.id || row.dataset.fuelId || "").trim();
+
+        if (id && typeof removeFuelSelectionId === "function") {
+            removeFuelSelectionId(id);
+        }
+
+        row.remove();
+
+        closeDeleteFuelModal(opener);
+
+        if (typeof refreshFuelTable === "function") {
+            refreshFuelTable({
+                resetPage: false,
+                refreshStatistics: true,
+                reason: "delete",
+            });
+        }
+
+        if (typeof loadFuelRecords === "function") {
+            await loadFuelRecords();
+        }
+
+        if (typeof showToast === "function") {
+            showToast("Fuel record deleted successfully.", "success");
+        }
     } catch (error) {
-      console.error("Bulk fuel delete failed for:", id, error);
-      failCount += 1;
+        console.error("FUEL DELETE ERROR:", error);
+
+        /*
+        |--------------------------------------------------------------------------
+        | Important:
+        | Current backend intentionally rejects deletion.
+        |--------------------------------------------------------------------------
+        */
+
+        closeDeleteFuelModal(opener);
+
+        if (typeof showToast === "function") {
+            showToast(
+                error.message || "Fuel records cannot be deleted.",
+                "warning",
+            );
+        }
+    } finally {
+        if (confirmButton) {
+            confirmButton.disabled = false;
+
+            confirmButton.dataset.processing = "false";
+
+            confirmButton.innerHTML =
+                '<i class="ph ph-trash"></i> Delete Fuel Record';
+        }
     }
-  });
+}
 
-  if (typeof clearFuelSelection === "function") {
-    clearFuelSelection();
-  } else {
-    selectedFuelIds?.clear?.();
-    if (typeof syncFuelSelectionUI === "function") {
-      syncFuelSelectionUI();
+async function confirmBulkFuelDelete() {
+    const opener = deleteFuelModalState.opener;
+
+    const ids = Array.from(deleteFuelModalState.bulkIds || []);
+
+    if (ids.length === 0) {
+        closeDeleteFuelModal(opener);
+        return;
     }
-  }
 
-  closeDeleteFuelModal(opener);
+    closeDeleteFuelModal(opener);
 
-  if (typeof refreshFuelTable === "function") {
-    refreshFuelTable({
-      resetPage: false,
-      refreshStatistics: true,
-      reason: "bulk-delete",
-    });
-  } else if (typeof updateFuelStatistics === "function") {
-    updateFuelStatistics();
-  }
-
-  if (typeof syncFuelSelectionUI === "function") {
-    syncFuelSelectionUI();
-  }
-
-  if (deleteButton) {
-    deleteButton.dataset.processing = "false";
-    deleteButton.disabled = false;
-  }
-
-  if (typeof showToast === "function") {
-    if (failCount === 0) {
-      showToast(
-        "Successfully deleted " +
-          successCount +
-          " fuel record" +
-          (successCount === 1 ? "" : "s") +
-          ".",
-        "success",
-      );
-    } else {
-      showToast(
-        "Successfully deleted " +
-          successCount +
-          " fuel records. " +
-          failCount +
-          " records could not be deleted.",
-        "warning",
-      );
-    }
-  }
+    await executeBulkFuelDelete(ids, opener);
 }
 
 function initDeleteFuelModal() {
-  if (deleteFuelInitialized) return;
-
-  const modal = document.getElementById("deleteFuelModal");
-  if (!modal) return;
-
-  deleteFuelInitialized = true;
-
-  document.addEventListener("click", (event) => {
-    const deleteBtn = event.target.closest(".action-btn.delete-fuel");
-    if (deleteBtn) {
-      const row = deleteBtn.closest("tr");
-      if (row) openDeleteFuelModal(row, deleteBtn);
-      return;
+    if (deleteFuelInitialized) {
+        return;
     }
 
-    if (
-      event.target.closest("#closeDeleteFuelModal") ||
-      event.target.closest("#cancelDeleteFuel") ||
-      event.target === modal
-    ) {
-      closeDeleteFuelModal();
-      return;
+    const modal = document.getElementById("deleteFuelModal");
+
+    if (!modal) {
+        return;
     }
 
-    if (event.target.closest("#confirmDeleteFuel")) {
-      if (deleteFuelModalState.mode === "bulk") {
-        confirmBulkFuelDelete();
-      } else {
-        confirmSingleFuelDelete();
-      }
-    }
-  });
+    deleteFuelInitialized = true;
 
-  document.addEventListener("keydown", (event) => {
-    if (event.key === "Escape" && modal.classList.contains("show")) {
-      closeDeleteFuelModal();
-    }
-  });
+    document.addEventListener("click", (event) => {
+        const deleteBtn = event.target.closest(".action-btn.delete-fuel");
+
+        if (deleteBtn) {
+            const row = deleteBtn.closest("tr");
+
+            if (row) {
+                openDeleteFuelModal(row, deleteBtn);
+            }
+
+            return;
+        }
+
+        if (
+            event.target.closest("#closeDeleteFuelModal") ||
+            event.target.closest("#cancelDeleteFuel") ||
+            event.target === modal
+        ) {
+            closeDeleteFuelModal();
+            return;
+        }
+
+        if (event.target.closest("#confirmDeleteFuel")) {
+            if (deleteFuelModalState.mode === "bulk") {
+                confirmBulkFuelDelete();
+            } else {
+                confirmSingleFuelDelete();
+            }
+        }
+    });
+
+    document.addEventListener("keydown", (event) => {
+        if (event.key === "Escape" && modal.classList.contains("show")) {
+            closeDeleteFuelModal();
+        }
+    });
 }
+
+document.addEventListener("DOMContentLoaded", () => {
+    initDeleteFuelModal();
+});

@@ -5,254 +5,214 @@
 const fuelRowsPerPage = 5;
 let fuelPaginationState = null;
 
-function updateFuelPaginationInfo(info, start, end, total) {
-  if (!info) return;
+function getFuelPaginationRows() {
+    if (!fuelPaginationState || typeof getFuelDataRows !== "function") {
+        return [];
+    }
 
-  const range = document.createElement("strong");
-  const totalCount = document.createElement("strong");
-  range.textContent = `${start}–${end}`;
-  totalCount.textContent = String(total);
-
-  info.replaceChildren(
-    document.createTextNode("Showing "),
-    range,
-    document.createTextNode(" of "),
-    totalCount,
-    document.createTextNode(" fuel records"),
-  );
-}
-
-function getFuelVisiblePages(currentPage, totalPages) {
-  if (totalPages <= 7) {
-    return Array.from({ length: totalPages }, (_, i) => i + 1);
-  }
-
-  const pages = new Set([1, totalPages, currentPage]);
-  for (let offset = -1; offset <= 1; offset += 1) {
-    const page = currentPage + offset;
-    if (page > 1 && page < totalPages) pages.add(page);
-  }
-  return Array.from(pages).sort((a, b) => a - b);
+    return getFuelDataRows(fuelPaginationState.tableBody);
 }
 
 function createFuelPaginationButton({
-  label,
-  ariaLabel,
-  iconClass,
-  disabled = false,
-  active = false,
-  pageAction,
-  pageNumber,
+    label,
+    ariaLabel,
+    iconClass,
+    disabled = false,
+    active = false,
+    onClick,
 }) {
-  const button = document.createElement("button");
-  button.type = "button";
-  button.setAttribute("aria-label", ariaLabel);
-  button.disabled = disabled;
+    const button = document.createElement("button");
 
-  if (pageAction) button.dataset.fuelPage = pageAction;
-  if (pageNumber != null) button.dataset.pageNumber = String(pageNumber);
+    button.type = "button";
+    button.setAttribute("aria-label", ariaLabel);
+    button.disabled = disabled;
 
-  if (active) {
-    button.classList.add("active");
-    button.setAttribute("aria-current", "page");
-  }
-
-  if (iconClass) {
-    const icon = document.createElement("i");
-    icon.className = iconClass;
-    icon.setAttribute("aria-hidden", "true");
-    button.appendChild(icon);
-  } else {
-    button.textContent = String(label);
-  }
-
-  return button;
-}
-
-function buildFuelPaginationControls(totalPages) {
-  const { pagination, currentPage } = fuelPaginationState;
-  if (!pagination) return;
-
-  const fragment = document.createDocumentFragment();
-
-  fragment.appendChild(
-    createFuelPaginationButton({
-      ariaLabel: "Previous page",
-      iconClass: "ph ph-caret-left",
-      disabled: currentPage === 1 || totalPages === 0,
-      pageAction: "prev",
-    }),
-  );
-
-  const visiblePages = getFuelVisiblePages(currentPage, totalPages);
-  let previousPage = 0;
-
-  visiblePages.forEach((page) => {
-    if (previousPage && page - previousPage > 1) {
-      const ellipsis = document.createElement("button");
-      ellipsis.type = "button";
-      ellipsis.textContent = "…";
-      ellipsis.disabled = true;
-      ellipsis.setAttribute("aria-hidden", "true");
-      ellipsis.setAttribute("tabindex", "-1");
-      fragment.appendChild(ellipsis);
+    if (active) {
+        button.classList.add("active");
     }
 
-    fragment.appendChild(
-      createFuelPaginationButton({
-        label: page,
-        ariaLabel: `Page ${page}`,
-        active: page === currentPage,
-        pageAction: "page",
-        pageNumber: page,
-      }),
-    );
+    if (iconClass) {
+        const icon = document.createElement("i");
 
-    previousPage = page;
-  });
+        icon.className = iconClass;
 
-  fragment.appendChild(
-    createFuelPaginationButton({
-      ariaLabel: "Next page",
-      iconClass: "ph ph-caret-right",
-      disabled: totalPages === 0 || currentPage === totalPages,
-      pageAction: "next",
-    }),
-  );
+        button.appendChild(icon);
+    } else {
+        button.textContent = label;
+    }
 
-  pagination.replaceChildren(fragment);
+    button.addEventListener("click", onClick);
+
+    return button;
 }
 
-function applyFuelPagination({
-  matchingRows = [],
-  allRows = [],
-  resetPage = false,
-} = {}) {
-  if (!fuelPaginationState) {
-    allRows.forEach((row) => {
-      row.style.display =
-        row.dataset.matchesFilter !== "false" ? "" : "none";
+function updateFuelPaginationInfo(info, start, end, total) {
+    if (!info) {
+        return;
+    }
+
+    const range = document.createElement("strong");
+    const totalCount = document.createElement("strong");
+
+    range.textContent = `${start}–${end}`;
+
+    totalCount.textContent = total;
+
+    info.replaceChildren(
+        document.createTextNode("Showing "),
+        range,
+        document.createTextNode(" of "),
+        totalCount,
+        document.createTextNode(" fuel records"),
+    );
+}
+
+function renderFuelPagination() {
+    if (!fuelPaginationState) {
+        return false;
+    }
+
+    const { tableBody, pagination, info } = fuelPaginationState;
+    const dataRows = getFuelPaginationRows();
+    const matchingRows = dataRows.filter(
+        (row) => row.dataset.fuelMatchesFilter !== "false",
+    );
+    const total = matchingRows.length;
+    const totalPages = Math.ceil(total / fuelRowsPerPage);
+
+    if (totalPages === 0) {
+        fuelPaginationState.currentPage = 1;
+    } else {
+        fuelPaginationState.currentPage = Math.min(
+            Math.max(fuelPaginationState.currentPage, 1),
+            totalPages,
+        );
+    }
+
+    const startIndex = (fuelPaginationState.currentPage - 1) * fuelRowsPerPage;
+    const endIndex = startIndex + fuelRowsPerPage;
+    const start = total === 0 ? 0 : startIndex + 1;
+    const end = Math.min(endIndex, total);
+
+    dataRows.forEach((row) => {
+        row.style.display = "none";
     });
+
+    matchingRows.slice(startIndex, endIndex).forEach((row) => {
+        row.style.display = "";
+    });
+
     if (typeof updateFuelNoResultsRow === "function") {
-      updateFuelNoResultsRow(
-        document.getElementById("fuelTableBody"),
-        matchingRows.length === 0,
-      );
+        updateFuelNoResultsRow(tableBody, total === 0);
     }
-    return false;
-  }
 
-  const { tableBody, info } = fuelPaginationState;
-  const total = matchingRows.length;
-  const totalPages = Math.ceil(total / fuelRowsPerPage) || 0;
+    updateFuelPaginationInfo(info, start, end, total);
 
-  if (resetPage) {
-    fuelPaginationState.currentPage = 1;
-  }
+    pagination.replaceChildren();
 
-  if (totalPages === 0) {
-    fuelPaginationState.currentPage = 1;
-  } else {
-    fuelPaginationState.currentPage = Math.min(
-      Math.max(fuelPaginationState.currentPage, 1),
-      totalPages,
-    );
-  }
+    const previousButton = createFuelPaginationButton({
+        ariaLabel: "Previous page",
 
-  const currentPage = fuelPaginationState.currentPage;
-  const startIndex = (currentPage - 1) * fuelRowsPerPage;
-  const endIndex = startIndex + fuelRowsPerPage;
-  const start = total === 0 ? 0 : startIndex + 1;
-  const end = Math.min(endIndex, total);
+        iconClass: "ph ph-caret-left",
 
-  allRows.forEach((row) => {
-    row.style.display = "none";
-  });
+        disabled: fuelPaginationState.currentPage === 1 || totalPages === 0,
 
-  matchingRows.slice(startIndex, endIndex).forEach((row) => {
-    row.style.display = "";
-  });
+        onClick: () => {
+            if (fuelPaginationState.currentPage > 1) {
+                fuelPaginationState.currentPage -= 1;
 
-  if (typeof updateFuelNoResultsRow === "function") {
-    updateFuelNoResultsRow(tableBody, total === 0);
-  }
+                renderFuelPagination();
+            }
+        },
+    });
 
-  updateFuelPaginationInfo(info, start, end, total);
+    pagination.appendChild(previousButton);
 
-  const last = fuelPaginationState.lastRendered || {};
-  const controlsChanged =
-    last.currentPage !== currentPage ||
-    last.totalPages !== totalPages ||
-    last.rowsPerPage !== fuelRowsPerPage;
+    for (let page = 1; page <= totalPages; page += 1) {
+        pagination.appendChild(
+            createFuelPaginationButton({
+                label: page,
+                ariaLabel: `Page ${page}`,
 
-  if (controlsChanged) {
-    buildFuelPaginationControls(totalPages);
-    fuelPaginationState.lastRendered = {
-      currentPage,
-      totalPages,
-      rowsPerPage: fuelRowsPerPage,
-    };
-  }
+                active: page === fuelPaginationState.currentPage,
 
-  return true;
+                onClick: () => {
+                    fuelPaginationState.currentPage = page;
+
+                    renderFuelPagination();
+                },
+            }),
+        );
+    }
+
+    const nextButton = createFuelPaginationButton({
+        ariaLabel: "Next page",
+        iconClass: "ph ph-caret-right",
+        disabled:
+            totalPages === 0 || fuelPaginationState.currentPage === totalPages,
+
+        onClick: () => {
+            if (fuelPaginationState.currentPage < totalPages) {
+                fuelPaginationState.currentPage += 1;
+
+                renderFuelPagination();
+            }
+        },
+    });
+
+    pagination.appendChild(nextButton);
+
+    if (typeof refreshFuelBulkState === "function") {
+        refreshFuelBulkState();
+    }
+
+    return true;
+}
+
+function refreshFuelPagination({ reset = false } = {}) {
+    if (!fuelPaginationState) {
+        return false;
+    }
+
+    if (reset) {
+        fuelPaginationState.currentPage = 1;
+    }
+
+    return renderFuelPagination();
+}
+
+function resetFuelPagination() {
+    return refreshFuelPagination({
+        reset: true,
+    });
 }
 
 function initFuelPagination() {
-  const tableBody = document.getElementById("fuelTableBody");
-  const pagination = document.getElementById("fuelPagination");
-  const info = document.getElementById("fuelPaginationInfo");
+    const tableBody = document.getElementById("fuelTableBody");
+    const pagination = document.getElementById("fuelPagination");
+    const info = document.getElementById("fuelPaginationInfo");
 
-  if (!tableBody || !pagination) return false;
-  if (tableBody.dataset.fuelPaginationInitialized === "true") return true;
-
-  tableBody.dataset.fuelPaginationInitialized = "true";
-
-  fuelPaginationState = {
-    tableBody,
-    pagination,
-    info,
-    currentPage: 1,
-    rowsPerPage: fuelRowsPerPage,
-    lastRendered: null,
-  };
-
-  pagination.addEventListener("click", (event) => {
-    const button = event.target.closest("button[data-fuel-page]");
-    if (!button || button.disabled || !fuelPaginationState) return;
-
-    const action = button.dataset.fuelPage;
-    const totalPages = fuelPaginationState.lastRendered?.totalPages || 0;
-
-    if (action === "prev") {
-      if (fuelPaginationState.currentPage <= 1) return;
-      fuelPaginationState.currentPage -= 1;
-    } else if (action === "next") {
-      if (
-        totalPages === 0 ||
-        fuelPaginationState.currentPage >= totalPages
-      ) {
-        return;
-      }
-      fuelPaginationState.currentPage += 1;
-    } else if (action === "page") {
-      const page = Number(button.dataset.pageNumber);
-      if (!page || page === fuelPaginationState.currentPage) return;
-      fuelPaginationState.currentPage = page;
-    } else {
-      return;
+    if (!tableBody || !pagination) {
+        return false;
     }
 
-    if (
-      typeof isFuelTableRefreshing === "function" &&
-      isFuelTableRefreshing()
-    ) {
-      return;
+
+    if (fuelPaginationState?.tableBody === tableBody) {
+        return refreshFuelPagination();
     }
 
-    if (typeof refreshFuelTable === "function") {
-      refreshFuelTable({ resetPage: false });
-    }
-  });
+    fuelPaginationState = {
+        tableBody,
+        pagination,
+        info,
+        currentPage: 1,
+    };
 
-  return true;
+    tableBody.dataset.fuelPaginationInitialized = "true";
+
+    return renderFuelPagination();
 }
+
+document.addEventListener("DOMContentLoaded", () => {
+    initFuelPagination();
+});

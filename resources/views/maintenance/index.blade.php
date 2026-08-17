@@ -333,7 +333,6 @@
 
     <!-- Main JS -->
     @push('scripts')
-    
   
     <script src="{{ asset('assets/js/components/dropdown.js') }}"></script>
     <script src="{{ asset('assets/js/maintenance/maintenance-modal.js') }}"></script>

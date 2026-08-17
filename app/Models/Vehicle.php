@@ -18,9 +18,20 @@ class Vehicle extends Model
         'insurance_expiry',
         'capacity',
         'fuel_type',
+        'tank_capacity',
+        'current_fuel',
+        'current_odometer',
         'status',
         'notes',
         //'last_service',
+    ];
+
+    protected $casts = [
+        'purchase_date' => 'date',
+        'insurance_expiry' => 'date',
+        'tank_capacity' => 'decimal:2',
+        'current_fuel' => 'decimal:2',
+        'current_odometer' => 'decimal:2',
     ];
     
      public function drivers()
@@ -36,5 +47,10 @@ class Vehicle extends Model
     public function maintenances(): HasMany
     {
         return $this->hasMany(Maintenance::class);
+    }
+
+    public function fuelLogs(): HasMany
+    {
+        return $this->hasMany(FuelLog::class);
     }
 }

@@ -82,6 +82,16 @@
         </div>
 
         <div class="view-vehicle-detail-item">
+          <label>Tank Capacity</label>
+          <p id="viewTankCapacity"></p>
+        </div>
+
+        <div class="view-vehicle-detail-item">
+          <label>Current Fuel</label>
+          <p id="viewCurrentFuel"></p>
+        </div>
+
+        <div class="view-vehicle-detail-item">
           <label>Purchase Date</label>
           <p id="viewPurchaseDate"></p>
         </div>

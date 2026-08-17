@@ -2,217 +2,266 @@
    Fuel Table Sorting
 ========================================== */
 
-const FUEL_SORT_CONFIG = {
-  1: { type: "text", field: "number" },
-  2: { type: "date", field: "refuelDate" },
-  3: { type: "text", field: "vehicleRaw" },
-  6: { type: "text", field: "fuelTypeRaw" },
-  7: { type: "number", field: "quantity" },
-  9: { type: "number", field: "totalCost" },
-  10: { type: "number", field: "odometer" },
-};
+let fuelSortingInitialized = false;
 
-let fuelSortState = null;
+const FUEL_SORT_CLASS_MAP = [
+    null,
+    ".fuel-number", // 1 - Fuel Record No.
+    ".fuel-date", // 2 - Date
+    ".fuel-vehicle", // 3 - Vehicle
+    null, // 4 - Plate No. (not sortable)
+    null, // 5 - Driver (not sortable)
+    ".fuel-type", // 6 - Fuel Type
+    ".fuel-quantity", // 7 - Quantity
+    null, // 8 - Cost / L (not sortable)
+    ".fuel-total-cost", // 9 - Total Cost
+    ".fuel-odometer", // 10 - Odometer
+    null, // 11 - Fuel Station (not sortable)
+    null, // 12 - Actions
+];
+
+function getFuelSortableRows(tableBody) {
+    if (!tableBody) {
+        return [];
+    }
+
+    return Array.from(tableBody.querySelectorAll("tr")).filter((row) => {
+        if (row.classList.contains("fuel-no-results")) {
+            return false;
+        }
+
+        return (
+            row.querySelector(".fuel-number") !== null ||
+            row.querySelector(".fuel-checkbox") !== null
+        );
+    });
+}
+
+function getFuelSortValue(row, columnIndex) {
+    const selector = FUEL_SORT_CLASS_MAP[columnIndex];
+
+    if (!selector) {
+        return "";
+    }
+
+    return (row.querySelector(selector)?.textContent || "").trim();
+}
 
 function parseFuelSortNumber(value) {
-  if (value == null || value === "") return Number.NaN;
-  const cleaned = String(value).replace(/[^\d.-]/g, "");
-  if (!cleaned) return Number.NaN;
-  return Number.parseFloat(cleaned);
+    const cleaned = String(value || "").replace(/[^\d.-]/g, "");
+
+    const number = Number.parseFloat(cleaned);
+
+    return Number.isNaN(number) ? null : number;
 }
 
-function parseFuelSortDate(value) {
-  if (value == null || value === "") return Number.NaN;
-  const raw = String(value).trim();
-  if (!raw || raw === "—") return Number.NaN;
-  const time = Date.parse(raw);
-  return Number.isNaN(time) ? Number.NaN : time;
+function parseFuelSortDate(row) {
+
+    const raw = row.dataset.refuelDate || "";
+
+    if (raw) {
+        const timestamp = Date.parse(raw);
+
+        if (!Number.isNaN(timestamp)) {
+            return timestamp;
+        }
+    }
+
+    const display = getFuelSortValue(row, 2);
+
+    const timestamp = Date.parse(display);
+
+    return Number.isNaN(timestamp) ? null : timestamp;
 }
 
-function compareFuelMetaValues(aMeta, bMeta, columnIndex, direction) {
-  const config = FUEL_SORT_CONFIG[columnIndex];
-  if (!config || !aMeta || !bMeta) return 0;
+function compareFuelSortValues(rowA, rowB, columnIndex, direction) {
+    let result = 0;
 
-  const aRaw = aMeta[config.field] != null ? aMeta[config.field] : "";
-  const bRaw = bMeta[config.field] != null ? bMeta[config.field] : "";
-  const dir = direction === "desc" ? -1 : 1;
+    /* Date */
 
-  if (config.type === "number") {
-    const aNum = parseFuelSortNumber(aRaw);
-    const bNum = parseFuelSortNumber(bRaw);
-    const aEmpty = Number.isNaN(aNum);
-    const bEmpty = Number.isNaN(bNum);
-    if (aEmpty && bEmpty) return 0;
-    if (aEmpty) return 1;
-    if (bEmpty) return -1;
-    if (aNum === bNum) return 0;
-    return aNum < bNum ? -dir : dir;
-  }
+    if (columnIndex === 2) {
+        const aDate = parseFuelSortDate(rowA);
+        const bDate = parseFuelSortDate(rowB);
 
-  if (config.type === "date") {
-    const aTime = parseFuelSortDate(aRaw);
-    const bTime = parseFuelSortDate(bRaw);
-    const aEmpty = Number.isNaN(aTime);
-    const bEmpty = Number.isNaN(bTime);
-    if (aEmpty && bEmpty) return 0;
-    if (aEmpty) return 1;
-    if (bEmpty) return -1;
-    if (aTime === bTime) return 0;
-    return aTime < bTime ? -dir : dir;
-  }
+        if (aDate === null && bDate === null) {
+            return 0;
+        }
+        if (aDate === null) {
+            return 1;
+        }
+        if (bDate === null) {
+            return -1;
+        }
+        if (aDate < bDate) {
+            result = -1;
+        } else if (aDate > bDate) {
+            result = 1;
+        } else {
+            result = 0;
+        }
+    } else if (columnIndex === 7 || columnIndex === 9 || columnIndex === 10) {
 
-  return (
-    String(aRaw).localeCompare(String(bRaw), undefined, {
-      sensitivity: "base",
-      numeric: true,
-    }) * dir
-  );
+    /* Numeric */
+        const aNumber = parseFuelSortNumber(
+            getFuelSortValue(rowA, columnIndex),
+        );
+        const bNumber = parseFuelSortNumber(
+            getFuelSortValue(rowB, columnIndex),
+        );
+        if (aNumber === null && bNumber === null) {
+            return 0;
+        }
+        if (aNumber === null) {
+            return 1;
+        }
+        if (bNumber === null) {
+            return -1;
+        }
+        if (aNumber < bNumber) {
+            result = -1;
+        } else if (aNumber > bNumber) {
+            result = 1;
+        } else {
+            result = 0;
+        }
+    } else {
+
+    /* Text */
+        const aValue = getFuelSortValue(rowA, columnIndex).toLowerCase();
+        const bValue = getFuelSortValue(rowB, columnIndex).toLowerCase();
+
+        if (aValue < bValue) {
+            result = -1;
+        } else if (aValue > bValue) {
+            result = 1;
+        } else {
+            result = 0;
+        }
+    }
+
+    return direction === "asc" ? result : -result;
 }
 
-function clearFuelSortIndicators(headers) {
-  headers.forEach((th) => {
-    th.removeAttribute("aria-sort");
+function clearFuelSortIndicators() {
+    document.querySelectorAll("th.sortable").forEach((th) => {
+        th.removeAttribute("aria-sort");
+
+        const icon = th.querySelector(".sort-icon");
+
+        if (icon) {
+            icon.className = "ph ph-caret-up-down sort-icon";
+        }
+    });
+}
+
+function setFuelSortIcon(th, direction) {
     const icon = th.querySelector(".sort-icon");
-    if (icon) icon.className = "ph ph-caret-up-down sort-icon";
-  });
-}
 
-function setFuelSortIndicator(th, direction) {
-  if (!th) return;
-  if (!direction) {
-    th.removeAttribute("aria-sort");
-    const icon = th.querySelector(".sort-icon");
-    if (icon) icon.className = "ph ph-caret-up-down sort-icon";
-    return;
-  }
+    if (!icon) {
+        return;
+    }
 
-  th.setAttribute(
-    "aria-sort",
-    direction === "asc" ? "ascending" : "descending",
-  );
-  const icon = th.querySelector(".sort-icon");
-  if (icon) {
     icon.className =
-      direction === "asc"
-        ? "ph ph-caret-up sort-icon"
-        : "ph ph-caret-down sort-icon";
-  }
+        direction === "asc"
+            ? "ph ph-caret-up sort-icon"
+            : "ph ph-caret-down sort-icon";
 }
 
-function updateFuelSortIndicators() {
-  if (!fuelSortState) return;
-  const { activeColumn, activeDirection, headers } = fuelSortState;
-  clearFuelSortIndicators(headers);
-  if (activeColumn && activeDirection) {
-    const activeHeader = headers.find(
-      (th) => Number(th.dataset.column) === activeColumn,
+function applyFuelSort(columnIndex, direction) {
+    const tableBody = document.getElementById("fuelTableBody");
+
+    if (!tableBody) {
+        return;
+    }
+
+    const rows = getFuelSortableRows(tableBody).filter(
+        (row) => row.dataset.fuelMatchesFilter !== "false",
     );
-    setFuelSortIndicator(activeHeader, activeDirection);
-  }
-}
 
-function sortFuelRowMetas(matchingMetas, nonMatchingMetas) {
-  const byOriginal = (a, b) => a.originalOrder - b.originalOrder;
+    const sorted = rows
+        .slice()
+        .sort((a, b) => compareFuelSortValues(a, b, columnIndex, direction));
 
-  if (!fuelSortState?.activeColumn || !fuelSortState?.activeDirection) {
-    matchingMetas.sort(byOriginal);
-    nonMatchingMetas.sort(byOriginal);
-    return;
-  }
+    sorted.forEach((row) => {
+        tableBody.appendChild(row);
+    });
 
-  const { activeColumn, activeDirection } = fuelSortState;
-  const byActive = (a, b) =>
-    compareFuelMetaValues(a, b, activeColumn, activeDirection);
-
-  matchingMetas.sort(byActive);
-  nonMatchingMetas.sort(byActive);
-}
-
-function applyFuelRowOrder(tableBody, matchingMetas, nonMatchingMetas) {
-  if (!tableBody) return false;
-
-  const desired = [...matchingMetas, ...nonMatchingMetas].map((m) => m.row);
-  const current = getFuelDataRows(tableBody);
-
-  const sameOrder =
-    desired.length === current.length &&
-    desired.every((row, index) => row === current[index]);
-
-  if (sameOrder) {
-    updateFuelSortIndicators();
-    return false;
-  }
-
-  const fragment = document.createDocumentFragment();
-  desired.forEach((row) => fragment.appendChild(row));
-
-  const emptyRow = tableBody.querySelector(".fuel-no-results");
-  if (emptyRow) fragment.appendChild(emptyRow);
-
-  tableBody.appendChild(fragment);
-  updateFuelSortIndicators();
-  return true;
-}
-
-function cycleFuelSortDirection(current) {
-  if (current === "asc") return "desc";
-  if (current === "desc") return null;
-  return "asc";
+    if (typeof refreshFuelPagination === "function") {
+        refreshFuelPagination();
+    } else if (typeof applyFuelPagination === "function") {
+        applyFuelPagination();
+    }
 }
 
 function initFuelSorting() {
-  const tableBody = document.getElementById("fuelTableBody");
-  if (!tableBody) return;
-  if (tableBody.dataset.fuelSortingInitialized === "true") return;
+    if (fuelSortingInitialized) {
+        return;
+    }
 
-  tableBody.dataset.fuelSortingInitialized = "true";
+    fuelSortingInitialized = true;
 
-  const table = tableBody.closest("table");
-  if (!table) return;
+    const table =
+        document.querySelector(".fuel-page .fleet-table") ||
+        document.querySelector(".fuel-table") ||
+        document.querySelector(".fleet-table");
 
-  const headers = Array.from(
-    table.querySelectorAll("th.sortable[data-column]"),
-  ).filter((th) => FUEL_SORT_CONFIG[Number(th.dataset.column)]);
+    if (!table) {
+        return;
+    }
 
-  if (headers.length === 0) return;
+    let activeColumn = null;
+    let activeDirection = "asc";
 
-  fuelSortState = {
-    activeColumn: null,
-    activeDirection: null,
-    headers,
-  };
+    table.addEventListener("click", (event) => {
+        const th = event.target.closest("th.sortable");
 
-  headers.forEach((th) => {
-    th.style.cursor = "pointer";
-    th.tabIndex = 0;
-
-    const activate = () => {
-      const column = Number(th.dataset.column);
-      if (!FUEL_SORT_CONFIG[column]) return;
-
-      if (fuelSortState.activeColumn === column) {
-        fuelSortState.activeDirection = cycleFuelSortDirection(
-          fuelSortState.activeDirection,
-        );
-        if (!fuelSortState.activeDirection) {
-          fuelSortState.activeColumn = null;
+        if (!th) {
+            return;
         }
-      } else {
-        fuelSortState.activeColumn = column;
-        fuelSortState.activeDirection = "asc";
-      }
 
-      if (typeof refreshFuelTable === "function") {
-        refreshFuelTable({ resetPage: false });
-      }
-    };
+        const columnIndex = Number(th.dataset.column);
 
-    th.addEventListener("click", activate);
-    th.addEventListener("keydown", (event) => {
-      if (event.key === "Enter" || event.key === " ") {
-        event.preventDefault();
-        activate();
-      }
+        if (!FUEL_SORT_CLASS_MAP[columnIndex]) {
+            return;
+        }
+
+        if (activeColumn === columnIndex) {
+            activeDirection = activeDirection === "asc" ? "desc" : "asc";
+        } else {
+            activeColumn = columnIndex;
+
+            activeDirection = "asc";
+        }
+
+        clearFuelSortIndicators();
+
+        th.setAttribute(
+            "aria-sort",
+            activeDirection === "asc" ? "ascending" : "descending",
+        );
+
+        setFuelSortIcon(th, activeDirection);
+
+        applyFuelSort(activeColumn, activeDirection);
     });
-  });
+
+    table.addEventListener("keydown", (event) => {
+        const th = event.target.closest("th.sortable");
+
+        if (!th) {
+            return;
+        }
+
+        if (event.key !== "Enter" && event.key !== " ") {
+            return;
+        }
+
+        event.preventDefault();
+
+        th.click();
+    });
 }
+
+document.addEventListener("DOMContentLoaded", () => {
+    initFuelSorting();
+});

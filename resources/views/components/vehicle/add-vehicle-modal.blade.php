@@ -127,6 +127,7 @@
                 <option value="">Select Fuel Type</option>
                 <option value="Diesel">Diesel</option>
                 <option value="Gasoline">Gasoline</option>
+                <option value="Premium Gasoline">Premium Gasoline</option>
                 <option value="Electric">Electric</option>
                 <option value="Hybrid">Hybrid</option>
             </select>
@@ -134,7 +135,38 @@
 
           <div class="form-group">
             <label for="vehicleMileage">Current Mileage</label>
-            <input type="number" id="vehicleMileage" placeholder="58240" />
+            <input
+              type="number"
+              id="vehicleMileage"
+              name="current_odometer"
+              min="0"
+              step="0.01"
+              placeholder="58240"
+            />
+          </div>
+
+          <div class="form-group">
+            <label for="vehicleTankCapacity">Tank Capacity (Liters)</label>
+            <input
+              type="number"
+              id="vehicleTankCapacity"
+              name="tank_capacity"
+              min="0.01"
+              step="0.01"
+              placeholder="80"
+            />
+          </div>
+
+          <div class="form-group">
+            <label for="vehicleCurrentFuel">Current Fuel (Liters)</label>
+            <input
+              type="number"
+              id="vehicleCurrentFuel"
+              name="current_fuel"
+              min="0"
+              step="0.01"
+              placeholder="40"
+            />
           </div>
 
           <div class="form-group">

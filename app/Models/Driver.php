@@ -33,4 +33,9 @@ class Driver extends Model
     {
         return $this->hasMany(Reservation::class);
     }
+
+    public function fuelLogs(): HasMany
+    {
+        return $this->hasMany(FuelLog::class);
+    }
 }

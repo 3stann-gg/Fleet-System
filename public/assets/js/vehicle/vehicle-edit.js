@@ -5,230 +5,398 @@
 function populateEditDriverDropdown(drivers, vehicle) {
     const select = document.getElementById("editVehicleDriver");
 
-    if (!select) return;
+    if (!select) {
+        return;
+    }
 
     select.innerHTML = `
         <option value="">Select Driver</option>
     `;
 
-    drivers.forEach(driver => {
+    (drivers || []).forEach((driver) => {
         const option = document.createElement("option");
+
         option.value = driver.id;
-        option.textContent =
-            `${driver.first_name} ${driver.last_name}`;
+
+        option.textContent = `${driver.first_name} ${driver.last_name}`;
 
         if (
-            vehicle.drivers &&
-            vehicle.drivers.length > 0 &&
-            vehicle.drivers[0].id == driver.id
+            vehicle?.drivers?.length &&
+            String(vehicle.drivers[0].id) === String(driver.id)
         ) {
             option.selected = true;
         }
+
         select.appendChild(option);
     });
 }
 
-function getEditVehicleRowText(row, columnIndex, selector) {
-  const selectedElement = selector ? row.querySelector(selector) : null;
-  const cell = row.children?.[columnIndex];
-  const value = selectedElement ? selectedElement.textContent : cell?.textContent;
-
-  return value && value.trim() ? value.trim() : "";
-}
 
 function setEditVehicleFieldValue(id, value) {
-  const field = document.getElementById(id);
+    const field = document.getElementById(id);
 
-  if (field) {
-    field.value = value;
-  }
+    if (field) {
+        field.value = value ?? "";
+    }
 }
 
 function setEditVehicleSelectValue(id, value) {
-  const select = document.getElementById(id);
+    const select = document.getElementById(id);
 
-  if (!select) return;
+    if (!select) {
+        return;
+    }
 
-  if (
-    value &&
-    !Array.from(select.options).some((option) => option.value === value)
-  ) {
-    const option = document.createElement("option");
+    const normalizedValue = value == null ? "" : String(value);
 
-    option.value = value;
-    option.textContent = value;
-    select.appendChild(option);
-  }
+    if (
+        normalizedValue &&
+        !Array.from(select.options).some(
+            (option) => option.value === normalizedValue,
+        )
+    ) {
+        const option = document.createElement("option");
 
-  select.value = value;
+        option.value = normalizedValue;
+
+        option.textContent = normalizedValue;
+
+        select.appendChild(option);
+    }
+
+    select.value = normalizedValue;
 }
 
+
 function openEditVehicleModal(modal) {
-  if (!modal) return;
+    if (!modal) {
+        return;
+    }
+    if (!modal.classList.contains("show")) {
+        modal.dataset.previousBodyOverflow = document.body.style.overflow;
+    }
 
-  if (!modal.classList.contains("show")) {
-    modal.dataset.previousBodyOverflow = document.body.style.overflow;
-  }
+    modal.classList.add("show");
 
-  modal.classList.add("show");
-  document.body.style.overflow = "hidden";
+    document.body.style.overflow = "hidden";
 }
 
 function closeEditVehicleModal(modal) {
-  if (!modal || !modal.classList.contains("show")) return;
+    if (!modal || !modal.classList.contains("show")) {
+        return;
+    }
 
-  modal.classList.remove("show");
-  document.body.style.overflow = modal.dataset.previousBodyOverflow || "";
-  delete modal.dataset.previousBodyOverflow;
-  modal.currentRow = null;
+    modal.classList.remove("show");
+
+    document.body.style.overflow = modal.dataset.previousBodyOverflow || "";
+
+    delete modal.dataset.previousBodyOverflow;
+
+    modal.currentRow = null;
 }
 
+
 function populateEditVehicleModal(vehicle) {
-    document.getElementById("editVehicleId").value = vehicle.id;
+    if (!vehicle) {
+        return;
+    }
+
+    setEditVehicleFieldValue("editVehicleId", vehicle.id);
+    setEditVehicleFieldValue("editVehiclePlate", vehicle.plate_number);
+    setEditVehicleSelectValue("editVehicleType", vehicle.vehicle_type);
+    setEditVehicleFieldValue("editVehicleCapacity", vehicle.capacity);
+    setEditVehicleSelectValue("editVehicleFuel", vehicle.fuel_type);
+    setEditVehicleFieldValue("editVehicleTankCapacity", vehicle.tank_capacity);
     /*
-    document.getElementById("editVehicleBrand").value = vehicle.brand;
-    document.getElementById("editVehicleModel").value = vehicle.model;
+    |--------------------------------------------------------------------------
+    | Current Fuel is controlled by Fuel Management.
+    |--------------------------------------------------------------------------
     */
-    document.getElementById("editVehiclePlate").value = vehicle.plate_number;
-    document.getElementById("editVehicleType").value = vehicle.vehicle_type;
-    document.getElementById("editVehicleCapacity").value = vehicle.capacity;
-    document.getElementById("editVehicleFuel").value =
-        vehicle.fuel_type;
-    document.getElementById("editVehicleStatus").value =
-        vehicle.status;
-    document.getElementById("editVehicleNotes").value =
-        vehicle.notes ?? "";
+    setEditVehicleFieldValue("editVehicleCurrentFuel", vehicle.current_fuel);
+    /*
+    |--------------------------------------------------------------------------
+    | Current Mileage is controlled by Fuel Management.
+    |--------------------------------------------------------------------------
+    */
+    setEditVehicleFieldValue("editVehicleMileage", vehicle.current_odometer);
+    setEditVehicleSelectValue("editVehicleStatus", vehicle.status);
+    setEditVehicleFieldValue("editVehicleNotes", vehicle.notes);
 }
 
 function updateVehicleActionLabels(row, name) {
-  const checkbox = row.querySelector(".vehicle-checkbox");
-  const viewButton = row.querySelector(".action-btn.view");
-  const editButton = row.querySelector(".action-btn.edit");
-  const deleteButton = row.querySelector(".action-btn.delete");
+    if (!row) {
+        return;
+    }
 
-  checkbox?.setAttribute("aria-label", `Select ${name}`);
-  viewButton?.setAttribute("aria-label", `View ${name}`);
-  editButton?.setAttribute("aria-label", `Edit ${name}`);
-  deleteButton?.setAttribute("aria-label", `Delete ${name}`);
+    const checkbox = row.querySelector(".vehicle-checkbox");
+    const viewButton = row.querySelector(".action-btn.view");
+    const editButton = row.querySelector(".action-btn.edit");
+    const deleteButton = row.querySelector(".action-btn.delete");
+
+    checkbox?.setAttribute("aria-label", `Select ${name}`);
+    viewButton?.setAttribute("aria-label", `View ${name}`);
+    editButton?.setAttribute("aria-label", `Edit ${name}`);
+    deleteButton?.setAttribute("aria-label", `Delete ${name}`);
 }
 
+
 function refreshVehicleAfterEdit() {
-  if (typeof updateVehicleStats === "function") {
-    updateVehicleStats();
-  }
+    if (typeof updateVehicleStats === "function") {
+        updateVehicleStats();
+    }
 
-  if (typeof applyVehicleFilters === "function") {
-    applyVehicleFilters();
-  } else if (typeof refreshVehiclePagination === "function") {
-    refreshVehiclePagination();
-  }
+    if (typeof applyVehicleFilters === "function") {
+        applyVehicleFilters();
+    } else if (typeof refreshVehiclePagination === "function") {
+        refreshVehiclePagination();
+    }
 
-  if (typeof refreshVehicleBulkState === "function") {
-    refreshVehicleBulkState();
-  }
+    if (typeof refreshVehicleBulkState === "function") {
+        refreshVehicleBulkState();
+    }
+}
+
+
+function validateEditVehicleFuelFields() {
+    const tankCapacity = document.getElementById("editVehicleTankCapacity");
+
+    const currentFuel = document.getElementById("editVehicleCurrentFuel");
+
+    if (!tankCapacity) {
+        return true;
+    }
+
+    const tankValue = Number(tankCapacity.value);
+
+    const currentFuelValue = Number(currentFuel?.value || 0);
+
+    if (Number.isNaN(tankValue) || tankValue <= 0) {
+        tankCapacity.setCustomValidity(
+            "Tank capacity must be greater than zero.",
+        );
+
+        tankCapacity.reportValidity();
+
+        return false;
+    }
+
+    if (!Number.isNaN(currentFuelValue) && currentFuelValue > tankValue) {
+        tankCapacity.setCustomValidity(
+            "Tank capacity cannot be lower than the current fuel level.",
+        );
+
+        tankCapacity.reportValidity();
+
+        return false;
+    }
+
+    tankCapacity.setCustomValidity("");
+
+    return true;
 }
 
 function initEditVehicleModal() {
-  const modal = document.getElementById("editVehicleModal");
-  const form = document.getElementById("editVehicleForm");
-  const closeButton = document.getElementById("closeEditVehicleModal");
-  const cancelButton = document.getElementById("cancelEditVehicle");
+    const modal = document.getElementById("editVehicleModal");
+    const form = document.getElementById("editVehicleForm");
+    const closeButton = document.getElementById("closeEditVehicleModal");
+    const cancelButton = document.getElementById("cancelEditVehicle");
 
-  if (!modal || !form || modal.dataset.editVehicleModalInitialized === "true") {
-    return;
-  }
+    if (
+        !modal ||
+        !form ||
+        modal.dataset.editVehicleModalInitialized === "true"
+    ) {
+        return;
+    }
 
-  modal.dataset.editVehicleModalInitialized = "true";
+    modal.dataset.editVehicleModalInitialized = "true";
 
-  document.addEventListener("click", function (event) {
-      const button = event.target.closest(".action-btn.edit");
+    document.addEventListener("click", async (event) => {
+        const button = event.target.closest(".action-btn.edit");
 
-      if (!button) return;
+        if (!button) {
+            return;
+        }
 
-      const vehicleId = button.dataset.id;
+        const vehicleId = button.dataset.id;
 
-      fetch(`/fleet/${vehicleId}`)
-        .then(response => response.json())
-        .then(data => {
-            console.log(data);
+        if (!vehicleId) {
+            window.showToast("Vehicle ID not found.", "error");
+
+            return;
+        }
+
+        try {
+            const response = await fetch(`/fleet/${vehicleId}`, {
+                headers: {
+                    Accept: "application/json",
+                },
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.message || "Failed to load vehicle.");
+            }
+
+            console.log("EDIT VEHICLE RESPONSE:", data);
+
+            const row = button.closest("tr");
+
+            modal.currentRow = row || null;
 
             populateEditVehicleModal(data.vehicle);
-            populateEditDriverDropdown(
-                data.drivers,
-                data.vehicle
-            );
+            populateEditDriverDropdown(data.drivers || [], data.vehicle);
             openEditVehicleModal(modal);
+        } catch (error) {
+            console.error("EDIT VEHICLE LOAD ERROR:", error);
+
+            window.showToast(
+                error.message || "Unable to load vehicle information.",
+                "error",
+            );
+        }
+    });
+
+
+    closeButton?.addEventListener("click", () => closeEditVehicleModal(modal));
+    cancelButton?.addEventListener("click", () => closeEditVehicleModal(modal));
+
+    modal.addEventListener("click", (event) => {
+        if (event.target === modal) {
+            closeEditVehicleModal(modal);
+        }
+    });
+
+    document.addEventListener("keydown", (event) => {
+        if (event.key === "Escape" && modal.classList.contains("show")) {
+            closeEditVehicleModal(modal);
+        }
+    });
+
+    document
+        .getElementById("editVehicleTankCapacity")
+        ?.addEventListener("input", () => {
+            validateEditVehicleFuelFields();
         });
 
-  });
+    form.addEventListener("submit", async (event) => {
+        event.preventDefault();
 
-  closeButton?.addEventListener("click", () => closeEditVehicleModal(modal));
-  cancelButton?.addEventListener("click", () => closeEditVehicleModal(modal));
+        const vehicleId = document.getElementById("editVehicleId")?.value;
 
-  modal.addEventListener("click", (event) => {
-    if (event.target === modal) {
-      closeEditVehicleModal(modal);
-    }
-  });
+        if (!vehicleId) {
+            window.showToast("Vehicle ID not found.", "error");
 
-  document.addEventListener("keydown", (event) => {
-    if (event.key === "Escape" && modal.classList.contains("show")) {
-      closeEditVehicleModal(modal);
-    }
-  });
+            return;
+        }
+        if (!form.checkValidity()) {
+            form.reportValidity();
+            return;
+        }
+        if (!validateEditVehicleFuelFields()) {
+            return;
+        }
 
-  form.addEventListener("submit", function (event) {
-      event.preventDefault();
+        const csrfToken = document
+            .querySelector('meta[name="csrf-token"]')
+            ?.getAttribute("content");
 
-      const vehicleId = document.getElementById("editVehicleId").value;
+        if (!csrfToken) {
+            window.showToast("CSRF token not found.", "error");
 
-      const formData = {
-          /*
-          brand: document.getElementById("editVehicleBrand").value,
-          model: document.getElementById("editVehicleModel").value,
-          */
-          plate_number: document.getElementById("editVehiclePlate").value,
-          vehicle_type: document.getElementById("editVehicleType").value,
-          capacity: document.getElementById("editVehicleCapacity").value,
-          fuel_type: document.getElementById("editVehicleFuel").value,
-          status: document.getElementById("editVehicleStatus").value,
-          notes: document.getElementById("editVehicleNotes").value || null,
-          assigned_driver_id: document.getElementById("editVehicleDriver").value || null,
-      };
+            return;
+        }
 
-      fetch(`/fleet/${vehicleId}`, {
+        /*
+            |--------------------------------------------------------------------------
+            | Current Fuel + Mileage are NOT submitted.
+            | Fuel Management owns those values.
+            |--------------------------------------------------------------------------
+            */
+        const formData = {
+            plate_number:
+                document.getElementById("editVehiclePlate")?.value.trim() || "",
+            vehicle_type:
+                document.getElementById("editVehicleType")?.value || "",
+            capacity:
+                document.getElementById("editVehicleCapacity")?.value || "",
+            fuel_type: document.getElementById("editVehicleFuel")?.value || "",
+            tank_capacity:
+                document.getElementById("editVehicleTankCapacity")?.value || "",
+            status: document.getElementById("editVehicleStatus")?.value || "",
+            notes:
+                document.getElementById("editVehicleNotes")?.value.trim() ||
+                null,
+            assigned_driver_id:
+                document.getElementById("editVehicleDriver")?.value || null,
+        };
 
-          method: "PUT",
+        const updateButton = document.getElementById("updateVehicleBtn");
 
-          headers: {
-              "Content-Type": "application/json",
-              "Accept": "application/json",
+        if (updateButton) {
+            updateButton.disabled = true;
 
-              "X-CSRF-TOKEN": document
-                  .querySelector('meta[name="csrf-token"]')
-                  .content,
-          },
+            updateButton.innerHTML =
+                '<i class="ph ph-spinner"></i> Updating...';
+        }
 
-          body: JSON.stringify(formData),
+        try {
+            const response = await fetch(`/fleet/${vehicleId}`, {
+                method: "PUT",
+                headers: {
+                    "Content-Type": "application/json",
+                    Accept: "application/json",
+                    "X-CSRF-TOKEN": csrfToken,
+                },
 
-      })
+                body: JSON.stringify(formData),
+            });
 
-      .then(response => response.json())
+            const data = await response.json();
 
-      .then(data => {
-          if (!data.success) return;
+            if (!response.ok) {
+                const firstError = data.errors
+                    ? Object.values(data.errors).flat()[0]
+                    : null;
 
-          closeEditVehicleModal(modal);
+                throw new Error(
+                    firstError || data.message || "Failed to update vehicle.",
+                );
+            }
 
-          window.showToast(
-              data.message,
-              "success"
-          );
-          
-          loadVehicles();
-      });
+            closeEditVehicleModal(modal);
 
-  });
+            if (typeof refreshVehicleAfterEdit === "function") {
+                refreshVehicleAfterEdit();
+            }
+            if (typeof loadVehicles === "function") {
+                await loadVehicles();
+            }
+
+            window.showToast(
+                data.message || "Vehicle updated successfully.",
+                "success",
+            );
+        } catch (error) {
+            console.error("EDIT VEHICLE ERROR:", error);
+
+            window.showToast(
+                error.message || "Unable to update vehicle.",
+                "error",
+            );
+        } finally {
+            if (updateButton) {
+                updateButton.disabled = false;
+
+                updateButton.innerHTML =
+                    '<i class="ph ph-floppy-disk"></i> Update Vehicle';
+            }
+        }
+    });
 }
 
-document.addEventListener("DOMContentLoaded", initEditVehicleModal);
+
+document.addEventListener("DOMContentLoaded", () => {
+    initEditVehicleModal();
+});
