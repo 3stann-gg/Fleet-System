@@ -32,8 +32,7 @@
             <input
               type="text"
               id="reservationNumber"
-              placeholder="RES-2026-001"
-              required
+              readonly
             />
           </div>
 

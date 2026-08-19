@@ -209,18 +209,26 @@
           aria-controls="sidebarProfileMenu"
           aria-label="Tristan Dave, Fleet Administrator"
         >
-          <span class="profile-avatar" aria-hidden="true">
-            {{ strtoupper(substr(Auth::user()->name,0,2)) }}
-          </span>
+          @auth
+              @php
+                  $userName = Auth::user()->name ?? 'User';
+                  $userRole = Auth::user()->role ?? 'user';
+              @endphp
 
-          <span class="profile-info">
-            <span class="profile-name">
-                {{ Auth::user()->name }}
-            </span>
-            <span class="profile-role">
-                {{ ucfirst(Auth::user()->role) }}
-            </span>
-          </span>
+              <span class="profile-avatar" aria-hidden="true">
+                  {{ strtoupper(substr($userName, 0, 2)) }}
+              </span>
+
+              <span class="profile-info">
+                  <span class="profile-name">
+                      {{ $userName }}
+                  </span>
+
+                  <span class="profile-role">
+                      {{ ucfirst($userRole) }}
+                  </span>
+              </span>
+          @endauth
 
           <span class="profile-chevron" aria-hidden="true">
             <i class="ph ph-caret-up-down"></i>
@@ -235,7 +243,7 @@
           aria-hidden="true"
         >
           <a
-            href="{{ route('profile') }}"
+            href="{{ route('profile.edit') }}"
             class="profile-menu-item"
             role="menuitem"
             data-profile-action="profile"

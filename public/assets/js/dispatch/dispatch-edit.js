@@ -1,34 +1,108 @@
 /* ==========================================
-   Dispatch Edit
+   HIMS Fleet - Dispatch Edit
+
+   Lifecycle:
+   Pending
+      ↓
+   Assigned
+      ↓
+   En Route
+      ↓
+   Arrived
+      ↓
+   Completed
+
+   Cancellation:
+   Pending / Assigned / En Route
+      ↓
+   Cancelled
+
+   Backend remains authoritative for:
+   - Reservation status
+   - Vehicle status
+   - Driver status
+   - RoutePlan completion
 ========================================== */
 
 let editDispatchInitialized = false;
+
+function getEditDispatchCsrfToken() {
+    return (
+        document
+            .querySelector('meta[name="csrf-token"]')
+            ?.getAttribute("content") || ""
+    );
+}
+
+async function editDispatchApiRequest(url, options = {}) {
+    const method = String(options.method || "GET").toUpperCase();
+    const headers = {
+        Accept: "application/json",
+        ...(options.headers || {}),
+    };
+    if (options.body !== undefined && options.body !== null) {
+        headers["Content-Type"] = "application/json";
+    }
+    if (!["GET", "HEAD", "OPTIONS"].includes(method)) {
+        const token = getEditDispatchCsrfToken();
+        if (token) {
+            headers["X-CSRF-TOKEN"] = token;
+        }
+    }
+    const response = await fetch(url, {
+        ...options,
+        method,
+        headers,
+        credentials: "same-origin",
+    });
+    let data = {};
+    try {
+        data = await response.json();
+    } catch (error) {
+        data = {};
+    }
+    if (!response.ok) {
+        const requestError = new Error(
+            data.message || "Dispatch request failed.",
+        );
+        requestError.status = response.status;
+        requestError.errors = data.errors || {};
+        requestError.data = data;
+        throw requestError;
+    }
+
+    return data;
+}
+
+/**
+ * Support Laravel relationship JSON naming.
+ */
+function getEditReservationRoutePlan(reservation) {
+    return reservation?.route_plan || reservation?.routePlan || null;
+}
 
 function getEditFormValues() {
     return {
         dispatch_number:
             document.getElementById("editDispatchNumber")?.value.trim() || "",
-
-        trip_status:
-            document.getElementById("editDispatchStatus")?.value || "",
-    };  
+        trip_status: document.getElementById("editDispatchStatus")?.value || "",
+        remarks:
+            document.getElementById("editDispatchNotes")?.value.trim() || null,
+    };
 }
-
 
 function validateEditDispatchForm(form) {
     let isValid = true;
-    const firstInvalid = [];
-
+    const invalidFields = [];
     const dispatchNumber = document.getElementById("editDispatchNumber");
     const status = document.getElementById("editDispatchStatus");
 
     if (dispatchNumber) {
         const value = dispatchNumber.value.trim();
-
         if (value.length < 5) {
             dispatchNumber.classList.add("is-invalid");
             isValid = false;
-            firstInvalid.push(dispatchNumber);
+            invalidFields.push(dispatchNumber);
         } else {
             dispatchNumber.classList.remove("is-invalid");
         }
@@ -36,31 +110,28 @@ function validateEditDispatchForm(form) {
 
     if (status) {
         const value = status.value.trim();
-
         if (!value) {
             status.classList.add("is-invalid");
             isValid = false;
-            firstInvalid.push(status);
+            invalidFields.push(status);
         } else {
             status.classList.remove("is-invalid");
         }
     }
 
-    if (firstInvalid.length > 0) {
-        firstInvalid[0].focus();
+    if (invalidFields.length > 0) {
+        invalidFields[0].focus();
     }
-
     return isValid;
 }
 
 function updateEditDispatchStatusOptions(currentStatus) {
-    const statusEl = document.getElementById("editDispatchStatus");
-
-    if (!statusEl) {
+    const statusElement = document.getElementById("editDispatchStatus");
+    if (!statusElement) {
         return;
     }
-
     const allowedTransitions = {
+        Pending: ["Assigned", "Cancelled"],
         Assigned: ["En Route", "Cancelled"],
         "En Route": ["Arrived", "Cancelled"],
         Arrived: ["Completed"],
@@ -69,73 +140,75 @@ function updateEditDispatchStatusOptions(currentStatus) {
     };
 
     const allowed = allowedTransitions[currentStatus] || [];
-
-    Array.from(statusEl.options).forEach((option) => {
+    Array.from(statusElement.options).forEach((option) => {
         const optionStatus = option.value;
-
         if (!optionStatus) {
-            option.disabled = false;
+            option.disabled = true;
+
             return;
         }
-
-        /*
-         * Current status should remain selectable.
-         */
         if (optionStatus === currentStatus) {
             option.disabled = false;
+
             return;
         }
-
-        /*
-         * Only valid next statuses are selectable.
-         */
         option.disabled = !allowed.includes(optionStatus);
     });
-
-    statusEl.value = currentStatus;
+    statusElement.value = currentStatus;
+    statusElement.disabled = ["Completed", "Cancelled"].includes(currentStatus);
 }
 
 function formatEditVehicle(vehicle) {
     if (!vehicle) {
         return "Unassigned";
     }
-
-    return [
-        [vehicle.brand, vehicle.model].filter(Boolean).join(" "),
-        vehicle.vehicle_type,
-    ]
+    const brandModel = [vehicle.brand, vehicle.model]
         .filter(Boolean)
-        .join(" - ");
+        .map((value) => String(value).trim())
+        .filter(Boolean)
+        .join(" ")
+        .trim();
+    const vehicleType = String(
+        vehicle.vehicle_type || vehicle.type || "",
+    ).trim();
+    if (brandModel && vehicleType) {
+        return `${brandModel} - ${vehicleType}`;
+    }
+    if (brandModel) {
+        return brandModel;
+    }
+    if (vehicleType) {
+        return vehicleType;
+    }
+    return (
+        vehicle.vehicle_name ||
+        vehicle.name ||
+        vehicle.plate_number ||
+        "Unassigned"
+    );
 }
-
 
 function formatEditDriver(driver) {
     if (!driver) {
         return "Unassigned";
     }
-
     const name = [driver.first_name, driver.last_name]
         .filter(Boolean)
-        .join(" ");
-
-    return name || "Unassigned";
+        .map((value) => String(value).trim())
+        .filter(Boolean)
+        .join(" ")
+        .trim();
+    return name || driver.name || "Unassigned";
 }
 
 async function populateEditDispatchForm(dispatchId) {
     try {
-        const response = await fetch(`/dispatch/${dispatchId}`, {
-            headers: {
-                Accept: "application/json",
+        const data = await editDispatchApiRequest(
+            `/dispatch/${encodeURIComponent(dispatchId)}`,
+            {
+                method: "GET",
             },
-        });
-
-        const data = await response.json();
-
-        if (!response.ok) {
-            throw new Error(
-                data.message || "Failed to load dispatch details.",
-            );
-        }
+        );
 
         const dispatch = data.dispatch;
 
@@ -144,156 +217,132 @@ async function populateEditDispatchForm(dispatchId) {
         }
 
         const reservation = dispatch.reservation || {};
+        const routePlan = getEditReservationRoutePlan(reservation);
         const vehicle = reservation.vehicle || null;
         const driver = reservation.driver || null;
+        const numberElement = document.getElementById("editDispatchNumber");
 
-        /* Dispatch Number */
-        const numberEl = document.getElementById("editDispatchNumber");
-
-        if (numberEl) {
-            numberEl.value = dispatch.dispatch_number || "";
+        if (numberElement) {
+            numberElement.value = dispatch.dispatch_number || "";
         }
-
-        /* Reservation */
-        const reservationEl = document.getElementById(
+        const reservationElement = document.getElementById(
             "editDispatchReservation",
         );
-
-        if (reservationEl) {
-            reservationEl.value = reservation.reservation_number || "";
+        if (reservationElement) {
+            reservationElement.value = reservation.reservation_number || "";
         }
-
-        /* Patient */
-        const patientEl = document.getElementById("editDispatchPatient");
-
-        if (patientEl) {
-            patientEl.value = reservation.patient_name || "";
+        const patientElement = document.getElementById("editDispatchPatient");
+        if (patientElement) {
+            patientElement.value = reservation.patient_name || "";
         }
-
-        /* Request Type */
-        const requestTypeEl = document.getElementById(
+        const requestTypeElement = document.getElementById(
             "editDispatchRequestType",
         );
-
-        if (requestTypeEl) {
-            requestTypeEl.value = reservation.request_type || "";
+        if (requestTypeElement) {
+            requestTypeElement.value = reservation.request_type || "";
         }
-
-        /* Vehicle */
-        const vehicleEl = document.getElementById("editDispatchVehicle");
-
-        if (vehicleEl) {
-            vehicleEl.value = formatEditVehicle(vehicle);
+        const vehicleElement = document.getElementById("editDispatchVehicle");
+        if (vehicleElement) {
+            vehicleElement.value = formatEditVehicle(vehicle);
         }
-
-        /* Driver */
-        const driverEl = document.getElementById("editDispatchDriver");
-
-        if (driverEl) {
-            driverEl.value = formatEditDriver(driver);
+        const driverElement = document.getElementById("editDispatchDriver");
+        if (driverElement) {
+            driverElement.value = formatEditDriver(driver);
         }
-
-        /* Pickup */
-        const pickupEl = document.getElementById("editDispatchPickup");
-
-        if (pickupEl) {
-            pickupEl.value = reservation.pickup_location || "";
+        /*
+        |--------------------------------------------------------------------------
+        | Final Planned Route
+        |--------------------------------------------------------------------------
+        |
+        | Dispatch uses RoutePlan origin/destination.
+        |
+        */
+        const pickupElement = document.getElementById("editDispatchPickup");
+        if (pickupElement) {
+            pickupElement.value =
+                routePlan?.origin || reservation.pickup_location || "";
         }
-
-        /* Destination */
-        const destinationEl = document.getElementById(
+        const destinationElement = document.getElementById(
             "editDispatchDestination",
         );
-
-        if (destinationEl) {
-            destinationEl.value = reservation.destination || "";
+        if (destinationElement) {
+            destinationElement.value =
+                routePlan?.destination || reservation.destination || "";
         }
-
-        /* Schedule Date */
-        const dateEl = document.getElementById("editDispatchDate");
-
-        if (dateEl) {
-            dateEl.value = reservation.schedule_date || "";
+        /*
+        |--------------------------------------------------------------------------
+        | Dispatch Schedule
+        |--------------------------------------------------------------------------
+        |
+        | First priority:
+        | dispatch.dispatch_date / departure_time
+        |
+        | Fallback:
+        | RoutePlan departure_date / departure_time
+        |
+        | Never use Reservation schedule as authoritative here.
+        |
+        */
+        const dateElement = document.getElementById("editDispatchDate");
+        if (dateElement) {
+            dateElement.value = String(
+                dispatch.dispatch_date || routePlan?.departure_date || "",
+            ).slice(0, 10);
         }
-
-        /* Schedule Time */
-        const timeEl = document.getElementById("editDispatchTime");
-
-        if (timeEl) {
-            timeEl.value = reservation.schedule_time || "";
+        const timeElement = document.getElementById("editDispatchTime");
+        if (timeElement) {
+            timeElement.value = String(
+                dispatch.departure_time || routePlan?.departure_time || "",
+            ).slice(0, 5);
         }
-
-        /* Priority */
-        const priorityEl = document.getElementById("editDispatchPriority");
-
-        if (priorityEl) {
-            priorityEl.value = reservation.priority || "";
+        const priorityElement = document.getElementById("editDispatchPriority");
+        if (priorityElement) {
+            priorityElement.value =
+                routePlan?.priority || reservation.priority || "";
         }
+        const statusElement = document.getElementById("editDispatchStatus");
 
-        /* Status */
-        const statusEl = document.getElementById("editDispatchStatus");
-
-        if (statusEl) {
-            const currentStatus = dispatch.trip_status || "Assigned";
-            statusEl.value = currentStatus;
+        if (statusElement) {
+            const currentStatus = dispatch.trip_status || "Pending";
             updateEditDispatchStatusOptions(currentStatus);
         }
-
-        /* Contact */
-        const contactEl = document.getElementById("editDispatchContact");
-
-        if (contactEl) {
-            contactEl.value = reservation.contact_number || "";
+        const contactElement = document.getElementById("editDispatchContact");
+        if (contactElement) {
+            contactElement.value = reservation.contact_number || "";
         }
-
-        /* Notes */
-        const notesEl = document.getElementById("editDispatchNotes");
-
-        if (notesEl) {
-            notesEl.value = reservation.notes || "";
+        const notesElement = document.getElementById("editDispatchNotes");
+        if (notesElement) {
+            notesElement.value = dispatch.remarks || "";
         }
-
         return dispatch;
     } catch (error) {
-        console.error(
-            "Error loading dispatch for edit:",
-            error,
-        );
-
+        console.error("Error loading dispatch for edit:", error);
         if (typeof showToast === "function") {
             showToast(
-                "Failed to load dispatch details.",
+                error.message || "Failed to load dispatch details.",
                 "error",
             );
         }
-
         return null;
     }
 }
 
 function openEditDispatchModal() {
-    const modal =
-        document.getElementById("editDispatchModal");
-
+    const modal = document.getElementById("editDispatchModal");
     if (!modal) {
         return;
     }
-
     modal.classList.add("show");
     document.body.style.overflow = "hidden";
 }
 
 function closeEditDispatchModal() {
-    const modal =
-        document.getElementById("editDispatchModal");
-
+    const modal = document.getElementById("editDispatchModal");
     if (!modal) {
         return;
     }
-
     modal.classList.remove("show");
     document.body.style.overflow = "";
-
     modal.currentDispatchId = null;
 }
 
@@ -301,94 +350,74 @@ async function submitEditDispatch(form, dispatchId) {
     const values = getEditFormValues();
 
     try {
-        const response = await fetch(
-            `/dispatch/${dispatchId}`,
+        /*
+        |--------------------------------------------------------------------------
+        | IMPORTANT
+        |--------------------------------------------------------------------------
+        |
+        | Frontend only requests the Dispatch status change.
+        |
+        | Backend performs operational side effects:
+        |
+        | Pending → Assigned
+        | Reservation → Scheduled
+        |
+        | Assigned → En Route
+        | Vehicle → On Trip
+        | Driver → On Duty
+        |
+        | Arrived → Completed
+        | Reservation → Completed
+        | RoutePlan → Completed
+        | Vehicle → Available
+        | Driver → Available
+        |
+        */
+        const data = await editDispatchApiRequest(
+            `/dispatch/${encodeURIComponent(dispatchId)}`,
             {
                 method: "PUT",
-
-                headers: {
-                    "Content-Type": "application/json",
-                    Accept: "application/json",
-
-                    "X-CSRF-TOKEN":
-                        document
-                            .querySelector(
-                                'meta[name="csrf-token"]',
-                            )
-                            ?.getAttribute("content"),
-                },
 
                 body: JSON.stringify(values),
             },
         );
 
-        const data = await response.json();
-
-        if (!response.ok) {
-            console.error(data);
-
-            if (typeof showToast === "function") {
-                showToast(
-                    data.message ||
-                        "Failed to update dispatch.",
-                    "error",
-                );
-            }
-
-            return false;
-        }
-
-        /* Close modal */
         closeEditDispatchModal();
 
-        /* Reload dispatch table */
         if (typeof loadDispatches === "function") {
             await loadDispatches();
         }
-
-        /* Refresh UI */
-        if (
-            typeof updateDispatchStatistics ===
-            "function"
-        ) {
+        if (typeof updateDispatchStatistics === "function") {
             updateDispatchStatistics();
         }
-
-        if (
-            typeof refreshDispatchPagination ===
-            "function"
-        ) {
+        if (typeof refreshDispatchPagination === "function") {
             refreshDispatchPagination();
+        } else if (typeof updateDispatchPagination === "function") {
+            updateDispatchPagination();
         }
-
-        if (
-            typeof refreshDispatchBulkState ===
-            "function"
-        ) {
+        if (typeof refreshDispatchBulkState === "function") {
             refreshDispatchBulkState();
         }
-
+        if (typeof loadAvailableReservations === "function") {
+            await loadAvailableReservations();
+        }
         if (typeof showToast === "function") {
             showToast(
-                "Dispatch updated successfully.",
+                data.message || "Dispatch updated successfully.",
                 "success",
             );
         }
 
         return true;
     } catch (error) {
-        console.error(
-            "Dispatch update error:",
-            error,
-        );
-
+        console.error("Dispatch update error:", error);
         if (typeof showToast === "function") {
             showToast(
-                "Something went wrong while updating the dispatch.",
+                error.message ||
+                    "Something went wrong while updating the dispatch.",
                 "error",
             );
         }
-
         return false;
     }
 }
@@ -397,181 +426,84 @@ function initEditDispatchModal() {
     if (editDispatchInitialized) {
         return;
     }
-
-    const modal =
-        document.getElementById("editDispatchModal");
-
+    const modal = document.getElementById("editDispatchModal");
     if (!modal) {
         return;
     }
-
     editDispatchInitialized = true;
-
     document.body.addEventListener("click", async (event) => {
-        const editBtn =
-            event.target.closest(
-                ".action-btn.edit-dispatch",
-            );
-
-        if (!editBtn) {
+        const editButton = event.target.closest(".action-btn.edit-dispatch");
+        if (!editButton || editButton.disabled) {
             return;
         }
-
-        const dispatchId =
-            editBtn.dataset.id;
-
+        const dispatchId = editButton.dataset.id;
         if (!dispatchId) {
-            console.error(
-                "Dispatch ID not found.",
-            );
+            console.error("Dispatch ID not found.");
             return;
         }
-
-        modal.currentDispatchId =
-            dispatchId;
-
-        const dispatch =
-            await populateEditDispatchForm(
-                dispatchId,
-            );
-
+        modal.currentDispatchId = dispatchId;
+        const dispatch = await populateEditDispatchForm(dispatchId);
         if (!dispatch) {
             modal.currentDispatchId = null;
             return;
         }
-
         openEditDispatchModal();
     });
+    document
+        .getElementById("closeEditDispatchModal")
+        ?.addEventListener("click", closeEditDispatchModal);
+    document
+        .getElementById("cancelEditDispatch")
+        ?.addEventListener("click", closeEditDispatchModal);
+    modal.addEventListener("click", (event) => {
+        if (event.target === modal) {
+            closeEditDispatchModal();
+        }
+    });
+    document.addEventListener("keydown", (event) => {
+        if (event.key === "Escape" && modal.classList.contains("show")) {
+            closeEditDispatchModal();
+        }
+    });
 
-    const closeXBtn =
-        document.getElementById(
-            "closeEditDispatchModal",
-        );
-
-    if (closeXBtn) {
-        closeXBtn.addEventListener(
-            "click",
-            closeEditDispatchModal,
-        );
-    }
-
-    const cancelBtn =
-        document.getElementById(
-            "cancelEditDispatch",
-        );
-
-    if (cancelBtn) {
-        cancelBtn.addEventListener(
-            "click",
-            closeEditDispatchModal,
-        );
-    }
-
-    modal.addEventListener(
-        "click",
-        (event) => {
-            if (event.target === modal) {
-                closeEditDispatchModal();
-            }
-        },
-    );
-
-    document.addEventListener(
-        "keydown",
-        (event) => {
-            if (
-                event.key === "Escape" &&
-                modal.classList.contains("show")
-            ) {
-                closeEditDispatchModal();
-            }
-        },
-    );
-
-    const form =
-        document.getElementById(
-            "editDispatchForm",
-        );
-
+    const form = document.getElementById("editDispatchForm");
     if (form) {
-        form.addEventListener(
-            "submit",
-            async (event) => {
-                event.preventDefault();
-
-                if (
-                    !validateEditDispatchForm(
-                        form,
-                    )
-                ) {
-                    return;
+        form.addEventListener("submit", async (event) => {
+            event.preventDefault();
+            if (!validateEditDispatchForm(form)) {
+                return;
+            }
+            const dispatchId = modal.currentDispatchId;
+            if (!dispatchId) {
+                console.error("Dispatch ID not found.");
+                return;
+            }
+            const submitButton = document.getElementById("updateDispatchBtn");
+            if (submitButton) {
+                submitButton.disabled = true;
+                submitButton.textContent = "Updating...";
+            }
+            try {
+                await submitEditDispatch(form, dispatchId);
+            } finally {
+                if (submitButton) {
+                    submitButton.disabled = false;
+                    submitButton.textContent = "Update Dispatch";
                 }
+            }
+        });
 
-                const dispatchId =
-                    modal.currentDispatchId;
-
-                if (!dispatchId) {
-                    console.error(
-                        "Dispatch ID not found.",
-                    );
-                    return;
-                }
-
-                const submitBtn =
-                    document.getElementById(
-                        "updateDispatchBtn",
-                    );
-
-                if (submitBtn) {
-                    submitBtn.disabled = true;
-                    submitBtn.textContent =
-                        "Updating...";
-                }
-
-                await submitEditDispatch(
-                    form,
-                    dispatchId,
-                );
-
-                if (submitBtn) {
-                    submitBtn.disabled = false;
-                    submitBtn.textContent =
-                        "Update Dispatch";
-                }
-            },
-        );
-
-        /* Remove validation error */
-        const inputs =
-            form.querySelectorAll(
-                "input, select, textarea",
-            );
-
-        inputs.forEach((input) => {
-            input.addEventListener(
-                "input",
-                () => {
-                    input.classList.remove(
-                        "is-invalid",
-                    );
-                },
-            );
-
-            input.addEventListener(
-                "change",
-                () => {
-                    input.classList.remove(
-                        "is-invalid",
-                    );
-                },
-            );
+        form.querySelectorAll("input, select, textarea").forEach((input) => {
+            input.addEventListener("input", () => {
+                input.classList.remove("is-invalid");
+            });
+            input.addEventListener("change", () => {
+                input.classList.remove("is-invalid");
+            });
         });
     }
 }
 
-document.addEventListener(
-    "DOMContentLoaded",
-    () => {
-        initEditDispatchModal();
-    },
-);
+document.addEventListener("DOMContentLoaded", () => {
+    initEditDispatchModal();
+});

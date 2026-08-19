@@ -123,9 +123,15 @@ function initDispatchModal() {
     }
 
     dispatchModalInitialized = true;
-    openBtn.addEventListener("click", () => {
+    openBtn.addEventListener("click", async () => {
         modal.classList.add("show");
         document.body.style.overflow = "hidden";
+        if (typeof loadNextDispatchNumber === "function") {
+            await loadNextDispatchNumber();
+        }
+        if (typeof loadAvailableReservations === "function") {
+            await loadAvailableReservations();
+        }
     });
     const closeModal = () => {
         modal.classList.remove("show");

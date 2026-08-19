@@ -24,4 +24,5 @@ class Dispatch extends Model
     {
         return $this->belongsTo(Reservation::class);
     }
+
 }

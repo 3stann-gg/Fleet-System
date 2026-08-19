@@ -195,7 +195,7 @@
                             required
                         >
                             <option value="">Select status</option>
-                            <!--<option value="Pending">Pending</option>-->
+                            <option value="Pending">Pending</option>
                             <option value="Assigned">Assigned</option>
                             <option value="En Route">En Route</option>
                             <option value="Arrived">Arrived</option>

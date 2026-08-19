@@ -32,8 +32,7 @@
               type="text"
               id="dispatchNumber"
               name="dispatchNumber"
-              placeholder="DSP-2026-001"
-              required
+              readonly
             />
           </div>
 
@@ -160,7 +159,7 @@
               required
             >
               <option value="">Select status</option>
-              <!--<option value="Pending">Pending</option>-->
+              <option value="Pending">Pending</option>
               <option value="Assigned">Assigned</option>
               <option value="En Route">En Route</option>
             </select>

@@ -164,15 +164,30 @@ function updateDispatchPagination() {
     }
 
     if (totalMatching === 0) {
-        paginationEl.style.display = "none";
-
+        paginationEl.style.display = "";
         infoEl.innerHTML =
             "Showing <strong>0–0</strong> of <strong>0</strong> dispatches";
-
         allRows.forEach((row) => {
             row.style.display = "none";
         });
-
+        /*buildDispatchPaginationControls(paginationEl, 1);
+        dispatchCurrentPage = 1;*/
+        const prevBtn = paginationEl.querySelector(
+            '[data-dispatch-pagination-action="prev"]',
+        );
+        const nextBtn = paginationEl.querySelector(
+            '[data-dispatch-pagination-action="next"]',
+        );
+        if (prevBtn) {
+            prevBtn.disabled = true;
+        }
+        if (nextBtn) {
+            nextBtn.disabled = true;
+        }
+        /*if (pageBtn) {
+            pageBtn.disabled = true;
+            pageBtn.classList.add("active");
+        }*/
         return;
     }
 

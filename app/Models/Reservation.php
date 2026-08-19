@@ -7,6 +7,8 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use App\Models\Vehicle;
 use App\Models\Driver;
 use App\Models\Dispatch;
+use App\Models\RoutePlan;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Reservation extends Model
 {
@@ -41,5 +43,10 @@ class Reservation extends Model
     public function dispatch()
     {
         return $this->hasOne(Dispatch::class);
+    }
+
+    public function routePlan(): HasOne
+    {
+        return $this->hasOne(RoutePlan::class);
     }
 }

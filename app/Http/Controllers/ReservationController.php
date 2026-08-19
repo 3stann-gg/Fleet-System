@@ -203,7 +203,7 @@ class ReservationController extends Controller
             $request->all(),
             [
                 'reservation_number' => [
-                    'required',
+                    'nullable',
                     'string',
                     'max:50',
                     'unique:reservations,reservation_number',
@@ -238,6 +238,7 @@ class ReservationController extends Controller
                 'schedule_date' => [
                     'required',
                     'date',
+                    'after_or_equal:today',
                 ],
                 'schedule_time' => [
                     'required',
@@ -272,6 +273,11 @@ class ReservationController extends Controller
 
         try {
             $validated = $validator->validated();
+            
+            $validated['status'] = 'Pending';
+            
+            $validated['reservation_number'] = $validated['reservation_number']
+                ?? $this->generateReservationNumber();
 
             $this->validateVehicleAndDriverAvailability(
                 $validated['vehicle_id'] ?? null,
@@ -362,6 +368,7 @@ class ReservationController extends Controller
                 'schedule_date' => [
                     'required',
                     'date',
+                    'after_or_equal:today',
                 ],
                 'schedule_time' => [
                     'required',
@@ -407,9 +414,21 @@ class ReservationController extends Controller
             );
 
             $reservation->load([
+                'routePlan',
                 'vehicle',
                 'driver'
             ]);
+            
+            if ($reservation->dispatch) {
+                throw new \Exception(
+                    'This reservation can no longer be modified because a dispatch has already been created.'
+                );
+            }
+            if ($reservation->routePlan) {
+                throw new \Exception(
+                    'This reservation can no longer be modified because a route plan has already been created.'
+                );
+            }
 
             return response()->json([
                 'success' => true,
@@ -430,12 +449,32 @@ class ReservationController extends Controller
      */
     public function destroy(Reservation $reservation)
     {
-        $reservation->delete();
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Reservation deleted successfully.',
-        ]);
+        try {
+            $reservation->load([
+                'routePlan',
+                'dispatch',
+            ]);
+            if ($reservation->dispatch) {
+                throw new \Exception(
+                    'This reservation cannot be deleted because it already has a dispatch.'
+                );
+            }
+            if ($reservation->routePlan) {
+                throw new \Exception(
+                    'This reservation cannot be deleted because it already has a route plan.'
+                );
+            }
+            $reservation->delete();
+            return response()->json([
+                'success' => true,
+                'message' => 'Reservation deleted successfully.',
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ], 422);
+        }
     }
 
     /**
@@ -443,20 +482,72 @@ class ReservationController extends Controller
      */
     public function bulkDelete(Request $request)
     {
-        $request->validate([
-            'ids' => 'required|array',
-            'ids.*' => 'exists:reservations,id',
-        ]);
+        $validator = Validator::make(
+            $request->all(),
+            [
+                'ids' => [
+                    'required',
+                    'array',
+                    'min:1',
+                ],
+                'ids.*' => [
+                    'integer',
+                    'exists:reservations,id',
+                ],
+            ]
+        );
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Please select valid reservations.',
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+        $deletedIds = [];
+        try {
+            $reservations = Reservation::with([
+                'routePlan',
+                'dispatch',
+            ])
+                ->whereIn(
+                    'id',
+                    $validator->validated()['ids']
+                )
+                ->get();
+            foreach ($reservations as $reservation) {
+                if (
+                    $reservation->routePlan ||
+                    $reservation->dispatch
+                ) {
+                    continue;
+                }
+                $deletedIds[] =
+                    $reservation->id;
+                $reservation->delete();
+            }
+            if (empty($deletedIds)) {
+                return response()->json([
+                    'success' => false,
+                    'message' =>
+                        'Selected reservations cannot be deleted because they are already linked to route planning or dispatch.',
+                    'deleted_ids' => [],
+                ], 422);
+            }
+            return response()->json([
+                'success' => true,
+                'message' =>
+                    count($deletedIds) === 1
+                        ? 'Reservation deleted successfully.'
+                        : count($deletedIds) . ' reservations deleted successfully.',
+                'deleted_ids' => $deletedIds,
+            ]);
 
-        Reservation::whereIn(
-            'id',
-            $request->ids
-        )->delete();
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Reservation(s) deleted successfully.',
-        ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to delete reservations.',
+            ], 500);
+        }
     }
 
     /**
@@ -486,6 +577,46 @@ class ReservationController extends Controller
                 'status',
                 'Cancelled'
             )->count(),
+        ]);
+    }
+
+    private function generateReservationNumber(): string
+    {
+        $year = now()->format('Y');
+        $month = now()->format('m');
+        $prefix = "RES-{$year}-{$month}";
+        $latestReservation = Reservation::query()
+            ->where(
+                'reservation_number',
+                'like',
+                $prefix . '%'
+            )
+            ->orderByDesc('id')
+            ->first();
+
+        if (!$latestReservation) {
+            $nextSequence = 1;
+        } else {
+            $lastSequence = (int) substr(
+                $latestReservation->reservation_number,
+                -3
+            );
+            $nextSequence = $lastSequence + 1;
+        }
+        return $prefix . str_pad(
+            $nextSequence,
+            3,
+            '0',
+            STR_PAD_LEFT
+        );
+    }
+
+    public function nextNumber()
+    {
+        return response()->json([
+            'success' => true,
+            'reservation_number' =>
+                $this->generateReservationNumber(),
         ]);
     }
 }

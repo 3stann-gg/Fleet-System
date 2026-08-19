@@ -11,7 +11,7 @@
     />
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
     <script src="{{ asset('assets/js/core/theme-boot.js') }}"></script>
-    <script src="{{ asset('assets/js/core/auth-boot.js') }}"></script>
+    <!--<script src="{{ asset('assets/js/core/auth-boot.js') }}"></script>-->
     <link rel="stylesheet" href="{{ asset('assets/css/style.css') }}">
   </head>
 

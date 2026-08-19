@@ -81,6 +81,39 @@ function formatRouteExportDistance(km) {
   );
 }
 
+function formatRouteExportVehicle(vehicle) {
+    if (!vehicle) {
+        return "Unassigned";
+    }
+    if (typeof vehicle === "string") {
+        return vehicle.trim() || "Unassigned";
+    }
+    const brandModel = [vehicle.brand, vehicle.model]
+        .filter(Boolean)
+        .map((value) => String(value).trim())
+        .filter(Boolean)
+        .join(" ")
+        .trim();
+    const vehicleType = String(
+        vehicle.vehicle_type || vehicle.type || "",
+    ).trim();
+    if (brandModel && vehicleType) {
+        return `${brandModel} - ${vehicleType}`;
+    }
+    if (brandModel) {
+        return brandModel;
+    }
+    if (vehicleType) {
+        return vehicleType;
+    }
+    return (
+        vehicle.vehicle_name ||
+        vehicle.name ||
+        vehicle.plate_number ||
+        "Unassigned"
+    );
+}
+
 function escapeRouteExportHtml(value) {
   return String(value == null ? "" : value)
     .replace(/&/g, "&amp;")
@@ -101,7 +134,7 @@ function buildRoutePrintHtml(model) {
         <td>${escapeRouteExportHtml(r.origin)}</td>
         <td>${escapeRouteExportHtml(r.destination)}</td>
         <td>${escapeRouteExportHtml((r.stops || []).join("; "))}</td>
-        <td>${escapeRouteExportHtml(r.vehicle)}</td>
+        <td>${escapeRouteExportHtml(formatRouteExportVehicle(r.vehicle))}</td>
         <td>${escapeRouteExportHtml(r.driver)}</td>
         <td>${escapeRouteExportHtml(r.priority)}</td>
         <td>${escapeRouteExportHtml(formatRouteExportDistance(r.estimatedDistance))}</td>
@@ -110,7 +143,7 @@ function buildRoutePrintHtml(model) {
         <td>${escapeRouteExportHtml(r.optimizationScore)}</td>
         <td>${escapeRouteExportHtml(r.status)}</td>
         <td>${escapeRouteExportHtml(
-          (r.departureDate || "") + " " + (r.departureTime || ""),
+            (r.departureDate || "") + " " + (r.departureTime || ""),
         )}</td>
       </tr>`;
     })
@@ -299,7 +332,7 @@ function exportRoutesToPdf() {
         r.routeNumber,
         r.origin,
         r.destination,
-        r.vehicle,
+        formatRouteExportVehicle(r.vehicle),
         r.driver,
         r.priority,
         formatRouteExportDistance(r.estimatedDistance),
@@ -372,57 +405,71 @@ function exportRoutesToExcel() {
     ];
 
     const data = [
-      [
-        "Route No.",
-        "Origin",
-        "Destination",
-        "Stops",
-        "Vehicle",
-        "Driver",
-        "Priority",
-        "Department",
-        "Purpose",
-        "Distance (km)",
-        "Estimated Time",
-        "Optimization Strategy",
-        "Optimization Score",
-        "Status",
-        "Departure Date",
-        "Departure Time",
-        "Notes",
-      ],
-      ...model.rows.map((r) => [
-        r.routeNumber,
-        r.origin,
-        r.destination,
-        (r.stops || []).join("; "),
-        r.vehicle,
-        r.driver,
-        r.priority,
-        r.department,
-        r.purpose,
-        Number(r.estimatedDistance) || 0,
-        r.estimatedTravelTime,
-        r.optimizationStrategy,
-        r.optimizationScore,
-        r.status,
-        r.departureDate,
-        r.departureTime,
-        r.notes,
-      ]),
+        [
+            "Route No.",
+            "Origin",
+            "Destination",
+            "Stops",
+            "Vehicle",
+            "Driver",
+            "Priority",
+            "Department",
+            "Purpose",
+            "Distance (km)",
+            "Estimated Time",
+            "Optimization Strategy",
+            "Optimization Score",
+            "Status",
+            "Departure Date",
+            "Departure Time",
+            "Notes",
+        ],
+        ...model.rows.map((r) => [
+            r.routeNumber,
+            r.origin,
+            r.destination,
+            (r.stops || []).join("; "),
+            r.vehicle,
+            formatRouteExportVehicle(r.vehicle),
+            r.priority,
+            r.department,
+            r.purpose,
+            Number(r.estimatedDistance) || 0,
+            r.estimatedTravelTime,
+            r.optimizationStrategy,
+            r.optimizationScore,
+            r.status,
+            r.departureDate,
+            r.departureTime,
+            r.notes,
+        ]),
     ];
 
     const workbook = xlsx.utils.book_new();
-    xlsx.utils.book_append_sheet(
-      workbook,
-      xlsx.utils.aoa_to_sheet(summary),
-      "Summary",
-    );
-    xlsx.utils.book_append_sheet(
-      workbook,
-      xlsx.utils.aoa_to_sheet(data),
-      "Route Data",
-    );
+    const summarySheet = xlsx.utils.aoa_to_sheet(summary);
+    const routeSheet = xlsx.utils.aoa_to_sheet(data);
+    summarySheet["!cols"] = [{ wch: 34 }, { wch: 24 }];
+    routeSheet["!cols"] = [
+        { wch: 18 }, // Route No.
+        { wch: 24 }, // Origin
+        { wch: 24 }, // Destination
+        { wch: 30 }, // Stops
+        { wch: 28 }, // Vehicle
+        { wch: 22 }, // Driver
+        { wch: 14 }, // Priority
+        { wch: 20 }, // Department
+        { wch: 28 }, // Purpose
+        { wch: 16 }, // Distance
+        { wch: 18 }, // Estimated Time
+        { wch: 24 }, // Optimization Strategy
+        { wch: 18 }, // Optimization Score
+        { wch: 20 }, // Status
+        { wch: 18 }, // Departure Date
+        { wch: 16 }, // Departure Time
+        { wch: 32 }, // Notes
+    ];
+    xlsx.utils.book_append_sheet(workbook, summarySheet, "Summary");
+    xlsx.utils.book_append_sheet(workbook, routeSheet, "Route Data");
     xlsx.writeFile(
       workbook,
       "route-planning-" + getRouteExportDateStamp() + ".xlsx",

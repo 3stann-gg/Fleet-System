@@ -156,25 +156,15 @@
                   <div>
                     <h3>Route Map Preview</h3>
                     <p class="card-subtitle">
-                      Visual placeholder — maps integrate in backend phase.
+                      Live route preview powered by Google Maps
                     </p>
                   </div>
                 </div>
-                <div class="route-map-stage" aria-hidden="true">
-                  <div class="route-map-line"></div>
-                  <div class="route-map-marker route-map-marker--origin">
-                    <span class="route-map-pin"><i class="ph-fill ph-map-pin"></i></span>
-                    <span id="mapOriginLabel">—</span>
-                  </div>
-                  <div class="route-map-marker route-map-marker--stop">
-                    <span class="route-map-pin"><i class="ph-fill ph-flag"></i></span>
-                    <span id="mapStopsLabel">No stops</span>
-                  </div>
-                  <div class="route-map-marker route-map-marker--destination">
-                    <span class="route-map-pin"><i class="ph-fill ph-navigation-arrow"></i></span>
-                    <span id="mapDestinationLabel">—</span>
-                  </div>
-                </div>
+                <div
+                  id="routeGoogleMap"
+                  class="route-google-map"
+                  aria-label="Google Maps route preview"
+                ></div>
                 <div class="route-map-meta">
                   <div>Distance<strong id="mapDistanceLabel">—</strong></div>
                   <div>ETA<strong id="mapEtaLabel">—</strong></div>
@@ -182,7 +172,7 @@
                   <div>Strategy<strong id="mapStrategyLabel">—</strong></div>
                 </div>
                 <p class="route-map-note">
-                  Google Maps integration available in backend implementation.
+                  Route distance and estimated travel time are calculated using Google Maps.
                 </p>
               </div>
 
@@ -190,7 +180,9 @@
                 <div class="card-header">
                   <div>
                     <h3>Optimization Summary</h3>
-                    <p class="card-subtitle">Simulated Route Optimization (frontend only)</p>
+                    <p class="card-subtitle">
+                      Google Maps route optimization results
+                    </p>
                   </div>
                 </div>
                 <ul class="route-opt-list">
@@ -308,10 +300,16 @@
                 <input type="text" id="routeNumber" readonly />
               </div>
               <div class="form-group">
+                  <label for="routeReservation">Reservation Number *</label>
+                  <select id="routeReservation" required>
+                      <option value="">Select approved reservation</option>
+                  </select>
+              </div>
+              <div class="form-group">
                 <label for="routePriority">Priority *</label>
                 <select id="routePriority" required>
                   <option value="Low">Low</option>
-                  <option value="Medium" selected>Medium</option>
+                  <option value="Normal" selected>Normal</option>
                   <option value="High">High</option>
                   <option value="Emergency">Emergency</option>
                 </select>
@@ -334,11 +332,15 @@
               </div>
               <div class="form-group">
                 <label for="routeVehicle">Vehicle *</label>
-                <select id="routeVehicle" required></select>
+                <select id="routeVehicle" disabled>
+                    <option value="">Select reservation first</option>
+                </select>
               </div>
               <div class="form-group">
                 <label for="routeDriver">Driver *</label>
-                <select id="routeDriver" required></select>
+                <select id="routeDriver" disabled>
+                    <option value="">Select reservation first</option>
+                </select>
               </div>
               <div class="form-group">
                 <label for="routeDepartment">Department *</label>
@@ -483,6 +485,71 @@
         </div>
       </div>
     </div>
+
+    <script>
+      window.HIMS_GOOGLE_MAPS_KEY =
+          @json(config('services.google_maps.key'));
+    </script>
+    <script>
+        (g => {
+            var h, a, k,
+                p = "The Google Maps JavaScript API",
+                c = "google",
+                l = "importLibrary",
+                q = "__ib__",
+                m = document,
+                b = window;
+            b = b[c] || (b[c] = {});
+            var d = b.maps || (b.maps = {}),
+                r = new Set(),
+                e = new URLSearchParams(),
+                u = () =>
+                    h ||
+                    (h = new Promise(async (f, n) => {
+                        await (a = m.createElement("script"));
+                        e.set("libraries", [...r] + "");
+                        for (k in g) {
+                            e.set(
+                                k.replace(
+                                    /[A-Z]/g,
+                                    t => "_" + t[0].toLowerCase()
+                                ),
+                                g[k]
+                            );
+                        }
+                        e.set("callback", c + ".maps." + q);
+                        a.src =
+                            `https://maps.${c}apis.com/maps/api/js?` + e;
+                        d[q] = f;
+                        a.onerror = () =>
+                            h = n(
+                                Error(
+                                    p + " could not load."
+                                )
+                            );
+                        a.nonce =
+                            m.querySelector(
+                                "script[nonce]"
+                            )?.nonce || "";
+                        m.head.append(a);
+                    }));
+            d[l]
+                ? console.warn(
+                    p + " only loads once. Ignoring:",
+                    g
+                )
+                : d[l] = (f, ...n) =>
+                    r.add(f) &&
+                    u().then(() =>
+                        d[l](f, ...n)
+                    );
+        })({
+            key: window.HIMS_GOOGLE_MAPS_KEY,
+            v: "weekly",
+            region: "PH",
+            language: "en",
+        });
+    </script>
 
     <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>

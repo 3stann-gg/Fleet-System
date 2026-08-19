@@ -43,9 +43,9 @@
                 </div>
 
                 <div class="stat-content">
-                  <h3 id="assignedDispatches">0</h3>
+                  <h3 id="pendingDispatches">0</h3>
 
-                  <p>Assigned Dispatch</p>
+                  <p>Pending Dispatch</p>
                 </div>
               </div>
 
@@ -94,7 +94,7 @@
                   aria-label="Filter dispatches by status"
                 >
                   <option value="all">All Status</option>
-                  <!--<option value="Pending">Pending</option>-->
+                  <option value="Pending">Pending</option>
                   <option value="Assigned">Assigned</option>
                   <option value="En Route">En Route</option>
                   <option value="Arrived">Arrived</option>

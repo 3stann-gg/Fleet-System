@@ -9,7 +9,10 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 
 class DispatchController extends Controller
-{   
+{
+    /**
+     * Set vehicle and driver statuses when the trip starts.
+     */
     private function setTripResourcesOnEnRoute(Reservation $reservation): void
     {
         if ($reservation->vehicle) {
@@ -17,6 +20,7 @@ class DispatchController extends Controller
                 'status' => 'On Trip',
             ]);
         }
+
         if ($reservation->driver) {
             $reservation->driver->update([
                 'status' => 'On Duty',
@@ -24,6 +28,9 @@ class DispatchController extends Controller
         }
     }
 
+    /**
+     * Release vehicle and driver after completion/cancellation.
+     */
     private function releaseTripResources(Reservation $reservation): void
     {
         if (
@@ -45,13 +52,18 @@ class DispatchController extends Controller
         }
     }
 
-    private function validateTripResourcesAvailable(Reservation $reservation): void
-    {
+    /**
+     * Validate vehicle and driver before starting a trip.
+     */
+    private function validateTripResourcesAvailable(
+        Reservation $reservation
+    ): void {
         $vehicle = $reservation->vehicle;
         $driver = $reservation->driver;
+
         /*
         |--------------------------------------------------------------------------
-        | Vehicle must exist and be Available
+        | Vehicle Validation
         |--------------------------------------------------------------------------
         */
         if (!$vehicle) {
@@ -59,14 +71,16 @@ class DispatchController extends Controller
                 'No vehicle is assigned to this reservation.'
             );
         }
+
         if ($vehicle->status !== 'Available') {
             throw new \Exception(
                 "Vehicle {$vehicle->brand} {$vehicle->model} is currently {$vehicle->status} and cannot start the trip."
             );
         }
+
         /*
         |--------------------------------------------------------------------------
-        | Driver must exist and be Available
+        | Driver Validation
         |--------------------------------------------------------------------------
         */
         if (!$driver) {
@@ -74,6 +88,7 @@ class DispatchController extends Controller
                 'No driver is assigned to this reservation.'
             );
         }
+
         if ($driver->status !== 'Available') {
             $driverName = trim(
                 ($driver->first_name ?? '') . ' ' .
@@ -94,9 +109,10 @@ class DispatchController extends Controller
         $dispatches = Dispatch::with([
             'reservation.vehicle',
             'reservation.driver',
+            'reservation.routePlan.stops',
         ])
-        ->orderBy('id', 'asc')
-        ->get();
+            ->orderBy('id', 'asc')
+            ->get();
 
         if ($request->expectsJson()) {
             return response()->json([
@@ -109,21 +125,31 @@ class DispatchController extends Controller
 
     /**
      * Get reservations available for dispatch.
+     *
+     * Requirements:
+     * - Reservation must be Approved.
+     * - Reservation must have a Route Plan.
+     * - Route Plan must be Ready For Dispatch.
+     * - Reservation must not already have a Dispatch.
      */
     public function availableReservations()
     {
         $reservations = Reservation::with([
             'vehicle',
             'driver',
+            'routePlan.stops',
         ])
-        ->whereIn('status', [
-            'Approved',
-            //'Scheduled',
-        ])
-        ->whereDoesntHave('dispatch')
-        ->orderBy('schedule_date', 'asc')
-        ->orderBy('schedule_time', 'asc')
-        ->get();
+            ->where('status', 'Approved')
+            ->whereHas('routePlan', function ($query) {
+                $query->where(
+                    'status',
+                    'Ready For Dispatch'
+                );
+            })
+            ->whereDoesntHave('dispatch')
+            ->orderBy('schedule_date', 'asc')
+            ->orderBy('schedule_time', 'asc')
+            ->get();
 
         return response()->json([
             'reservations' => $reservations,
@@ -139,30 +165,18 @@ class DispatchController extends Controller
             $request->all(),
             [
                 'dispatch_number' => [
-                    'required',
+                    'nullable',
                     'string',
                     'max:50',
                     'unique:dispatch,dispatch_number',
                 ],
                 'reservation_id' => [
                     'required',
+                    'integer',
                     'exists:reservations,id',
-                ],
-                'dispatch_date' => [
-                    'required',
-                    'date',
-                ],
-                'departure_time' => [
-                    'required',
                 ],
                 'arrival_time' => [
                     'nullable',
-                ],
-                'trip_status' => [
-                    'required',
-                    'string',
-                    'max:50',
-                    'in:Assigned',
                 ],
                 'remarks' => [
                     'nullable',
@@ -180,18 +194,24 @@ class DispatchController extends Controller
         }
 
         try {
-            $dispatch = DB::transaction(function () use ($request, $validator) {
+            $dispatch = DB::transaction(function () use ($validator) {
+                $validated = $validator->validated();
+
                 /*
                 |--------------------------------------------------------------------------
-                | Find Reservation
+                | Find and Lock Reservation
                 |--------------------------------------------------------------------------
                 */
                 $reservation = Reservation::with([
                     'vehicle',
                     'driver',
+                    'routePlan.stops',
                 ])
-                ->lockForUpdate()
-                ->findOrFail($request->reservation_id);
+                    ->lockForUpdate()
+                    ->findOrFail(
+                        $validated['reservation_id']
+                    );
+
                 /*
                 |--------------------------------------------------------------------------
                 | Reservation must be Approved
@@ -202,6 +222,31 @@ class DispatchController extends Controller
                         'Only approved reservations can be dispatched.'
                     );
                 }
+
+                /*
+                |--------------------------------------------------------------------------
+                | Route Plan must exist
+                |--------------------------------------------------------------------------
+                */
+                $routePlan = $reservation->routePlan;
+
+                if (!$routePlan) {
+                    throw new \Exception(
+                        'This reservation does not have a route plan yet.'
+                    );
+                }
+
+                /*
+                |--------------------------------------------------------------------------
+                | Route Plan must be Ready For Dispatch
+                |--------------------------------------------------------------------------
+                */
+                if ($routePlan->status !== 'Ready For Dispatch') {
+                    throw new \Exception(
+                        'The route plan must be Ready For Dispatch before a dispatch can be created.'
+                    );
+                }
+
                 /*
                 |--------------------------------------------------------------------------
                 | Prevent Duplicate Dispatch
@@ -212,39 +257,71 @@ class DispatchController extends Controller
                         'This reservation already has a dispatch.'
                     );
                 }
+
+                /*
+                |--------------------------------------------------------------------------
+                | Make sure required trip resources exist
+                |--------------------------------------------------------------------------
+                |
+                | We do not mark them On Trip yet.
+                | That only happens when Dispatch becomes En Route.
+                |
+                */
+                if (!$reservation->vehicle) {
+                    throw new \Exception(
+                        'No vehicle is assigned to this reservation.'
+                    );
+                }
+
+                if (!$reservation->driver) {
+                    throw new \Exception(
+                        'No driver is assigned to this reservation.'
+                    );
+                }
+
+                $dispatchNumber = $validated['dispatch_number']
+                    ?? $this->generateDispatchNumber();    
+
                 /*
                 |--------------------------------------------------------------------------
                 | Create Dispatch
                 |--------------------------------------------------------------------------
                 |
-                | New dispatch always starts at Assigned.
+                | Schedule source:
+                |
+                | RoutePlan.departure_date
+                | RoutePlan.departure_time
+                |
+                | New dispatch always starts as Pending.
                 |
                 */
                 $dispatch = Dispatch::create([
-                    'dispatch_number' => $validator->validated()['dispatch_number'],
+                    'dispatch_number' => $dispatchNumber,
                     'reservation_id' => $reservation->id,
-                    'dispatch_date' => $validator->validated()['dispatch_date'],
-                    'departure_time' => $validator->validated()['departure_time'],
-                    'arrival_time' => $validator->validated()['arrival_time'] ?? null,
-                    'trip_status' => 'Assigned',
-                    'remarks' => $validator->validated()['remarks'] ?? null,
+                    'dispatch_date' => $routePlan->departure_date,
+                    'departure_time' => $routePlan->departure_time,
+                    'arrival_time' => $validated['arrival_time'] ?? null,
+                    'trip_status' => 'Pending',
+                    'remarks' => $validated['remarks'] ?? null,
                 ]);
+
                 /*
                 |--------------------------------------------------------------------------
-                | Reservation: Approved → Scheduled
+                | IMPORTANT
                 |--------------------------------------------------------------------------
+                |
+                | Reservation remains Approved while Dispatch is Pending.
+                |
+                | It becomes Scheduled only when Dispatch:
+                |
+                | Pending → Assigned
+                |
                 */
-                $reservation->update([
-                    'status' => 'Scheduled',
-                ]);
-                /*
-                |--------------------------------------------------------------------------
-                | Load Relationships
-                |--------------------------------------------------------------------------
-                */
+
                 $dispatch->load([
                     'reservation.vehicle',
                     'reservation.driver',
+                    'reservation.routePlan.stops',
                 ]);
 
                 return $dispatch;
@@ -257,7 +334,6 @@ class DispatchController extends Controller
             ], 201);
 
         } catch (\Exception $e) {
-
             return response()->json([
                 'success' => false,
                 'message' => $e->getMessage(),
@@ -268,8 +344,10 @@ class DispatchController extends Controller
     /**
      * Update the specified dispatch.
      */
-    public function update(Request $request, Dispatch $dispatch)
-    {
+    public function update(
+        Request $request,
+        Dispatch $dispatch
+    ) {
         $validator = Validator::make(
             $request->all(),
             [
@@ -277,14 +355,19 @@ class DispatchController extends Controller
                     'required',
                     'string',
                     'max:50',
-                    'unique:dispatch,dispatch_number,' . $dispatch->id,
+                    'unique:dispatch,dispatch_number,' .
+                        $dispatch->id,
                 ],
                 'trip_status' => [
                     'required',
                     'string',
                     'max:50',
-                    'in:Assigned,En Route,Arrived,Completed,Cancelled',
+                    'in:Pending,Assigned,En Route,Arrived,Completed,Cancelled',
                 ],
+                'remarks' => [
+                    'nullable',
+                    'string',
+                ]
             ]
         );
 
@@ -297,22 +380,26 @@ class DispatchController extends Controller
         }
 
         try {
-
             $result = DB::transaction(function () use (
                 $validator,
                 $dispatch
             ) {
+                $validated = $validator->validated();
+
                 /*
                 |--------------------------------------------------------------------------
-                | Lock Dispatch + Reservation
+                | Lock Dispatch + Related Data
                 |--------------------------------------------------------------------------
                 */
-                $dispatch = Dispatch::lockForUpdate()
-                    ->with([
-                        'reservation.vehicle',
-                        'reservation.driver',
-                    ])
-                    ->findOrFail($dispatch->id);
+                $dispatch = Dispatch::with([
+                    'reservation.vehicle',
+                    'reservation.driver',
+                    'reservation.routePlan',
+                ])
+                    ->lockForUpdate()
+                    ->findOrFail(
+                        $dispatch->id
+                    );
 
                 $reservation = $dispatch->reservation;
 
@@ -327,18 +414,29 @@ class DispatchController extends Controller
                 | Dispatch Status Lifecycle
                 |--------------------------------------------------------------------------
                 |
-                | Assigned → En Route → Arrived → Completed
+                | Pending
+                |    ↓
+                | Assigned
+                |    ↓
+                | En Route
+                |    ↓
+                | Arrived
+                |    ↓
+                | Completed
                 |
-                | Assigned / En Route → Cancelled
+                | Pending / Assigned / En Route can be cancelled.
                 |
                 */
                 $allowedTransitions = [
+                    'Pending' => [
+                        'Assigned',
+                        'Cancelled',
+                    ],
                     'Assigned' => [
                         'En Route',
                         'Cancelled',
                     ],
                     'En Route' => [
-                        //'Assigned',
                         'Arrived',
                         'Cancelled',
                     ],
@@ -349,8 +447,12 @@ class DispatchController extends Controller
                     'Cancelled' => [],
                 ];
 
-                $currentStatus = $dispatch->trip_status;
-                $newStatus = $validator->validated()['trip_status'];
+                $currentStatus =
+                    $dispatch->trip_status;
+
+                $newStatus =
+                    $validated['trip_status'];
+
                 /*
                 |--------------------------------------------------------------------------
                 | Prevent Invalid Transition
@@ -360,13 +462,29 @@ class DispatchController extends Controller
                     $currentStatus !== $newStatus &&
                     !in_array(
                         $newStatus,
-                        $allowedTransitions[$currentStatus] ?? []
+                        $allowedTransitions[$currentStatus] ?? [],
+                        true
                     )
                 ) {
                     throw new \Exception(
                         "Cannot change dispatch status from {$currentStatus} to {$newStatus}."
                     );
                 }
+
+                /*
+                |--------------------------------------------------------------------------
+                | Validate resources BEFORE entering En Route
+                |--------------------------------------------------------------------------
+                */
+                if (
+                    $currentStatus !== 'En Route' &&
+                    $newStatus === 'En Route'
+                ) {
+                    $this->validateTripResourcesAvailable(
+                        $reservation
+                    );
+                }
+
                 /*
                 |--------------------------------------------------------------------------
                 | Update Dispatch
@@ -374,63 +492,122 @@ class DispatchController extends Controller
                 */
                 $dispatch->update([
                     'dispatch_number' =>
-                        $validator->validated()['dispatch_number'],
+                        $validated['dispatch_number'],
 
-                    'trip_status' => $newStatus,
+                    'trip_status' =>
+                        $newStatus,
+
+                    'remarks' =>
+                        $validated['remarks'] ?? null,
                 ]);
+
                 /*
                 |--------------------------------------------------------------------------
-                | Synchronize Vehicle + Driver + Reservation
+                | Pending → Assigned
                 |--------------------------------------------------------------------------
+                |
+                | Reservation:
+                |
+                | Approved → Scheduled
+                |
                 */
+                if (
+                    $currentStatus === 'Pending' &&
+                    $newStatus === 'Assigned'
+                ) {
+                    $reservation->update([
+                        'status' => 'Scheduled',
+                    ]);
+                }
 
-                if ($newStatus === 'En Route') {
-                    /*
-                    |--------------------------------------------------------------------------
-                    | Validate Vehicle + Driver Availability
-                    |--------------------------------------------------------------------------
-                    */
-                    $this->validateTripResourcesAvailable(
-                        $reservation
-                    );
-                    /*
-                    |--------------------------------------------------------------------------
-                    | Start Trip
-                    |--------------------------------------------------------------------------
-                    | Vehicle: Available → On Trip
-                    | Driver: Available → On Duty
-                    |--------------------------------------------------------------------------
-                    */
+                /*
+                |--------------------------------------------------------------------------
+                | Assigned → En Route
+                |--------------------------------------------------------------------------
+                |
+                | Vehicle:
+                | Available → On Trip
+                |
+                | Driver:
+                | Available → On Duty
+                |
+                */
+                if (
+                    $currentStatus === 'Assigned' &&
+                    $newStatus === 'En Route'
+                ) {
                     $this->setTripResourcesOnEnRoute(
                         $reservation
                     );
-                } elseif ($newStatus === 'Completed') {
+                }
+                // En Route → Arrived
+                if (
+                    $currentStatus === 'En Route' &&
+                    $newStatus === 'Arrived'
+                ) {
+                    $dispatch->update([
+                        'arrival_time' => now()->format('H:i:s'),
+                    ]);
+                }
+
+                /*
+                |--------------------------------------------------------------------------
+                | Arrived → Completed
+                |--------------------------------------------------------------------------
+                */
+                if (
+                    $currentStatus === 'Arrived' &&
+                    $newStatus === 'Completed'
+                ) {
                     /*
-                    | Trip completed.
-                    |
-                    | Reservation: Scheduled → Completed
-                    | Vehicle: On Trip → Available
-                    | Driver: On Duty → Available
+                    |--------------------------------------------------------------------------
+                    | Reservation becomes Completed
+                    |--------------------------------------------------------------------------
                     */
                     $reservation->update([
                         'status' => 'Completed',
                     ]);
 
+                    /*
+                    |--------------------------------------------------------------------------
+                    | Route Plan becomes Completed
+                    |--------------------------------------------------------------------------
+                    */
+                    if (
+                        $reservation->routePlan &&
+                        $reservation->routePlan->status ===
+                            'Ready For Dispatch'
+                    ) {
+                        $reservation->routePlan->update([
+                            'status' => 'Completed',
+                        ]);
+                    }
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | Release Vehicle + Driver
+                    |--------------------------------------------------------------------------
+                    */
                     $this->releaseTripResources(
                         $reservation
                     );
+                }
 
-                } elseif ($newStatus === 'Cancelled') {
-                    /*
-                    | Reservation becomes Cancelled.
-                    |
-                    | If the trip had already started,
-                    | release the vehicle and driver.
-                    */
+                /*
+                |--------------------------------------------------------------------------
+                | Cancellation
+                |--------------------------------------------------------------------------
+                */
+                if ($newStatus === 'Cancelled') {
                     $reservation->update([
                         'status' => 'Cancelled',
                     ]);
 
+                    /*
+                    |--------------------------------------------------------------------------
+                    | If trip already started, release resources.
+                    |--------------------------------------------------------------------------
+                    */
                     $this->releaseTripResources(
                         $reservation
                     );
@@ -444,6 +621,7 @@ class DispatchController extends Controller
                 $dispatch->load([
                     'reservation.vehicle',
                     'reservation.driver',
+                    'reservation.routePlan.stops',
                 ]);
 
                 return $dispatch;
@@ -456,7 +634,6 @@ class DispatchController extends Controller
             ]);
 
         } catch (\Exception $e) {
-
             return response()->json([
                 'success' => false,
                 'message' => $e->getMessage(),
@@ -469,45 +646,80 @@ class DispatchController extends Controller
      */
     public function destroy(Dispatch $dispatch)
     {
-        $dispatch->load('reservation');
-        $reservation = $dispatch->reservation;
+        try {
+            DB::transaction(function () use ($dispatch) {
+                $dispatch = Dispatch::with([
+                    'reservation',
+                ])
+                    ->lockForUpdate()
+                    ->findOrFail(
+                        $dispatch->id
+                    );
 
-        if (!$reservation) {
+                $reservation =
+                    $dispatch->reservation;
+
+                if (!$reservation) {
+                    throw new \Exception(
+                        'Reservation associated with this dispatch was not found.'
+                    );
+                }
+
+                /*
+                |--------------------------------------------------------------------------
+                | Only Pending or Assigned can be deleted.
+                |--------------------------------------------------------------------------
+                */
+                if (
+                    !in_array(
+                        $dispatch->trip_status,
+                        [
+                            'Pending',
+                            'Assigned',
+                        ],
+                        true
+                    )
+                ) {
+                    throw new \Exception(
+                        "Dispatch {$dispatch->dispatch_number} cannot be deleted because its current status is {$dispatch->trip_status}."
+                    );
+                }
+
+                /*
+                |--------------------------------------------------------------------------
+                | Delete Dispatch
+                |--------------------------------------------------------------------------
+                */
+                $dispatch->delete();
+
+                /*
+                |--------------------------------------------------------------------------
+                | Return Reservation to Approved
+                |--------------------------------------------------------------------------
+                |
+                | Pending:
+                | Reservation should already be Approved.
+                |
+                | Assigned:
+                | Reservation was Scheduled, so return to Approved.
+                |
+                */
+                $reservation->update([
+                    'status' => 'Approved',
+                ]);
+            });
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Dispatch deleted successfully.',
+            ]);
+
+        } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Reservation associated with this dispatch was not found.',
-            ], 404);
-        }
-        /*
-        |--------------------------------------------------------------------------
-        | Only Assigned dispatches can be deleted
-        |--------------------------------------------------------------------------
-        */
-        if ($dispatch->trip_status !== 'Assigned') {
-            return response()->json([
-                'success' => false,
-                'message' => "Dispatch {$dispatch->dispatch_number} cannot be deleted because its current status is {$dispatch->trip_status}.",
+                'message' => $e->getMessage(),
             ], 422);
         }
-        /*
-        |--------------------------------------------------------------------------
-        | Delete Dispatch
-        |--------------------------------------------------------------------------
-        */
-        $dispatch->delete();
-        /*
-        |--------------------------------------------------------------------------
-        | Return Reservation to Approved
-        |--------------------------------------------------------------------------
-        */
-        $reservation->update([
-            'status' => 'Approved',
-        ]);
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Dispatch deleted successfully.',
-        ]);
     }
 
     /**
@@ -539,89 +751,94 @@ class DispatchController extends Controller
             ], 422);
         }
 
-        $dispatchIds = $validator->validated()['dispatch_ids'];
+        $dispatchIds =
+            $validator->validated()['dispatch_ids'];
 
         try {
-
             $deletedIds = [];
 
             DB::transaction(function () use (
                 $dispatchIds,
                 &$deletedIds
             ) {
-
-                $dispatches = Dispatch::with('reservation')
-                    ->whereIn('id', $dispatchIds)
+                $dispatches = Dispatch::with([
+                    'reservation',
+                ])
+                    ->whereIn(
+                        'id',
+                        $dispatchIds
+                    )
                     ->lockForUpdate()
                     ->get();
 
                 foreach ($dispatches as $dispatch) {
+                    /*
+                    |--------------------------------------------------------------------------
+                    | Only Pending or Assigned may be deleted.
+                    |--------------------------------------------------------------------------
+                    */
+                    if (
+                        !in_array(
+                            $dispatch->trip_status,
+                            [
+                                'Pending',
+                                'Assigned',
+                            ],
+                            true
+                        )
+                    ) {
+                        continue;
+                    }
 
                     /*
                     |--------------------------------------------------------------------------
-                    | Only Assigned dispatches can be deleted
+                    | Restore Reservation status.
                     |--------------------------------------------------------------------------
-                    | Assigned = dispatch has been created but trip has not started.
-                    */
-                    if ($dispatch->trip_status !== 'Assigned') {
-                        continue;
-                    }
-                    /*
-                    |--------------------------------------------------------------------------
-                    | Return Reservation to Approved
-                    |--------------------------------------------------------------------------
-                    | Dispatch deletion means the reservation is available
-                    | for dispatching again.
                     */
                     if ($dispatch->reservation) {
                         $dispatch->reservation->update([
                             'status' => 'Approved',
                         ]);
                     }
-                    /*
-                    |--------------------------------------------------------------------------
-                    | Delete Dispatch
-                    |--------------------------------------------------------------------------
-                    */
-                    $deletedIds[] = $dispatch->id;
+
+                    $deletedIds[] =
+                        $dispatch->id;
 
                     $dispatch->delete();
                 }
             });
-            /*
-            |--------------------------------------------------------------------------
-            | Nothing was deleted
-            |--------------------------------------------------------------------------
-            */
+
             if (empty($deletedIds)) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Only Assigned dispatches can be deleted.',
+                    'message' =>
+                        'Only Pending or Assigned dispatches can be deleted.',
                     'deleted_ids' => [],
                 ], 422);
             }
-            /*
-            |--------------------------------------------------------------------------
-            | Success
-            |--------------------------------------------------------------------------
-            */
+
             return response()->json([
                 'success' => true,
-                'message' => count($deletedIds) === 1
-                    ? 'Dispatch(es) deleted successfully.'
-                    : count($deletedIds) . ' dispatches deleted successfully.',
-                'deleted_ids' => $deletedIds,
+                'message' =>
+                    count($deletedIds) === 1
+                        ? 'Dispatch deleted successfully.'
+                        : count($deletedIds) .
+                            ' dispatches deleted successfully.',
+
+                'deleted_ids' =>
+                    $deletedIds,
             ]);
 
         } catch (\Exception $e) {
-
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to delete dispatches.',
-                'error' => $e->getMessage(),
+                'message' =>
+                    'Failed to delete dispatches.',
+                'error' =>
+                    $e->getMessage(),
             ], 500);
         }
-}
+    }
 
     /**
      * Display the specified dispatch.
@@ -631,10 +848,57 @@ class DispatchController extends Controller
         $dispatch->load([
             'reservation.vehicle',
             'reservation.driver',
+            'reservation.routePlan.stops',
         ]);
 
         return response()->json([
             'dispatch' => $dispatch,
+        ]);
+    }
+
+    /**
+     * Generate the next dispatch number.
+     */
+    private function generateDispatchNumber(): string
+    {
+        $year = now()->format('Y');
+        $month = now()->format('m');
+        $prefix = "DSP-{$year}-{$month}";
+        $latestDispatch = Dispatch::query()
+            ->where(
+                'dispatch_number',
+                'like',
+                $prefix . '%'
+            )
+            ->orderByDesc('id')
+            ->first();
+        if (!$latestDispatch) {
+            $nextSequence = 1;
+        } else {
+            $lastNumber = $latestDispatch->dispatch_number;
+            $lastSequence = (int) substr(
+                $lastNumber,
+                -3
+            );
+            $nextSequence = $lastSequence + 1;
+        }
+        return $prefix . str_pad(
+            $nextSequence,
+            3,
+            '0',
+            STR_PAD_LEFT
+        );
+    }
+
+
+    /**
+     * Preview the next dispatch number.
+     */
+    public function nextNumber()
+    {
+        return response()->json([
+            'success' => true,
+            'dispatch_number' => $this->generateDispatchNumber(),
         ]);
     }
 }

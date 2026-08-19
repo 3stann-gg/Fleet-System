@@ -602,7 +602,7 @@
     <script src="{{ asset('assets/js/cost-analysis/cost-charts.js') }}"></script>
     <script src="{{ asset('assets/js/cost-analysis/cost-table.js') }}"></script>
     <script src="{{ asset('assets/js/cost-analysis/cost-budget.js') }}"></script>
-    <script src="{{ asset('/assets/js/cost-analysis/cost-presets.js') }}"></script>
+    <script src="{{ asset('assets/js/cost-analysis/cost-presets.js') }}"></script>
     <script src="{{ asset('assets/js/cost-analysis/cost-export.js') }}"></script>
     <script src="{{ asset('assets/js/cost-analysis/cost-init.js') }}"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/js/bootstrap.bundle.min.js"></script>

@@ -1,5 +1,13 @@
 /* ==========================================
-   Dispatch Add 
+   HIMS Fleet - Dispatch Add
+
+   Flow:
+   Approved Reservation
+   + RoutePlan = Ready For Dispatch
+          ↓
+   Create Dispatch = Pending
+          ↓
+   Schedule comes from RoutePlan
 ========================================== */
 
 let availableReservations = [];
@@ -7,53 +15,185 @@ let availableReservations = [];
 document.addEventListener("DOMContentLoaded", () => {
     initDispatchAdd();
     loadAvailableReservations();
+    loadNextDispatchNumber();
 });
 
-function loadAvailableReservations() {
-    fetch("/dispatch/available-reservations", {
-        headers: {
-            Accept: "application/json",
-        },
-    })
-        .then((response) => {
-            if (!response.ok) {
-                throw new Error("Failed to load reservations.");
-            }
 
-            return response.json();
-        })
-        .then((data) => {
-            availableReservations = data.reservations || [];
-
-            populateReservationSelect(availableReservations);
-        })
-        .catch((error) => {
-            console.error("Error loading reservations:", error);
-        });
+function getDispatchCsrfToken() {
+    return (
+        document
+            .querySelector('meta[name="csrf-token"]')
+            ?.getAttribute("content") || ""
+    );
 }
+
+async function dispatchAddApiRequest(url, options = {}) {
+    const method = String(options.method || "GET").toUpperCase();
+    const headers = {
+        Accept: "application/json",
+        ...(options.headers || {}),
+    };
+    if (options.body !== undefined && options.body !== null) {
+        headers["Content-Type"] = "application/json";
+    }
+    if (!["GET", "HEAD", "OPTIONS"].includes(method)) {
+        const csrfToken = getDispatchCsrfToken();
+        if (csrfToken) {
+            headers["X-CSRF-TOKEN"] = csrfToken;
+        }
+    }
+    const response = await fetch(url, {
+        ...options,
+        method,
+        headers,
+        credentials: "same-origin",
+    });
+
+    let data = {};
+
+    try {
+        data = await response.json();
+    } catch (error) {
+        data = {};
+    }
+
+    if (!response.ok) {
+        const error = new Error(data.message || "Dispatch request failed.");
+        error.status = response.status;
+        error.errors = data.errors || {};
+        error.data = data;
+        throw error;
+    }
+
+    return data;
+}
+
+async function loadNextDispatchNumber() {
+    const numberInput = document.getElementById("dispatchNumber");
+
+    if (!numberInput) {
+        return;
+    }
+
+    try {
+        const data = await dispatchAddApiRequest("/dispatch/next-number", {
+            method: "GET",
+        });
+
+        numberInput.value = data.dispatch_number || "";
+    } catch (error) {
+        console.error("Unable to load next dispatch number:", error);
+
+        numberInput.value = "";
+    }
+}
+
+function getReservationRoutePlan(reservation) {
+    return reservation?.route_plan || reservation?.routePlan || null;
+}
+
+function getDispatchVehicleLabel(vehicle) {
+    if (!vehicle) {
+        return "Unassigned";
+    }
+    const brandModel = [vehicle.brand, vehicle.model]
+        .filter(Boolean)
+        .map((value) => String(value).trim())
+        .filter(Boolean)
+        .join(" ")
+        .trim();
+    const vehicleType = String(
+        vehicle.vehicle_type || vehicle.type || "",
+    ).trim();
+    if (brandModel && vehicleType) {
+        return `${brandModel} - ${vehicleType}`;
+    }
+    if (brandModel) {
+        return brandModel;
+    }
+    if (vehicleType) {
+        return vehicleType;
+    }
+    return (
+        vehicle.vehicle_name ||
+        vehicle.name ||
+        vehicle.plate_number ||
+        "Unassigned"
+    );
+}
+
+function getDispatchDriverLabel(driver) {
+    if (!driver) {
+        return "Unassigned";
+    }
+    const name = [driver.first_name, driver.last_name]
+        .filter(Boolean)
+        .map((value) => String(value).trim())
+        .filter(Boolean)
+        .join(" ")
+        .trim();
+    return name || driver.name || "Unassigned";
+}
+
+async function loadAvailableReservations() {
+    try {
+        const data = await dispatchAddApiRequest(
+            "/dispatch/available-reservations",
+            {
+                method: "GET",
+            },
+        );
+        availableReservations = Array.isArray(data.reservations)
+            ? data.reservations
+            : [];
+
+        populateReservationSelect(availableReservations);
+    } catch (error) {
+        console.error("Error loading Dispatch reservations:", error);
+        availableReservations = [];
+        populateReservationSelect([]);
+        if (typeof showToast === "function") {
+            showToast(
+                error.message ||
+                    "Unable to load reservations ready for dispatch.",
+                "error",
+            );
+        }
+    }
+}
+
 
 function populateReservationSelect(reservations) {
     const select = document.getElementById("dispatchReservation");
 
-    if (!select) return;
-
-    select.innerHTML = `
-        <option value="">Select Reservation</option>
-    `;
+    if (!select) {
+        return;
+    }
+    select.innerHTML = '<option value="">Select Reservation</option>';
     reservations.forEach((reservation) => {
         const option = document.createElement("option");
-        option.value = reservation.id;
-        option.textContent = reservation.reservation_number;
+        option.value = String(reservation.id);
+        const number =
+            reservation.reservation_number || `Reservation #${reservation.id}`;
+        const patient = reservation.patient_name
+            ? ` — ${reservation.patient_name}`
+            : "";
+        option.textContent = number + patient;
         select.appendChild(option);
     });
+
+    if (reservations.length === 0) {
+        select.innerHTML =
+            '<option value="">No routes ready for dispatch</option>';
+    }
 }
 
 function handleReservationChange() {
     const select = document.getElementById("dispatchReservation");
-    if (!select) return;
-
+    if (!select) {
+        return;
+    }
     const reservationId = select.value;
-
     if (!reservationId) {
         clearReservationDetails();
         return;
@@ -61,13 +201,16 @@ function handleReservationChange() {
     const reservation = availableReservations.find(
         (item) => String(item.id) === String(reservationId),
     );
-
-    if (!reservation) return;
-
+    if (!reservation) {
+        clearReservationDetails();
+        return;
+    }
     fillReservationDetails(reservation);
 }
 
 function fillReservationDetails(reservation) {
+    const routePlan = getReservationRoutePlan(reservation);
+
     const setValue = (id, value) => {
         const element = document.getElementById(id);
 
@@ -76,40 +219,57 @@ function fillReservationDetails(reservation) {
         }
     };
 
+
     setValue("dispatchPatient", reservation.patient_name);
     setValue("dispatchRequestType", reservation.request_type);
-
-    if (reservation.vehicle) {
-        const vehicle = reservation.vehicle;
-        const vehicleText = [
-            [vehicle.brand, vehicle.model].filter(Boolean).join(" "),
-            vehicle.vehicle_type,
-        ]
-            .filter(Boolean)
-            .join(" - ");
-        setValue("dispatchVehicle", vehicleText);
-    } else {
-        setValue("dispatchVehicle", "Unassigned");
-    }
-
-    if (reservation.driver) {
-        const driver = reservation.driver;
-        const driverText = [driver.first_name, driver.last_name]
-            .filter(Boolean)
-            .join(" ");
-        setValue("dispatchDriver", driverText);
-    } else {
-        setValue("dispatchDriver", "Unassigned");
-    }
-
-    setValue("dispatchPickup", reservation.pickup_location);
-    setValue("dispatchDestination", reservation.destination);
-    setValue("dispatchDate", reservation.schedule_date);
-    setValue("dispatchTime", reservation.schedule_time);
-    setValue("dispatchPriority", reservation.priority);
     setValue("dispatchContact", reservation.contact_number);
-    setValue("dispatchNotes", reservation.notes);
+    setValue("dispatchVehicle", getDispatchVehicleLabel(reservation.vehicle));
+    setValue("dispatchDriver", getDispatchDriverLabel(reservation.driver));
+    /*
+    |--------------------------------------------------------------------------
+    | FINAL ROUTE
+    |--------------------------------------------------------------------------
+    |
+    | Route Planning may have changed the initial
+    | Reservation route, so Dispatch uses RoutePlan.
+    |
+    */
+    setValue(
+        "dispatchPickup",
+        routePlan?.origin || reservation.pickup_location || "",
+    );
+    setValue(
+        "dispatchDestination",
+        routePlan?.destination || reservation.destination || "",
+    );
+    /*
+    |--------------------------------------------------------------------------
+    | FINAL DISPATCH SCHEDULE
+    |--------------------------------------------------------------------------
+    |
+    | IMPORTANT:
+    | Dispatch date/time comes from RoutePlan,
+    | NOT Reservation.schedule_date/time.
+    |
+    */
+    setValue(
+        "dispatchDate",
+        String(routePlan?.departure_date || "").slice(0, 10),
+    );
+    setValue(
+        "dispatchTime",
+        String(routePlan?.departure_time || "").slice(0, 5),
+    );
+    setValue(
+        "dispatchPriority",
+        routePlan?.priority || reservation.priority || "",
+    );
+    setValue("dispatchNotes", "");
 }
+
+/* ==========================================
+   CLEAR AUTO-FILLED DETAILS
+========================================== */
 
 function clearReservationDetails() {
     const fields = [
@@ -125,6 +285,7 @@ function clearReservationDetails() {
         "dispatchContact",
         "dispatchNotes",
     ];
+
     fields.forEach((id) => {
         const element = document.getElementById(id);
 
@@ -134,72 +295,80 @@ function clearReservationDetails() {
     });
 }
 
-function createDispatchRow(dispatch) {
-    const reservation = dispatch.reservation;
-    const vehicle = reservation?.vehicle;
-    const driver = reservation?.driver;
-    const vehicleName = vehicle
-        ? [vehicle.brand, vehicle.model].filter(Boolean).join(" ")
-        : "Unassigned";
-    const vehicleType = vehicle?.vehicle_type || "";
-    const driverName = driver
-        ? [driver.first_name, driver.last_name].filter(Boolean).join(" ")
-        : "Unassigned";
-    const scheduleText = formatDispatchSchedule(
-        reservation?.schedule_date,
-        reservation?.schedule_time,
-    );
 
-    //const status = dispatch.trip_status || "Pending";
-    const status = dispatch.trip_status || "Assigned";
+function createDispatchRow(dispatch) {
+    const reservation = dispatch.reservation || null;
+    const routePlan = getReservationRoutePlan(reservation);
+    const vehicle = reservation?.vehicle || null;
+    const driver = reservation?.driver || null;
+    const vehicleName = getDispatchVehicleLabel(vehicle);
+    const driverName = getDispatchDriverLabel(driver);
+    const scheduleText = formatDispatchSchedule(
+        dispatch.dispatch_date || routePlan?.departure_date,
+        dispatch.departure_time || routePlan?.departure_time,
+    );
+    const routeOrigin = routePlan?.origin || reservation?.pickup_location || "";
+    const routeDestination =
+        routePlan?.destination || reservation?.destination || "";
+    const priority = routePlan?.priority || reservation?.priority || "";
+    const status = dispatch.trip_status || "Pending";
     const statusClassMap = {
-        //Pending: "pending",
+        Pending: "pending",
         Assigned: "scheduled",
         "En Route": "trip",
         Arrived: "approved",
         Completed: "completed",
         Cancelled: "cancelled",
     };
-
     const statusClass =
         statusClassMap[status] || status.toLowerCase().replace(/\s+/g, "-");
     const tr = document.createElement("tr");
-
     tr.dataset.id = dispatch.id;
-    tr.dataset.pickup = reservation?.pickup_location ?? "";
-    tr.dataset.destination = reservation?.destination ?? "";
-    tr.dataset.scheduleDate = reservation?.schedule_date ?? "";
-    tr.dataset.scheduleTime = reservation?.schedule_time ?? "";
-    tr.dataset.priority = reservation?.priority ?? "";
+    tr.dataset.pickup = routeOrigin;
+    tr.dataset.destination = routeDestination;
+    tr.dataset.scheduleDate = String(
+        dispatch.dispatch_date || routePlan?.departure_date || "",
+    ).slice(0, 10);
+    tr.dataset.scheduleTime = String(
+        dispatch.departure_time || routePlan?.departure_time || "",
+    ).slice(0, 5);
+    tr.dataset.priority = priority;
     tr.dataset.contact = reservation?.contact_number ?? "";
-    tr.dataset.notes = reservation?.notes ?? "";
+    tr.dataset.notes = dispatch.remarks ?? "";
     tr.dataset.requestType = reservation?.request_type ?? "";
 
-    /* Checkbox */
     const tdCheckbox = document.createElement("td");
     const checkbox = document.createElement("input");
-
     checkbox.type = "checkbox";
     checkbox.className = "dispatch-checkbox";
     checkbox.dataset.id = dispatch.id;
     checkbox.setAttribute("aria-label", `Select ${dispatch.dispatch_number}`);
     tdCheckbox.appendChild(checkbox);
-
-    /* Dispatch Number */
+    /*
+    |--------------------------------------------------------------------------
+    | Dispatch Number
+    |--------------------------------------------------------------------------
+    */
     const tdNumber = document.createElement("td");
     const numberSpan = document.createElement("span");
     numberSpan.className = "dispatch-number";
-    numberSpan.textContent = dispatch.dispatch_number;
+    numberSpan.textContent = dispatch.dispatch_number || "—";
     tdNumber.appendChild(numberSpan);
-
-    /* Dispatch Number */
+    /*
+    |--------------------------------------------------------------------------
+    | Reservation Number
+    |--------------------------------------------------------------------------
+    */
     const tdReservation = document.createElement("td");
     const reservationSpan = document.createElement("span");
     reservationSpan.className = "dispatch-reservation-number";
     reservationSpan.textContent = reservation?.reservation_number ?? "—";
     tdReservation.appendChild(reservationSpan);
-
-    /* Patient */
+    /*
+    |--------------------------------------------------------------------------
+    | Patient
+    |--------------------------------------------------------------------------
+    */
     const tdPatient = document.createElement("td");
     const patientInfo = document.createElement("div");
     patientInfo.className = "dispatch-patient-info";
@@ -212,103 +381,112 @@ function createDispatchRow(dispatch) {
     patientInfo.appendChild(patientName);
     patientInfo.appendChild(requestType);
     tdPatient.appendChild(patientInfo);
-
-    /* Vehicle */
+    /*
+    |--------------------------------------------------------------------------
+    | Vehicle
+    |--------------------------------------------------------------------------
+    */
     const tdVehicle = document.createElement("td");
-    if (vehicle) {
-        const vehicleInfo = document.createElement("div");
-        vehicleInfo.className = "vehicle-info dispatch-vehicle";
-        
-        const vehicleDetails = document.createElement("div");
-        const vehicleNameElement = document.createElement("div");
-        vehicleNameElement.textContent = vehicleName;
-
-        const vehicleTypeElement = document.createElement("small");
-        vehicleTypeElement.textContent = vehicleType;
-        vehicleDetails.appendChild(vehicleNameElement);
-        vehicleDetails.appendChild(vehicleTypeElement);
-        vehicleInfo.appendChild(vehicleDetails);
-        tdVehicle.appendChild(vehicleInfo);
-    } else {
-        tdVehicle.textContent = "Unassigned";
-    }
-
-    /* Driver */
+    const vehicleSpan = document.createElement("span");
+    vehicleSpan.className = "dispatch-vehicle";
+    vehicleSpan.textContent = vehicleName;
+    tdVehicle.appendChild(vehicleSpan);
+    /*
+    |--------------------------------------------------------------------------
+    | Driver
+    |--------------------------------------------------------------------------
+    */
     const tdDriver = document.createElement("td");
     const driverSpan = document.createElement("span");
     driverSpan.className = "dispatch-driver";
     driverSpan.textContent = driverName;
     tdDriver.appendChild(driverSpan);
-
-    /* Route */
+    /*
+    |--------------------------------------------------------------------------
+    | Final Planned Route
+    |--------------------------------------------------------------------------
+    */
     const tdRoute = document.createElement("td");
     const routeSpan = document.createElement("span");
     routeSpan.className = "dispatch-route";
-    routeSpan.textContent = `${reservation?.pickup_location ?? ""} → ${reservation?.destination ?? ""}`;
+    routeSpan.textContent =
+        routeOrigin && routeDestination
+            ? `${routeOrigin} → ${routeDestination}`
+            : "—";
     tdRoute.appendChild(routeSpan);
-
-    /* Schedule */
+    /*
+    |--------------------------------------------------------------------------
+    | Schedule
+    |--------------------------------------------------------------------------
+    */
     const tdSchedule = document.createElement("td");
     const scheduleSpan = document.createElement("span");
     scheduleSpan.className = "dispatch-schedule";
-    scheduleSpan.textContent = scheduleText;
+    scheduleSpan.textContent = scheduleText || "—";
     tdSchedule.appendChild(scheduleSpan);
-
-    /* Priority */
+    /*
+    |--------------------------------------------------------------------------
+    | Priority
+    |--------------------------------------------------------------------------
+    */
     const tdPriority = document.createElement("td");
     const prioritySpan = document.createElement("span");
     prioritySpan.className = "dispatch-priority";
-    prioritySpan.textContent = reservation?.priority ?? "—";
+    prioritySpan.textContent = priority || "—";
     tdPriority.appendChild(prioritySpan);
-
-    /* Status */
+    /*
+    |--------------------------------------------------------------------------
+    | Status
+    |--------------------------------------------------------------------------
+    */
     const tdStatus = document.createElement("td");
     const statusSpan = document.createElement("span");
     statusSpan.className = `status-badge ${statusClass}`;
     statusSpan.textContent = status;
     tdStatus.appendChild(statusSpan);
-
-    /* Actions */
+    /*
+    |--------------------------------------------------------------------------
+    | Actions
+    |--------------------------------------------------------------------------
+    */
     const tdActions = document.createElement("td");
     const actionsWrap = document.createElement("div");
     actionsWrap.className = "action-buttons";
-
     const viewBtn = document.createElement("button");
     viewBtn.type = "button";
     viewBtn.className = "action-btn view-dispatch";
     viewBtn.dataset.id = dispatch.id;
     viewBtn.setAttribute("aria-label", `View ${dispatch.dispatch_number}`);
-
-    const viewIcon = document.createElement("i");
-    viewIcon.className = "ph ph-eye";
-    viewBtn.appendChild(viewIcon);
-    
+    viewBtn.innerHTML = '<i class="ph ph-eye"></i>';
     const editBtn = document.createElement("button");
     editBtn.type = "button";
     editBtn.className = "action-btn edit-dispatch";
     editBtn.dataset.id = dispatch.id;
     editBtn.setAttribute("aria-label", `Edit ${dispatch.dispatch_number}`);
-
-    const editIcon = document.createElement("i");
-    editIcon.className = "ph ph-pencil-simple";
-    editBtn.appendChild(editIcon);
-
+    editBtn.innerHTML = '<i class="ph ph-pencil-simple"></i>';
+    /*
+    |--------------------------------------------------------------------------
+    | Completed / Cancelled dispatches are history.
+    |--------------------------------------------------------------------------
+    */
+    if (["Completed", "Cancelled"].includes(status)) {
+        editBtn.disabled = true;
+    }
     const deleteBtn = document.createElement("button");
     deleteBtn.type = "button";
     deleteBtn.className = "action-btn delete-dispatch";
     deleteBtn.dataset.id = dispatch.id;
     deleteBtn.setAttribute("aria-label", `Delete ${dispatch.dispatch_number}`);
-
-    const deleteIcon = document.createElement("i");
-    deleteIcon.className = "ph ph-trash";
-    deleteBtn.appendChild(deleteIcon);
+    deleteBtn.innerHTML = '<i class="ph ph-trash"></i>';
+  
+    if (!["Pending", "Assigned"].includes(status)) {
+        deleteBtn.disabled = true;
+    }
     actionsWrap.appendChild(viewBtn);
     actionsWrap.appendChild(editBtn);
     actionsWrap.appendChild(deleteBtn);
-
     tdActions.appendChild(actionsWrap);
-
-    /* Append Row */
+    
     tr.appendChild(tdCheckbox);
     tr.appendChild(tdNumber);
     tr.appendChild(tdReservation);
@@ -320,21 +498,19 @@ function createDispatchRow(dispatch) {
     tr.appendChild(tdPriority);
     tr.appendChild(tdStatus);
     tr.appendChild(tdActions);
-
     return tr;
 }
 
-/* ==========================================
-   Schedule Formatter
-========================================== */
 
 function formatDispatchSchedule(date, time) {
-    if (!date) return "";
-
-    const iso = time ? `${date}T${time}` : `${date}T00:00`;
+    if (!date) {
+        return "";
+    }
+    const cleanDate = String(date).slice(0, 10);
+    const cleanTime = String(time || "").slice(0, 5);
+    const iso = cleanTime ? `${cleanDate}T${cleanTime}` : `${cleanDate}T00:00`;
     const parsed = new Date(iso);
-
-    if (isNaN(parsed.getTime())) {
+    if (Number.isNaN(parsed.getTime())) {
         return "";
     }
     const datePart = parsed.toLocaleDateString(undefined, {
@@ -342,50 +518,47 @@ function formatDispatchSchedule(date, time) {
         day: "numeric",
         year: "numeric",
     });
-
-    if (!time) {
+    if (!cleanTime) {
         return datePart;
     }
-
     const timePart = parsed.toLocaleTimeString(undefined, {
         hour: "numeric",
         minute: "2-digit",
         hour12: true,
     });
-
     return `${datePart}, ${timePart}`;
 }
 
-/* ==========================================
-   Initialize Add Dispatch
-========================================== */
 
 function initDispatchAdd() {
     const modal = document.getElementById("addDispatchModal");
     const form = document.getElementById("dispatchForm");
-
     if (!modal || !form) {
         return;
     }
     if (form.dataset.dispatchAddInitialized === "true") {
         return;
     }
-
     form.dataset.dispatchAddInitialized = "true";
-
-    /* Reservation Change */
     const reservationSelect = document.getElementById("dispatchReservation");
-    if (reservationSelect) {
-        reservationSelect.addEventListener("change", handleReservationChange);
-    }
-
-    /* Submit */
+    /*
+    |--------------------------------------------------------------------------
+    | Reservation Change
+    |--------------------------------------------------------------------------
+    */
+    reservationSelect?.addEventListener("change", handleReservationChange);
+    /*
+    |--------------------------------------------------------------------------
+    | Submit
+    |--------------------------------------------------------------------------
+    */
     form.addEventListener("submit", async (event) => {
         event.preventDefault();
-        if (typeof validateDispatchForm === "function") {
-            if (!validateDispatchForm(form)) {
-                return;
-            }
+        if (
+            typeof validateDispatchForm === "function" &&
+            !validateDispatchForm(form)
+        ) {
+            return;
         }
         const reservationId = reservationSelect?.value;
         if (!reservationId) {
@@ -394,80 +567,72 @@ function initDispatchAdd() {
             }
             return;
         }
+        const submitButton = form.querySelector('[type="submit"]');
+        if (submitButton) {
+            submitButton.disabled = true;
+        }
+        /*
+            |--------------------------------------------------------------------------
+            | IMPORTANT
+            |--------------------------------------------------------------------------
+            | Do NOT send dispatch_date / departure_time.
+            | DispatchController gets those values from:
+            | Reservation → RoutePlan
+            */
 
         const payload = {
-            dispatch_number: document
-                .getElementById("dispatchNumber")
-                ?.value.trim(),
-            reservation_id: reservationId,
-            dispatch_date: document.getElementById("dispatchDate")?.value,
-            departure_time: document.getElementById("dispatchTime")?.value,
+            dispatch_number:
+                document.getElementById("dispatchNumber")?.value.trim() || null,
+            reservation_id: Number(reservationId),
             arrival_time: null,
-            trip_status: "Assigned",
             remarks:
                 document.getElementById("dispatchNotes")?.value.trim() || null,
         };
 
         try {
-            const response = await fetch("/dispatch", {
+            const data = await dispatchAddApiRequest("/dispatch", {
                 method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-
-                    Accept: "application/json",
-
-                    "X-CSRF-TOKEN": document
-                        .querySelector('meta[name="csrf-token"]')
-                        ?.getAttribute("content"),
-                },
 
                 body: JSON.stringify(payload),
             });
 
-            const data = await response.json();
-
-            if (!response.ok) {
-                console.error(data);
-
-                if (typeof showToast === "function") {
-                    showToast(
-                        data.message || "Failed to create dispatch.",
-                        "error",
-                    );
-                }
-
-                return;
-            }
-
-            /* Successfully saved */
-
+            /*
+                |--------------------------------------------------------------------------
+                | Refresh table
+                |--------------------------------------------------------------------------
+                */
             const tableBody = document.getElementById("dispatchTableBody");
             if (tableBody && data.dispatch) {
                 const row = createDispatchRow(data.dispatch);
-
                 tableBody.insertBefore(row, tableBody.firstChild);
             }
-
-            /* Remove reservation from available list */
-
+            /*
+                |--------------------------------------------------------------------------
+                | Remove reservation from available selector
+                |--------------------------------------------------------------------------
+                */
             availableReservations = availableReservations.filter(
                 (reservation) =>
                     String(reservation.id) !== String(reservationId),
             );
-
             populateReservationSelect(availableReservations);
-
-            /* Reset */
+            /*
+                |--------------------------------------------------------------------------
+                | Reset Form
+                |--------------------------------------------------------------------------
+                */
             form.reset();
             clearReservationDetails();
             form.querySelectorAll(".is-invalid").forEach((element) =>
                 element.classList.remove("is-invalid"),
             );
-
             modal.classList.remove("show");
             document.body.style.overflow = "";
-
-            /* Refresh UI */
+            /*
+                |--------------------------------------------------------------------------
+                | Refresh Supporting UI
+                |--------------------------------------------------------------------------
+                */
             if (typeof updateDispatchStatistics === "function") {
                 updateDispatchStatistics();
             }
@@ -478,18 +643,24 @@ function initDispatchAdd() {
                 refreshDispatchBulkState();
             }
             if (typeof showToast === "function") {
-                showToast("Dispatch created successfully.", "success");
+                showToast(
+                    data.message || "Dispatch created successfully.",
+                    "success",
+                );
             }
         } catch (error) {
             console.error("Dispatch creation error:", error);
-
             if (typeof showToast === "function") {
                 showToast(
-                    "Something went wrong while creating the dispatch.",
+                    error.message ||
+                        "Something went wrong while creating the dispatch.",
                     "error",
                 );
+            }
+        } finally {
+            if (submitButton) {
+                submitButton.disabled = false;
             }
         }
     });
 }
-

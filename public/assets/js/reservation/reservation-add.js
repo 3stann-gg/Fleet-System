@@ -1,4 +1,29 @@
 
+
+async function loadNextReservationNumber() {
+    const numberInput = document.getElementById("reservationNumber");
+    if (!numberInput) {
+        return;
+    }
+    try {
+        const response = await fetch("/reservation/next-number", {
+            headers: {
+                Accept: "application/json",
+            },
+        });
+        const data = await response.json();
+        if (!response.ok) {
+            throw new Error(
+                data.message || "Failed to generate reservation number.",
+            );
+        }
+        numberInput.value = data.reservation_number || "";
+    } catch (error) {
+        console.error("Failed to load next reservation number:", error);
+        numberInput.value = "";
+    }
+}
+
 async function loadReservationOptions() {
     const vehicleSelect = document.getElementById("reservationVehicle");
     const driverSelect = document.getElementById("reservationDriver");
@@ -219,4 +244,5 @@ function initReservationAdd() {
 
 document.addEventListener("DOMContentLoaded", () => {
     initReservationAdd();
+    loadNextReservationNumber();
 });

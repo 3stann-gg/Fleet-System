@@ -194,21 +194,19 @@ function initReservationModal() {
     );
     // Open button
     document.addEventListener("click", async (event) => {
-      const button = event.target.closest("#addReservationBtn");
-
-      if (!button) return;
-
-      event.preventDefault();
-
-      const modal = document.getElementById("addReservationModal");
-      if (!modal) return;
-
-      openReservationModal(modal);
-
-      if (typeof loadReservationOptions === "function") {
-          await loadReservationOptions();
-      }
-  });
+        const button = event.target.closest("#addReservationBtn");
+        if (!button) return;
+        event.preventDefault();
+        const modal = document.getElementById("addReservationModal");
+        if (!modal) return;
+        openReservationModal(modal);
+        if (typeof loadNextReservationNumber === "function") {
+            await loadNextReservationNumber();
+        }
+        if (typeof loadReservationOptions === "function") {
+            await loadReservationOptions();
+        }
+    });
 
     // Close button
     closeButton?.addEventListener("click", () => {
