@@ -9,6 +9,8 @@ use App\Http\Controllers\DispatchController;
 use App\Http\Controllers\MaintenanceController;
 use App\Http\Controllers\FuelLogController;
 use App\Http\Controllers\RoutePlanController;
+use App\Http\Controllers\CostBudgetController;
+
 
 Route::get('/', function () {
     return view('welcome');
@@ -267,11 +269,26 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     /*
     |--------------------------------------------------------------------------
-    | COST ANALYSIS
+    | COST ANALYSIS MODULE
     |--------------------------------------------------------------------------
     */
     Route::view('/cost-analysis', 'cost-analysis.index')
         ->name('cost-analysis');
+
+    Route::get('/cost-analysis/budget', [CostBudgetController::class, 'show'])
+        ->name('cost-analysis.budget.show');
+
+    Route::put('/cost-analysis/budget', [CostBudgetController::class, 'save'])
+        ->name('cost-analysis.budget.save');
+
+    Route::delete('/cost-analysis/budget', [CostBudgetController::class, 'clear'])
+        ->name('cost-analysis.budget.clear');
+
+    Route::get('/cost-analysis/budget/history', [CostBudgetController::class, 'history'])
+        ->name('cost-analysis.budget.history');
+
+    Route::delete('/cost-analysis/budget/history', [CostBudgetController::class, 'clearHistory'])
+        ->name('cost-analysis.budget.history.clear');
 
 
     /*

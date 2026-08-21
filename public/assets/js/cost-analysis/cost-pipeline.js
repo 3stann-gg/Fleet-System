@@ -472,12 +472,7 @@ function getBudgetPeriodLabel(config) {
 }
 
 function renderBudgetPanel(kpis, options = {}) {
-  const config =
-    options.budgetConfig ||
-    costAnalysisState.budgetConfig ||
-    (typeof loadCostBudgetConfiguration === "function"
-      ? loadCostBudgetConfiguration()
-      : null);
+  const config = options.budgetConfig || costAnalysisState.budgetConfig || null;
   const matching = options.matching !== false;
   const configuredBudget =
     config && config.overallBudget != null ? config.overallBudget : null;
@@ -526,7 +521,7 @@ function renderBudgetPanel(kpis, options = {}) {
     renderCategoryBudgetTable(catRows);
   }
   if (typeof renderBudgetHistoryTable === "function") {
-    renderBudgetHistoryTable();
+      void renderBudgetHistoryTable();
   }
 
   if (appliedBudget == null || appliedBudget < 0) {
@@ -675,204 +670,264 @@ function renderTrendsKpis(filtered, range, filters, allNormalized) {
 /**
  * Central Cost Analysis pipeline.
  */
-function refreshCostAnalysis(options = {}) {
+async function refreshCostAnalysis(options = {}) {
   if (isRefreshingCostAnalysis) return;
   isRefreshingCostAnalysis = true;
 
   try {
-    const resetTablePage = options.resetTablePage === true;
-    const refreshSources = options.refreshSources === true;
+      const resetTablePage = options.resetTablePage === true;
+      const refreshSources = options.refreshSources === true;
 
-    const range = getResolvedCostDateRange();
-    if (!range) return;
+      const range = getResolvedCostDateRange();
+      if (!range) return;
 
-    const filters = getCostFilterValues();
-    costAnalysisState.range = range;
-    costAnalysisState.filters = filters;
-    costAnalysisState.analysisView = filters.analysisView;
+      const filters = getCostFilterValues();
+      costAnalysisState.range = range;
+      costAnalysisState.filters = filters;
+      costAnalysisState.analysisView = filters.analysisView;
 
-    if (refreshSources || !costAnalysisState.sources) {
-      costAnalysisState.sources = loadCostAnalysisSources();
-      costAnalysisState.normalized = normalizeCostRecords(
-        costAnalysisState.sources,
+      if (refreshSources || !costAnalysisState.sources) {
+          costAnalysisState.sources = await loadCostAnalysisSources();
+          costAnalysisState.normalized = normalizeCostRecords(
+              costAnalysisState.sources,
+          );
+      }
+
+      const normalized = costAnalysisState.normalized;
+      const filtered = filterCostRecords(normalized, range, filters);
+      costAnalysisState.filtered = filtered;
+
+      const vehicles = costAnalysisState.sources.vehicles || [];
+      const trips = costAnalysisState.sources.dispatches || [];
+
+      if (
+          !costAnalysisState.budgetConfig &&
+          typeof loadCostBudgetConfiguration === "function"
+      ) {
+          costAnalysisState.budgetConfig = await loadCostBudgetConfiguration();
+      }
+      const budgetConfig = costAnalysisState.budgetConfig;
+      const budgetMatches =
+          typeof isCostBudgetMatchingPeriod === "function"
+              ? isCostBudgetMatchingPeriod(budgetConfig, range)
+              : true;
+      const effectiveBudget =
+          budgetMatches && budgetConfig && budgetConfig.overallBudget != null
+              ? budgetConfig.overallBudget
+              : null;
+      costAnalysisState.budgetAmount = effectiveBudget;
+
+      const overviewKpis = computeOverviewKpis(
+          filtered,
+          vehicles,
+          trips,
+          effectiveBudget,
       );
-    }
+      renderOverviewKpis(overviewKpis);
 
-    const normalized = costAnalysisState.normalized;
-    const filtered = filterCostRecords(normalized, range, filters);
-    costAnalysisState.filtered = filtered;
+      const vehicleRows = buildVehicleAggregates(filtered, vehicles);
+      const deptRows = buildDepartmentAggregates(filtered);
+      const monthly = buildMonthlyTotals(filtered, range);
+      const categoryCounts = buildCategoryCounts(filtered);
 
-    const vehicles = costAnalysisState.sources.vehicles || [];
-    const trips = costAnalysisState.sources.dispatches || [];
+      showCostAnalysisView(filters.analysisView);
 
-    if (
-      !costAnalysisState.budgetConfig &&
-      typeof loadCostBudgetConfiguration === "function"
-    ) {
-      costAnalysisState.budgetConfig = loadCostBudgetConfiguration();
-    }
-    const budgetConfig = costAnalysisState.budgetConfig;
-    const budgetMatches =
-      typeof isCostBudgetMatchingPeriod === "function"
-        ? isCostBudgetMatchingPeriod(budgetConfig, range)
-        : true;
-    const effectiveBudget =
-      budgetMatches && budgetConfig && budgetConfig.overallBudget != null
-        ? budgetConfig.overallBudget
-        : null;
-    costAnalysisState.budgetAmount = effectiveBudget;
-
-    const overviewKpis = computeOverviewKpis(
-      filtered,
-      vehicles,
-      trips,
-      effectiveBudget,
-    );
-    renderOverviewKpis(overviewKpis);
-
-    const vehicleRows = buildVehicleAggregates(filtered, vehicles);
-    const deptRows = buildDepartmentAggregates(filtered);
-    const monthly = buildMonthlyTotals(filtered, range);
-    const categoryCounts = buildCategoryCounts(filtered);
-
-    showCostAnalysisView(filters.analysisView);
-
-    if (filters.analysisView === "vehicles") {
-      renderVehicleViewKpis(vehicleRows, filtered);
-    } else if (filters.analysisView === "departments") {
-      renderDepartmentViewKpis(deptRows);
-      const note = document.getElementById("deptAvailabilityNote");
-      if (note) {
-        const unassigned = deptRows.find((d) => d.department === "Unassigned");
-        note.hidden = !(unassigned && unassigned.totalCost > 0);
-      }
-    } else if (filters.analysisView === "trips") {
-      renderTripViewState(filtered, trips);
-    } else if (filters.analysisView === "budget") {
-      renderBudgetPanel(overviewKpis, {
-        budgetConfig,
-        matching: budgetMatches,
-        filtered,
-      });
-    } else if (filters.analysisView === "trends") {
-      renderTrendsKpis(filtered, range, filters, normalized);
-    }
-
-    if (typeof renderCostAnalysisCharts === "function") {
-      renderCostAnalysisCharts(filters.analysisView, {
-        categoryCounts,
-        monthly,
-        vehicleRows,
-        deptRows,
-        filtered,
-        budget: overviewKpis.budget,
-        actual: overviewKpis.total,
-      });
-    }
-
-    if (typeof setCostTableConfig === "function") {
-      let tableConfig;
       if (filters.analysisView === "vehicles") {
-        tableConfig = {
-          columns: [
-            { key: "vehicle", label: "Vehicle", type: "text" },
-            { key: "plateNumber", label: "Plate Number", type: "text" },
-            { key: "type", label: "Type", type: "text" },
-            { key: "department", label: "Department", type: "text" },
-            { key: "fuelCost", label: "Fuel Cost", type: "currency" },
-            { key: "maintenanceCost", label: "Maintenance Cost", type: "currency" },
-            { key: "otherCost", label: "Other Cost", type: "currency" },
-            { key: "totalCost", label: "Total Cost", type: "currency" },
-            { key: "costShare", label: "Cost Share", type: "percent" },
-          ],
-          rows: vehicleRows,
-          emptyMessage: "No vehicle cost data is available.",
-          searchable: ["vehicle", "plateNumber", "type", "department"],
-        };
+          renderVehicleViewKpis(vehicleRows, filtered);
       } else if (filters.analysisView === "departments") {
-        tableConfig = {
-          columns: [
-            { key: "department", label: "Department", type: "text" },
-            { key: "fuelCost", label: "Fuel Cost", type: "currency" },
-            { key: "maintenanceCost", label: "Maintenance Cost", type: "currency" },
-            { key: "tripCost", label: "Trip Cost", type: "currency" },
-            { key: "otherCost", label: "Other Cost", type: "currency" },
-            { key: "totalCost", label: "Total Cost", type: "currency" },
-            { key: "costShare", label: "Cost Share", type: "percent" },
-          ],
-          rows: deptRows,
-          emptyMessage: "No department cost data is available.",
-          searchable: ["department"],
-        };
+          renderDepartmentViewKpis(deptRows);
+          const note = document.getElementById("deptAvailabilityNote");
+          if (note) {
+              const unassigned = deptRows.find(
+                  (d) => d.department === "Unassigned",
+              );
+              note.hidden = !(unassigned && unassigned.totalCost > 0);
+          }
       } else if (filters.analysisView === "trips") {
-        const tripRows = filtered.filter(
-          (r) => r.category === "Trip Operations",
-        );
-        tableConfig = {
-          columns: [
-            { key: "referenceNumber", label: "Trip No.", type: "text" },
-            { key: "date", label: "Date", type: "date" },
-            { key: "vehicleName", label: "Vehicle", type: "text" },
-            { key: "driverName", label: "Driver", type: "text" },
-            { key: "description", label: "Route", type: "text" },
-            { key: "distance", label: "Distance", type: "number" },
-            { key: "totalCost", label: "Total Cost", type: "currency" },
-            { key: "status", label: "Status", type: "text" },
-          ],
-          rows: tripRows,
-          emptyMessage: "No trip cost data is available.",
-          searchable: [
-            "referenceNumber",
-            "vehicleName",
-            "driverName",
-            "description",
-            "status",
-          ],
-        };
-      } else {
-        tableConfig = {
-          columns: [
-            { key: "date", label: "Date", type: "date" },
-            { key: "referenceNumber", label: "Reference", type: "text" },
-            { key: "category", label: "Category", type: "text" },
-            { key: "description", label: "Description", type: "text" },
-            { key: "vehicleName", label: "Vehicle", type: "text" },
-            { key: "department", label: "Department", type: "text" },
-            { key: "sourceModule", label: "Source", type: "text" },
-            { key: "quantity", label: "Quantity", type: "number" },
-            { key: "unitCost", label: "Unit Cost", type: "currency" },
-            { key: "totalCost", label: "Total Cost", type: "currency" },
-            { key: "status", label: "Status", type: "text" },
-          ],
-          rows: filtered.map((r) => ({
-            ...r,
-            department: r.department || "Unassigned",
-          })),
-          emptyMessage: "No cost records found for the selected filters.",
-          searchable: [
-            "referenceNumber",
-            "category",
-            "description",
-            "vehicleName",
-            "plateNumber",
-            "department",
-            "sourceModule",
-            "status",
-          ],
-        };
+          renderTripViewState(filtered, trips);
+      } else if (filters.analysisView === "budget") {
+          renderBudgetPanel(overviewKpis, {
+              budgetConfig,
+              matching: budgetMatches,
+              filtered,
+          });
+      } else if (filters.analysisView === "trends") {
+          renderTrendsKpis(filtered, range, filters, normalized);
       }
 
-      setCostTableConfig(tableConfig, { resetPage: resetTablePage });
-    }
+      if (typeof renderCostAnalysisCharts === "function") {
+          renderCostAnalysisCharts(filters.analysisView, {
+              categoryCounts,
+              monthly,
+              vehicleRows,
+              deptRows,
+              filtered,
+              budget: overviewKpis.budget,
+              actual: overviewKpis.total,
+          });
+      }
 
-    populateCostFilterOptions(costAnalysisState.sources, filtered);
-    updateCostLastUpdated();
+      if (typeof setCostTableConfig === "function") {
+          let tableConfig;
+          if (filters.analysisView === "vehicles") {
+              tableConfig = {
+                  columns: [
+                      { key: "vehicle", label: "Vehicle", type: "text" },
+                      {
+                          key: "plateNumber",
+                          label: "Plate Number",
+                          type: "text",
+                      },
+                      { key: "type", label: "Type", type: "text" },
+                      { key: "department", label: "Department", type: "text" },
+                      { key: "fuelCost", label: "Fuel Cost", type: "currency" },
+                      {
+                          key: "maintenanceCost",
+                          label: "Maintenance Cost",
+                          type: "currency",
+                      },
+                      {
+                          key: "otherCost",
+                          label: "Other Cost",
+                          type: "currency",
+                      },
+                      {
+                          key: "totalCost",
+                          label: "Total Cost",
+                          type: "currency",
+                      },
+                      {
+                          key: "costShare",
+                          label: "Cost Share",
+                          type: "percent",
+                      },
+                  ],
+                  rows: vehicleRows,
+                  emptyMessage: "No vehicle cost data is available.",
+                  searchable: ["vehicle", "plateNumber", "type", "department"],
+              };
+          } else if (filters.analysisView === "departments") {
+              tableConfig = {
+                  columns: [
+                      { key: "department", label: "Department", type: "text" },
+                      { key: "fuelCost", label: "Fuel Cost", type: "currency" },
+                      {
+                          key: "maintenanceCost",
+                          label: "Maintenance Cost",
+                          type: "currency",
+                      },
+                      { key: "tripCost", label: "Trip Cost", type: "currency" },
+                      {
+                          key: "otherCost",
+                          label: "Other Cost",
+                          type: "currency",
+                      },
+                      {
+                          key: "totalCost",
+                          label: "Total Cost",
+                          type: "currency",
+                      },
+                      {
+                          key: "costShare",
+                          label: "Cost Share",
+                          type: "percent",
+                      },
+                  ],
+                  rows: deptRows,
+                  emptyMessage: "No department cost data is available.",
+                  searchable: ["department"],
+              };
+          } else if (filters.analysisView === "trips") {
+              const tripRows = filtered.filter(
+                  (r) => r.category === "Trip Operations",
+              );
+              tableConfig = {
+                  columns: [
+                      {
+                          key: "referenceNumber",
+                          label: "Trip No.",
+                          type: "text",
+                      },
+                      { key: "date", label: "Date", type: "date" },
+                      { key: "vehicleName", label: "Vehicle", type: "text" },
+                      { key: "driverName", label: "Driver", type: "text" },
+                      { key: "description", label: "Route", type: "text" },
+                      { key: "distance", label: "Distance", type: "number" },
+                      {
+                          key: "totalCost",
+                          label: "Total Cost",
+                          type: "currency",
+                      },
+                      { key: "status", label: "Status", type: "text" },
+                  ],
+                  rows: tripRows,
+                  emptyMessage: "No trip cost data is available.",
+                  searchable: [
+                      "referenceNumber",
+                      "vehicleName",
+                      "driverName",
+                      "description",
+                      "status",
+                  ],
+              };
+          } else {
+              tableConfig = {
+                  columns: [
+                      { key: "date", label: "Date", type: "date" },
+                      {
+                          key: "referenceNumber",
+                          label: "Reference",
+                          type: "text",
+                      },
+                      { key: "category", label: "Category", type: "text" },
+                      {
+                          key: "description",
+                          label: "Description",
+                          type: "text",
+                      },
+                      { key: "vehicleName", label: "Vehicle", type: "text" },
+                      { key: "department", label: "Department", type: "text" },
+                      { key: "sourceModule", label: "Source", type: "text" },
+                      { key: "quantity", label: "Quantity", type: "number" },
+                      { key: "unitCost", label: "Unit Cost", type: "currency" },
+                      {
+                          key: "totalCost",
+                          label: "Total Cost",
+                          type: "currency",
+                      },
+                      { key: "status", label: "Status", type: "text" },
+                  ],
+                  rows: filtered.map((r) => ({
+                      ...r,
+                      department: r.department || "Unassigned",
+                  })),
+                  emptyMessage:
+                      "No cost records found for the selected filters.",
+                  searchable: [
+                      "referenceNumber",
+                      "category",
+                      "description",
+                      "vehicleName",
+                      "plateNumber",
+                      "department",
+                      "sourceModule",
+                      "status",
+                  ],
+              };
+          }
+
+          setCostTableConfig(tableConfig, { resetPage: resetTablePage });
+      }
+
+      populateCostFilterOptions(costAnalysisState.sources, filtered);
+      updateCostLastUpdated();
   } catch (error) {
-    console.error("refreshCostAnalysis failed:", error);
+      console.error("refreshCostAnalysis failed:", error);
+      throw error;
   } finally {
-    queueMicrotask(() => {
-      isRefreshingCostAnalysis = false;
-    });
+      queueMicrotask(() => {
+          isRefreshingCostAnalysis = false;
+      });
   }
 }
 
@@ -882,7 +937,11 @@ function populateCostFilterOptions(sources, filtered) {
   if (vehicleSelect) {
     const current = vehicleSelect.value;
     const names = Array.from(
-      new Set((sources.vehicles || []).map((v) => v.name).filter(Boolean)),
+        new Set(
+            (sources.vehicles || [])
+                .map((vehicle) => getCostVehicleLabel(vehicle))
+                .filter(Boolean),
+        ),
     ).sort((a, b) => a.localeCompare(b));
     vehicleSelect.innerHTML =
       '<option value="all">All Vehicles</option>' +

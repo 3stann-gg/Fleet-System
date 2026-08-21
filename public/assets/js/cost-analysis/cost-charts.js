@@ -22,6 +22,15 @@ const costAnalysisCharts = {
   departmentCosts: null,
 };
 
+function escapeCostChartHtml(value) {
+    return String(value ?? "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+}
+
 function setCostChartEmpty(container, empty) {
   if (!container) return;
   const emptyEl = container.querySelector(".cost-chart-empty");
@@ -37,7 +46,18 @@ function renderCostDonut(containerId, counts) {
   const entries = Object.entries(counts || {}).filter(([, v]) => Number(v) > 0);
   const total = entries.reduce((s, [, v]) => s + Number(v), 0);
   setCostChartEmpty(container, total === 0);
-  if (total === 0) return;
+  if (total === 0) {
+      const donut = container.querySelector(".cost-donut");
+      const legend = container.querySelector(".cost-legend");
+      if (donut) {
+          donut.style.background = "";
+      }
+      if (legend) {
+          legend.innerHTML = "";
+      }
+      costAnalysisCharts.categoryBreakdown = null;
+      return;
+  }
 
   let cursor = 0;
   const segments = entries.map(([label, value], index) => {
@@ -63,66 +83,107 @@ function renderCostDonut(containerId, counts) {
   }
   if (legend) {
     legend.innerHTML = segments
-      .map(
-        (s) => `
+        .map(
+            (s) => `
       <li>
         <span class="cost-legend-swatch" style="background:${s.color}"></span>
-        <span>${s.label}</span>
+        <span>${escapeCostChartHtml(s.label)}</span>
         <strong>${typeof formatCostCurrency === "function" ? formatCostCurrency(s.value) : s.value}</strong>
       </li>`,
-      )
-      .join("");
+        )
+        .join("");
   }
   costAnalysisCharts.categoryBreakdown = { type: "donut", data: segments };
 }
 
 function renderCostBars(containerId, items, options = {}) {
-  const container = document.getElementById(containerId);
-  if (!container) return;
+    const container = document.getElementById(containerId);
+    if (!container) {
+        return;
+    }
+    const list = items || [];
+    const hasData = list.some((item) => Number(item.value) > 0);
+    setCostChartEmpty(container, !hasData);
+    const body = container.querySelector(".cost-bars");
+    if (!hasData) {
+        if (body) {
+            body.innerHTML = "";
+        }
+        return;
+    }
+    if (!body) {
+        return;
+    }
+    const max = Math.max(...list.map((item) => Number(item.value) || 0), 1);
+    const horizontal = options.horizontal === true;
+    body.classList.toggle("is-horizontal", horizontal);
+    const format =
+        options.currency && typeof formatCostCurrency === "function"
+            ? (value) => formatCostCurrency(value)
+            : (value) =>
+                  Number(value).toLocaleString(undefined, {
+                      maximumFractionDigits: 1,
+                  });
+    body.innerHTML = list
+        .map((item, index) => {
+            const value = Number(item.value) || 0;
+            const pct =
+                value > 0 ? Math.max(4, Math.round((value / max) * 100)) : 0;
+            const color = costChartPalette[index % costChartPalette.length];
+            const label = item.label || item.name || "";
+            const safeLabel =
+                typeof escapeCostChartHtml === "function"
+                    ? escapeCostChartHtml(label)
+                    : String(label);
 
-  const list = items || [];
-  const hasData = list.some((i) => Number(i.value) > 0);
-  setCostChartEmpty(container, !hasData);
-  if (!hasData) return;
-
-  const max = Math.max(...list.map((i) => Number(i.value) || 0), 1);
-  const body = container.querySelector(".cost-bars");
-  if (!body) return;
-
-  const horizontal = options.horizontal === true;
-  body.classList.toggle("is-horizontal", horizontal);
-  const format =
-    options.currency && typeof formatCostCurrency === "function"
-      ? (v) => formatCostCurrency(v)
-      : (v) =>
-          Number(v).toLocaleString(undefined, { maximumFractionDigits: 1 });
-
-  body.innerHTML = list
-    .map((item, index) => {
-      const value = Number(item.value) || 0;
-      const pct = Math.max(4, Math.round((value / max) * 100));
-      const color = costChartPalette[index % costChartPalette.length];
-      const label = item.label || item.name || "";
-      if (horizontal) {
-        return `
+            if (horizontal) {
+                return `
           <div class="cost-bar-row">
-            <span class="cost-bar-label" title="${label}">${label}</span>
+            <span
+              class="cost-bar-label"
+              title="${safeLabel}"
+            >
+              ${safeLabel}
+            </span>
             <div class="cost-bar-track">
-              <div class="cost-bar-fill" style="width:${pct}%;background:${color}"></div>
+              <div
+                class="cost-bar-fill"
+                style="
+                  width:${pct}%;
+                  background:${color};
+                "
+              ></div>
             </div>
-            <span class="cost-bar-value">${format(value)}</span>
-          </div>`;
-      }
-      return `
+            <span class="cost-bar-value">
+              ${format(value)}
+            </span>
+          </div>
+        `;
+            }
+            return `
         <div class="cost-bar-col">
           <div class="cost-bar-col-track">
-            <div class="cost-bar-fill vertical" style="height:${pct}%;background:${color}"></div>
+            <div
+              class="cost-bar-fill vertical"
+              style="
+                height:${pct}%;
+                background:${color};
+              "
+            ></div>
           </div>
-          <span class="cost-bar-label" title="${label}">${label}</span>
-          <span class="cost-bar-value">${format(value)}</span>
-        </div>`;
-    })
-    .join("");
+          <span
+            class="cost-bar-label"
+            title="${safeLabel}"
+          >
+            ${safeLabel}
+          </span>
+          <span class="cost-bar-value">
+            ${format(value)}
+          </span>
+        </div>
+      `;
+        })
+        .join("");
 }
 
 function renderCostGroupedBars(containerId, months) {
@@ -144,11 +205,14 @@ function renderCostGroupedBars(containerId, months) {
   body.classList.remove("is-horizontal");
   body.innerHTML = list
     .map((m) => {
-      const fuelPct = Math.max(3, Math.round(((Number(m.fuel) || 0) / max) * 100));
-      const mntPct = Math.max(
-        3,
-        Math.round(((Number(m.maintenance) || 0) / max) * 100),
-      );
+      const fuelValue = Number(m.fuel) || 0;
+      const maintenanceValue = Number(m.maintenance) || 0;
+      const fuelPct =
+          fuelValue > 0 ? Math.max(3, Math.round((fuelValue / max) * 100)) : 0;
+      const mntPct =
+          maintenanceValue > 0
+              ? Math.max(3, Math.round((maintenanceValue / max) * 100))
+              : 0;
       return `
         <div class="cost-bar-col grouped">
           <div class="cost-bar-col-track grouped">

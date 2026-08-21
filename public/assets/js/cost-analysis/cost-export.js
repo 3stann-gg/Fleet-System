@@ -64,11 +64,22 @@ function getCostAnalysisOutputModel() {
       ? costTableConfig.columns.slice()
       : [];
   const range = costAnalysisState.range;
-  const budget =
-    costAnalysisState.budgetConfig ||
-    (typeof loadCostBudgetConfiguration === "function"
-      ? loadCostBudgetConfiguration()
-      : { overallBudget: null, periodType: "filter", notes: "" });
+  const budget = costAnalysisState.budgetConfig || {
+      overallBudget: null,
+      categoryBudgets: {
+          Fuel: null,
+          Maintenance: null,
+          TripOperations: null,
+          ReservationOperations: null,
+          Other: null,
+      },
+      periodType: "filter",
+      startDate: "",
+      endDate: "",
+      notes: "",
+      createdAt: null,
+      updatedAt: null,
+  };
   const actual = sumCost(filtered);
   const overall = budget.overallBudget;
   const matching =
@@ -77,10 +88,16 @@ function getCostAnalysisOutputModel() {
       : true;
   const appliedBudget =
     matching && overall != null && overall >= 0 ? overall : null;
-  const util =
-    appliedBudget != null && appliedBudget > 0
-      ? (actual / appliedBudget) * 100
-      : null;
+  let util = null;
+  if (appliedBudget != null) {
+      if (appliedBudget > 0) {
+          util = (actual / appliedBudget) * 100;
+      } else if (appliedBudget === 0 && actual > 0) {
+          util = 999;
+      } else if (appliedBudget === 0 && actual === 0) {
+          util = 0;
+      }
+  }
 
   const now = new Date();
   let trendSummary = null;
@@ -157,6 +174,41 @@ function escapeCostHtml(value) {
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;");
+}
+
+function formatCostPdfCurrency(value) {
+    const n = Number(value);
+    if (Number.isNaN(n)) {
+        return "PHP 0.00";
+    }
+    return (
+        "PHP " +
+        n.toLocaleString(undefined, {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2,
+        })
+    );
+}
+function formatCostPdfCell(value, col) {
+    if (value == null || value === "") {
+        return "—";
+    }
+    if (col?.type === "currency") {
+        return formatCostPdfCurrency(value);
+    }
+    if (col?.type === "percent") {
+        return formatCostPercent(value);
+    }
+    if (col?.type === "number") {
+        const n = Number(value);
+        if (Number.isNaN(n)) {
+            return String(value);
+        }
+        return n.toLocaleString(undefined, {
+            maximumFractionDigits: 2,
+        });
+    }
+    return String(value);
 }
 
 function formatCostExportCell(value, col) {
@@ -377,26 +429,26 @@ function exportCostAnalysisToPdf() {
     });
     const s = model.statistics;
     pdf.text(
-      "Total: " +
-        formatCostCurrency(s.totalOperatingCost) +
-        "  ·  Fuel: " +
-        formatCostCurrency(s.fuelCost) +
-        "  ·  Maintenance: " +
-        formatCostCurrency(s.maintenanceCost) +
-        "  ·  Rows: " +
-        s.tableRowCount,
-      14,
-      y,
+        "Total: " +
+            formatCostPdfCurrency(s.totalOperatingCost) +
+            "  ·  Fuel: " +
+            formatCostPdfCurrency(s.fuelCost) +
+            "  ·  Maintenance: " +
+            formatCostPdfCurrency(s.maintenanceCost) +
+            "  ·  Rows: " +
+            s.tableRowCount,
+        14,
+        y,
     );
     y += 6;
     if (model.budgetSummary?.configured) {
       pdf.text(
-        "Budget: " +
-          formatCostCurrency(model.budgetSummary.overallBudget) +
-          "  ·  Utilization: " +
-          formatCostPercent(model.budgetSummary.utilization),
-        14,
-        y,
+          "Budget: " +
+              formatCostPdfCurrency(model.budgetSummary.overallBudget) +
+              "  ·  Utilization: " +
+              formatCostPercent(model.budgetSummary.utilization),
+          14,
+          y,
       );
       y += 6;
     }
@@ -411,23 +463,21 @@ function exportCostAnalysisToPdf() {
 
     if (model.columns?.length && model.rows?.length) {
       pdf.autoTable({
-        head: [model.columns.map((c) => c.label)],
-        body: model.rows.map((row) =>
-          model.columns.map((col) =>
-            formatCostExportCell(row[col.key], col),
+          head: [model.columns.map((c) => c.label)],
+          body: model.rows.map((row) =>
+              model.columns.map((col) => formatCostPdfCell(row[col.key], col)),
           ),
-        ),
-        startY: y,
-        styles: { fontSize: 7, cellPadding: 1.4, overflow: "linebreak" },
-        headStyles: {
-          fillColor: [0, 168, 107],
-          textColor: 255,
-          fontStyle: "bold",
-          fontSize: 7,
-        },
-        alternateRowStyles: { fillColor: [245, 247, 250] },
-        margin: { top: 14, right: 10, bottom: 14, left: 10 },
-        showHead: "everyPage",
+          startY: y,
+          styles: { fontSize: 7, cellPadding: 1.4, overflow: "linebreak" },
+          headStyles: {
+              fillColor: [0, 168, 107],
+              textColor: 255,
+              fontStyle: "bold",
+              fontSize: 7,
+          },
+          alternateRowStyles: { fillColor: [245, 247, 250] },
+          margin: { top: 14, right: 10, bottom: 14, left: 10 },
+          showHead: "everyPage",
       });
     }
 
@@ -447,159 +497,231 @@ function exportCostAnalysisToPdf() {
   }
 }
 
-function exportCostAnalysisToExcel() {
-  if (costExportBusy) return;
-  const xlsx = window.XLSX;
-  if (!xlsx?.utils) {
-    showCostExportToast("Excel export is unavailable.", "error");
-    return;
-  }
-  const model = getCostAnalysisOutputModel();
-  if (!hasCostExportableData(model)) {
-    showCostExportToast(
-      "No cost analysis data is available for the selected filters.",
-      "warning",
-    );
-    return;
-  }
-
-  costExportBusy = true;
-  try {
-    const s = model.statistics;
-    const b = model.budgetSummary;
-    const summary = [
-      ["Hospital Information Management System"],
-      ["Fleet & Transportation Management"],
-      ["Cost Analysis"],
-      ["Analysis View", model.analysisView],
-      ["Generated Date", model.generatedDate],
-      ["Generated Time", model.generatedTime],
-      ["Period", model.dateRangeLabel],
-      [],
-      ["Applied Filters"],
-      ...(model.appliedFilters || []).map((l) => [l]),
-      [],
-      ["KPIs"],
-      ["Total Operating Cost", s.totalOperatingCost],
-      ["Fuel Cost", s.fuelCost],
-      ["Maintenance Cost", s.maintenanceCost],
-      ["Matching Records", s.tableRowCount],
-      [],
-      ["Budget"],
-      [
-        "Overall Budget",
-        b.configured ? b.overallBudget : "Not Configured",
-      ],
-      ["Actual", b.actual],
-      ["Remaining", b.remaining],
-      ["Utilization %", b.utilization],
-      ["Period Type", b.periodType],
-      ["Matches Active Range", b.matching ? "Yes" : "No"],
-    ];
-
-    if (model.tripUnavailable) {
-      summary.push([]);
-      summary.push([
-        "Note",
-        "Trip cost analysis is unavailable because no valid monetary trip-cost records exist.",
-      ]);
+async function exportCostAnalysisToExcel() {
+    if (costExportBusy) return;
+    const xlsx = window.XLSX;
+    if (!xlsx?.utils) {
+        showCostExportToast("Excel export is unavailable.", "error");
+        return;
+    }
+    const model = getCostAnalysisOutputModel();
+    if (!hasCostExportableData(model)) {
+        showCostExportToast(
+            "No cost analysis data is available for the selected filters.",
+            "warning",
+        );
+        return;
     }
 
-    const workbook = xlsx.utils.book_new();
-    xlsx.utils.book_append_sheet(
-      workbook,
-      xlsx.utils.aoa_to_sheet(summary),
-      "Summary",
-    );
+    costExportBusy = true;
+    try {
+        const s = model.statistics;
+        const b = model.budgetSummary;
+        const summary = [
+            ["Hospital Information Management System"],
+            ["Fleet & Transportation Management"],
+            ["Cost Analysis"],
+            ["Analysis View", model.analysisView],
+            ["Generated Date", model.generatedDate],
+            ["Generated Time", model.generatedTime],
+            ["Period", model.dateRangeLabel],
+            [],
+            ["Applied Filters"],
+            ...(model.appliedFilters || []).map((l) => [l]),
+            [],
+            ["KPIs"],
+            ["Total Operating Cost", s.totalOperatingCost],
+            ["Fuel Cost", s.fuelCost],
+            ["Maintenance Cost", s.maintenanceCost],
+            ["Matching Records", s.tableRowCount],
+            [],
+            ["Budget"],
+            [
+                "Overall Budget",
+                b.configured ? b.overallBudget : "Not Configured",
+            ],
+            ["Actual", b.actual],
+            ["Remaining", b.remaining],
+            ["Utilization %", b.utilization],
+            ["Period Type", b.periodType],
+            ["Matches Active Range", b.matching ? "Yes" : "No"],
+        ];
 
-    if (model.columns?.length) {
-      const data = [
-        model.columns.map((c) => c.label),
-        ...model.rows.map((row) =>
-          model.columns.map((col) => {
-            const raw = row[col.key];
-            if (
-              (col.type === "currency" || col.type === "number") &&
-              typeof raw === "number"
-            ) {
-              return raw;
+        if (model.tripUnavailable) {
+            summary.push([]);
+            summary.push([
+                "Note",
+                "Trip cost analysis is unavailable because no valid monetary trip-cost records exist.",
+            ]);
+        }
+
+        const workbook = xlsx.utils.book_new();
+        const summarySheet = xlsx.utils.aoa_to_sheet(summary);
+        summarySheet["!cols"] = [{ wch: 32 }, { wch: 48 }];
+        xlsx.utils.book_append_sheet(workbook, summarySheet, "Summary");
+
+        if (model.columns?.length) {
+            const data = [
+                model.columns.map((c) => c.label),
+                ...model.rows.map((row) =>
+                    model.columns.map((col) => {
+                        const raw = row[col.key];
+                        if (
+                            (col.type === "currency" ||
+                                col.type === "number") &&
+                            typeof raw === "number"
+                        ) {
+                            return raw;
+                        }
+                        if (col.type === "percent" && typeof raw === "number")
+                            return raw;
+                        return raw == null ? "" : raw;
+                    }),
+                ),
+            ];
+            const sheetName =
+                model.analysisView === "vehicles"
+                    ? "Vehicle Costs"
+                    : model.analysisView === "departments"
+                      ? "Department Costs"
+                      : model.analysisView === "trips"
+                        ? "Trip Costs"
+                        : model.analysisView === "budget"
+                          ? "Budget Analysis"
+                          : model.analysisView === "trends"
+                            ? "Cost Trends"
+                            : "Cost Records";
+            const dataSheet = xlsx.utils.aoa_to_sheet(data);
+            dataSheet["!cols"] = model.columns.map((column) => {
+                if (column.type === "currency") {
+                    return { wch: 18 };
+                }
+                if (column.type === "percent") {
+                    return { wch: 16 };
+                }
+                if (column.type === "date") {
+                    return { wch: 14 };
+                }
+                if (column.key === "description") {
+                    return { wch: 36 };
+                }
+                if (column.key === "vehicle" || column.key === "vehicleName") {
+                    return { wch: 30 };
+                }
+                if (column.key === "department") {
+                    return { wch: 24 };
+                }
+                return { wch: 20 };
+            });
+            xlsx.utils.book_append_sheet(
+                workbook,
+                dataSheet,
+                sheetName.slice(0, 31),
+            );
+        }
+
+        if (
+            model.analysisView === "budget" &&
+            model.categoryBudgetRows?.length
+        ) {
+            const cat = [
+                [
+                    "Category",
+                    "Budget",
+                    "Actual",
+                    "Remaining",
+                    "Utilization",
+                    "Status",
+                ],
+                ...model.categoryBudgetRows.map((r) => [
+                    r.category,
+                    r.budget,
+                    r.actual,
+                    r.remaining,
+                    r.utilization,
+                    r.status,
+                ]),
+            ];
+            const categorySheet = xlsx.utils.aoa_to_sheet(cat);
+            categorySheet["!cols"] = [
+                { wch: 26 },
+                { wch: 18 },
+                { wch: 18 },
+                { wch: 18 },
+                { wch: 16 },
+                { wch: 18 },
+            ];
+            xlsx.utils.book_append_sheet(
+                workbook,
+                categorySheet,
+                "Category Budgets",
+            );
+        }
+
+        if (model.analysisView === "budget") {
+            let history = [];
+
+            if (typeof loadCostBudgetHistory === "function") {
+                history = await loadCostBudgetHistory();
             }
-            if (col.type === "percent" && typeof raw === "number") return raw;
-            return raw == null ? "" : raw;
-          }),
-        ),
-      ];
-      const sheetName =
-        model.analysisView === "vehicles"
-          ? "Vehicle Costs"
-          : model.analysisView === "departments"
-            ? "Department Costs"
-            : model.analysisView === "trips"
-              ? "Trip Costs"
-              : model.analysisView === "budget"
-                ? "Budget Analysis"
-                : model.analysisView === "trends"
-                  ? "Cost Trends"
-                  : "Cost Records";
-      xlsx.utils.book_append_sheet(
-        workbook,
-        xlsx.utils.aoa_to_sheet(data),
-        sheetName.slice(0, 31),
-      );
-    }
 
-    if (model.analysisView === "budget" && model.categoryBudgetRows?.length) {
-      const cat = [
-        ["Category", "Budget", "Actual", "Remaining", "Utilization", "Status"],
-        ...model.categoryBudgetRows.map((r) => [
-          r.category,
-          r.budget,
-          r.actual,
-          r.remaining,
-          r.utilization,
-          r.status,
-        ]),
-      ];
-      xlsx.utils.book_append_sheet(
-        workbook,
-        xlsx.utils.aoa_to_sheet(cat),
-        "Category Budgets",
-      );
-    }
+            const hist = [
+                [
+                    "Action",
+                    "Previous Budget",
+                    "New Budget",
+                    "Period",
+                    "Changed At",
+                ],
 
-    if (model.analysisView === "budget") {
-      const history =
-        typeof loadCostBudgetHistory === "function"
-          ? loadCostBudgetHistory()
-          : [];
-      const hist = [
-        ["Action", "Previous", "New", "Period", "Changed At"],
-        ...history.map((h) => [
-          h.action,
-          h.previousValue,
-          h.newValue,
-          h.periodType,
-          h.changedAt,
-        ]),
-      ];
-      xlsx.utils.book_append_sheet(
-        workbook,
-        xlsx.utils.aoa_to_sheet(hist),
-        "Budget History",
-      );
-    }
+                ...history.map((item) => [
+                    item.action || "",
+                    item.previousValue,
+                    item.newValue,
+                    item.periodType || "",
+                    item.changedAt || "",
+                ]),
+            ];
 
-    xlsx.writeFile(
-      workbook,
-      "cost-analysis-" + getCostExportDateStamp() + ".xlsx",
-    );
-    showCostExportToast("Cost analysis Excel exported successfully.", "success");
-  } catch (error) {
-    console.error(error);
-    showCostExportToast("Unable to export cost analysis Excel.", "error");
-  } finally {
-    costExportBusy = false;
-  }
+            const historySheet = xlsx.utils.aoa_to_sheet(hist);
+
+            historySheet["!cols"] = [
+                { wch: 16 },
+                { wch: 20 },
+                { wch: 20 },
+                { wch: 18 },
+                { wch: 28 },
+            ];
+
+            xlsx.utils.book_append_sheet(
+                workbook,
+                historySheet,
+                "Budget History",
+            );
+        }
+
+        const viewSlug = String(model.analysisView || "overview").replace(
+            /[^a-z0-9]+/gi,
+            "-",
+        );
+        xlsx.writeFile(
+            workbook,
+            "cost-analysis-" +
+                viewSlug +
+                "-" +
+                getCostExportDateStamp() +
+                ".xlsx",
+        );
+        showCostExportToast(
+            "Cost analysis Excel exported successfully.",
+            "success",
+        );
+    } catch (error) {
+        console.error(error);
+        showCostExportToast("Unable to export cost analysis Excel.", "error");
+    } finally {
+        costExportBusy = false;
+    }
 }
 
 function initCostAnalysisExport() {
@@ -623,9 +745,9 @@ function initCostAnalysisExport() {
   }
   if (excelBtn && excelBtn.dataset.costExcelInit !== "true") {
     excelBtn.dataset.costExcelInit = "true";
-    excelBtn.addEventListener("click", (e) => {
-      e.preventDefault();
-      exportCostAnalysisToExcel();
+    excelBtn.addEventListener("click", async (event) => {
+        event.preventDefault();
+        await exportCostAnalysisToExcel();
     });
   }
 }

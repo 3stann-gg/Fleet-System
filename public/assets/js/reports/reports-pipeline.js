@@ -293,9 +293,11 @@ function matchesVehicleFilter(record, vehicleFilter) {
 }
 
 function matchesDepartmentFilter(record, departmentFilter) {
-  if (!departmentFilter || departmentFilter === "all") return true;
-  if (!record.department) return true; /* not applicable — do not exclude */
-  return record.department === departmentFilter;
+    if (!departmentFilter || departmentFilter === "all") {
+        return true;
+    }
+    const department = record.department || "Unassigned";
+    return department === departmentFilter;
 }
 
 function filterDatedRecords(records, range, filters, options = {}) {
@@ -367,8 +369,10 @@ function normalizeVehicleStatus(status) {
 }
 
 function isActiveReservationStatus(status) {
-  const s = String(status || "").toLowerCase();
-  return s === "pending" || s === "approved" || s === "active";
+    const normalized = String(status || "")
+        .trim()
+        .toLowerCase();
+    return ["pending", "approved", "scheduled"].includes(normalized);
 }
 
 function monthKey(iso) {
@@ -461,9 +465,12 @@ function computeOverviewModel(sources, range, filters) {
   const activeReservations = reservations.filter((r) =>
     isActiveReservationStatus(r.status),
   ).length;
-  const maintenanceCost = maintenance.reduce(
-    (sum, m) => sum + (Number(m.cost) || 0),
-    0,
+  const completedMaintenance = maintenance.filter(
+      (record) => String(record.status).toLowerCase() === "completed",
+  );
+  const maintenanceCost = completedMaintenance.reduce(
+      (sum, record) => sum + (Number(record.cost) || 0),
+      0,
   );
   const fuelCost = fuel.reduce(
     (sum, f) => sum + (Number(f.totalCost) || 0),
@@ -488,14 +495,17 @@ function computeOverviewModel(sources, range, filters) {
   }));
 
   const costByMonth = months.map((key) => ({
-    key,
-    label: monthLabel(key),
-    fuel: fuel
-      .filter((f) => monthKey(f.date) === key)
-      .reduce((s, f) => s + (Number(f.totalCost) || 0), 0),
-    maintenance: maintenance
-      .filter((m) => monthKey(m.date) === key)
-      .reduce((s, m) => s + (Number(m.cost) || 0), 0),
+      key,
+      label: monthLabel(key),
+      fuel: fuel
+          .filter((f) => monthKey(f.date) === key)
+          .reduce((s, f) => s + (Number(f.totalCost) || 0), 0),
+      maintenance: completedMaintenance
+          .filter(
+              (record) =>
+                  monthKey(record.completionDate || record.date) === key,
+          )
+          .reduce((sum, record) => sum + (Number(record.cost) || 0), 0),
   }));
 
   const tripCountsByVehicle = {};
@@ -563,8 +573,12 @@ function computeUtilizationModel(sources, range, filters) {
   const reservations = filterDatedRecords(sources.reservations, range, filters);
 
   const rows = vehicles.map((v) => {
-    const completedTrips = trips.filter((t) => t.vehicleName === v.name).length;
-    const resCount = reservations.filter((r) => r.vehicleName === v.name).length;
+    const completedTrips = trips.filter(
+        (trip) => String(trip.vehicleId) === String(v.id),
+    ).length;
+    const resCount = reservations.filter(
+        (reservation) => String(reservation.vehicleId) === String(v.id),
+    ).length;
     const distance = trips
       .filter((t) => t.vehicleName === v.name)
       .reduce((s, t) => s + (Number(t.distance) || 0), 0);
@@ -635,63 +649,70 @@ function computeUtilizationModel(sources, range, filters) {
 }
 
 function computeTripsModel(sources, range, filters) {
-  const trips = filterDatedRecords(sources.dispatches, range, filters);
-  const statusCounts = {};
-  trips.forEach((t) => {
-    const s = t.status || "Unknown";
-    statusCounts[s] = (statusCounts[s] || 0) + 1;
-  });
-  const months = buildMonthBuckets(range);
-  const overTime = months.map((key) => ({
-    key,
-    label: monthLabel(key),
-    value: trips.filter((t) => monthKey(t.date) === key).length,
-  }));
-  const destCounts = {};
-  trips.forEach((t) => {
-    if (!t.destination) return;
-    destCounts[t.destination] = (destCounts[t.destination] || 0) + 1;
-  });
+    const trips = filterDatedRecords(sources.dispatches, range, filters);
+    const statusCounts = {};
+    trips.forEach((trip) => {
+        const status = trip.status || "Unknown";
+        statusCounts[status] = (statusCounts[status] || 0) + 1;
+    });
+    const ongoing =
+        (statusCounts["En Route"] || 0) + (statusCounts["Arrived"] || 0);
+    const months = buildMonthBuckets(range);
+    const overTime = months.map((key) => ({
+        key,
+        label: monthLabel(key),
+        value: trips.filter((trip) => monthKey(trip.date) === key).length,
+    }));
+    const destCounts = {};
+    trips.forEach((trip) => {
+        if (!trip.destination) {
+            return;
+        }
+        destCounts[trip.destination] = (destCounts[trip.destination] || 0) + 1;
+    });
+    return {
+        kpis: {
+            total: trips.length,
+            completed: statusCounts["Completed"] || 0,
+            ongoing,
+            cancelled: statusCounts["Cancelled"] || 0,
+        },
+        charts: {
+            status: statusCounts,
+            overTime,
+            destinations: Object.entries(destCounts)
+                .map(([name, value]) => ({
+                    name,
+                    value,
+                }))
+                .sort((a, b) => b.value - a.value)
+                .slice(0, 6),
+        },
+        table: {
+            columns: [
+                { key: "tripNumber", label: "Trip No.", type: "text" },
+                { key: "date", label: "Date", type: "date" },
+                { key: "vehicleName", label: "Vehicle", type: "text" },
+                { key: "driverName", label: "Driver", type: "text" },
+                { key: "origin", label: "Origin", type: "text" },
+                { key: "destination", label: "Destination", type: "text" },
+                { key: "status", label: "Status", type: "text" },
+                { key: "distance", label: "Distance (km)", type: "number" },
+                { key: "duration", label: "Duration (min)", type: "number" },
+            ],
 
-  return {
-    kpis: {
-      total: trips.length,
-      completed: statusCounts.Completed || 0,
-      ongoing: statusCounts.Ongoing || 0,
-      cancelled: statusCounts.Cancelled || 0,
-    },
-    charts: {
-      status: statusCounts,
-      overTime,
-      destinations: Object.entries(destCounts)
-        .map(([name, value]) => ({ name, value }))
-        .sort((a, b) => b.value - a.value)
-        .slice(0, 6),
-    },
-    table: {
-      columns: [
-        { key: "tripNumber", label: "Trip No.", type: "text" },
-        { key: "date", label: "Date", type: "date" },
-        { key: "vehicleName", label: "Vehicle", type: "text" },
-        { key: "driverName", label: "Driver", type: "text" },
-        { key: "origin", label: "Origin", type: "text" },
-        { key: "destination", label: "Destination", type: "text" },
-        { key: "status", label: "Status", type: "text" },
-        { key: "distance", label: "Distance (km)", type: "number" },
-        { key: "duration", label: "Duration (min)", type: "number" },
-      ],
-      rows: trips,
-      emptyMessage: "No trip or dispatch records found.",
-      searchable: [
-        "tripNumber",
-        "vehicleName",
-        "driverName",
-        "origin",
-        "destination",
-        "status",
-      ],
-    },
-  };
+            rows: trips,
+            emptyMessage: "No trip or dispatch records found.",
+            searchable: [
+                "tripNumber",
+                "vehicleName",
+                "driverName",
+                "origin",
+                "destination",
+                "status",
+            ],
+        },
+    };
 }
 
 function computeReservationsModel(sources, range, filters) {
@@ -759,7 +780,9 @@ function computeMaintenanceModel(sources, range, filters) {
     statusCounts[m.status] = (statusCounts[m.status] || 0) + 1;
     typeCounts[m.type] = (typeCounts[m.type] || 0) + 1;
   });
-  const totalCost = list.reduce((s, m) => s + (Number(m.cost) || 0), 0);
+  const totalCost = list
+      .filter((record) => String(record.status).toLowerCase() === "completed")
+      .reduce((sum, record) => sum + (Number(record.cost) || 0), 0);
   const months = buildMonthBuckets(range);
   const costOverTime = months.map((key) => ({
     label: monthLabel(key),
@@ -774,45 +797,49 @@ function computeMaintenanceModel(sources, range, filters) {
   });
 
   return {
-    kpis: {
-      total: list.length,
-      scheduled: statusCounts.Scheduled || 0,
-      inProgress: statusCounts["In Progress"] || 0,
-      completed: statusCounts.Completed || 0,
-      totalCost,
-    },
-    charts: {
-      byType: Object.entries(typeCounts).map(([name, value]) => ({
-        name,
-        value,
-      })),
-      status: statusCounts,
-      costOverTime,
-      topVehicles: Object.entries(byVehicle)
-        .map(([name, value]) => ({ name, value }))
-        .sort((a, b) => b.value - a.value)
-        .slice(0, 6),
-    },
-    table: {
-      columns: [
-        { key: "maintenanceNumber", label: "Maintenance No.", type: "text" },
-        { key: "date", label: "Date", type: "date" },
-        { key: "vehicleName", label: "Vehicle", type: "text" },
-        { key: "type", label: "Type", type: "text" },
-        { key: "status", label: "Status", type: "text" },
-        { key: "cost", label: "Cost", type: "number" },
-        { key: "serviceProvider", label: "Service Provider", type: "text" },
-      ],
-      rows: list,
-      emptyMessage: "No maintenance records found.",
-      searchable: [
-        "maintenanceNumber",
-        "vehicleName",
-        "type",
-        "status",
-        "serviceProvider",
-      ],
-    },
+      kpis: {
+          total: list.length,
+          scheduled: statusCounts.Scheduled || 0,
+          inProgress: statusCounts["In Progress"] || 0,
+          completed: statusCounts.Completed || 0,
+          totalCost,
+      },
+      charts: {
+          byType: Object.entries(typeCounts).map(([name, value]) => ({
+              name,
+              value,
+          })),
+          status: statusCounts,
+          costOverTime,
+          topVehicles: Object.entries(byVehicle)
+              .map(([name, value]) => ({ name, value }))
+              .sort((a, b) => b.value - a.value)
+              .slice(0, 6),
+      },
+      table: {
+          columns: [
+              {
+                  key: "maintenanceNumber",
+                  label: "Maintenance No.",
+                  type: "text",
+              },
+              { key: "date", label: "Date", type: "date" },
+              { key: "vehicleName", label: "Vehicle", type: "text" },
+              { key: "type", label: "Type", type: "text" },
+              { key: "status", label: "Status", type: "text" },
+              { key: "cost", label: "Cost", type: "currency" },
+              { key: "serviceProvider", label: "Technician", type: "text" },
+          ],
+          rows: list,
+          emptyMessage: "No maintenance records found.",
+          searchable: [
+              "maintenanceNumber",
+              "vehicleName",
+              "type",
+              "status",
+              "serviceProvider",
+          ],
+      },
   };
 }
 
@@ -843,42 +870,49 @@ function computeFuelModel(sources, range, filters) {
   });
 
   return {
-    kpis: {
-      total: list.length,
-      quantity,
-      totalCost,
-      averagePerLiter: avg,
-    },
-    charts: {
-      qtyOverTime,
-      costOverTime,
-      topVehicles: Object.entries(byVehicle)
-        .map(([name, value]) => ({ name, value }))
-        .sort((a, b) => b.value - a.value)
-        .slice(0, 6),
-      byType: Object.entries(byType).map(([name, value]) => ({ name, value })),
-    },
-    table: {
-      columns: [
-        { key: "fuelRecordNumber", label: "Fuel Record No.", type: "text" },
-        { key: "date", label: "Date", type: "date" },
-        { key: "vehicleName", label: "Vehicle", type: "text" },
-        { key: "fuelType", label: "Fuel Type", type: "text" },
-        { key: "quantity", label: "Quantity (L)", type: "number" },
-        { key: "costPerLiter", label: "Cost per Liter", type: "number" },
-        { key: "totalCost", label: "Total Cost", type: "number" },
-        { key: "odometer", label: "Odometer", type: "number" },
-        { key: "station", label: "Fuel Station", type: "text" },
-      ],
-      rows: list,
-      emptyMessage: "No fuel records found.",
-      searchable: [
-        "fuelRecordNumber",
-        "vehicleName",
-        "fuelType",
-        "station",
-      ],
-    },
+      kpis: {
+          total: list.length,
+          quantity,
+          totalCost,
+          averagePerLiter: avg,
+      },
+      charts: {
+          qtyOverTime,
+          costOverTime,
+          topVehicles: Object.entries(byVehicle)
+              .map(([name, value]) => ({ name, value }))
+              .sort((a, b) => b.value - a.value)
+              .slice(0, 6),
+          byType: Object.entries(byType).map(([name, value]) => ({
+              name,
+              value,
+          })),
+      },
+      table: {
+          columns: [
+              {
+                  key: "fuelRecordNumber",
+                  label: "Fuel Record No.",
+                  type: "text",
+              },
+              { key: "date", label: "Date", type: "date" },
+              { key: "vehicleName", label: "Vehicle", type: "text" },
+              { key: "fuelType", label: "Fuel Type", type: "text" },
+              { key: "quantity", label: "Quantity (L)", type: "number" },
+              { key: "costPerLiter", label: "Cost per Liter", type: "currency" },
+              { key: "totalCost", label: "Total Cost", type: "currency"},
+              { key: "odometer", label: "Odometer", type: "number" },
+              { key: "station", label: "Fuel Station", type: "text" },
+          ],
+          rows: list,
+          emptyMessage: "No fuel records found.",
+          searchable: [
+              "fuelRecordNumber",
+              "vehicleName",
+              "fuelType",
+              "station",
+          ],
+      },
   };
 }
 
@@ -902,13 +936,14 @@ function computeDriversModel(sources, range, filters) {
   });
 
   const rows = drivers.map((d) => {
-    const mine = trips.filter((t) => t.driverName === d.name);
+    const mine = trips.filter((trip) => String(trip.driverId) === String(d.id));
     const completed = mine.filter(
       (t) => String(t.status).toLowerCase() === "completed",
     ).length;
-    const ongoing = mine.filter(
-      (t) => String(t.status).toLowerCase() === "ongoing",
-    ).length;
+    const ongoing = mine.filter((trip) => {
+        const status = String(trip.status || "").toLowerCase();
+        return status === "en route" || status === "arrived";
+    }).length;
     const cancelled = mine.filter(
       (t) => String(t.status).toLowerCase() === "cancelled",
     ).length;
@@ -1078,64 +1113,72 @@ function renderViewKpis(reportType, model) {
 /**
  * Centralized Reports dashboard pipeline.
  */
-function refreshReportsDashboard(options = {}) {
-  if (isRefreshingReports) return;
-  isRefreshingReports = true;
+async function refreshReportsDashboard(options = {}) {
+    if (isRefreshingReports) return;
+    isRefreshingReports = true;
 
-  try {
-    const resetTablePage = options.resetTablePage === true;
-    const refreshSources = options.refreshSources === true;
+    try {
+        const resetTablePage = options.resetTablePage === true;
+        const refreshSources = options.refreshSources === true;
 
-    const range = getResolvedReportDateRange();
-    if (!range) {
-      return;
+        const range = getResolvedReportDateRange();
+        if (!range) {
+            return;
+        }
+
+        const filters = getReportsFilterValues();
+        reportsState.filters = filters;
+        reportsState.range = range;
+        reportsState.reportType = filters.reportType;
+
+        if (refreshSources || !reportsState.sources) {
+            reportsState.sources =
+                typeof getAllReportsSourceData === "function"
+                    ? await getAllReportsSourceData()
+                    : {
+                          vehicles: [],
+                          reservations: [],
+                          dispatches: [],
+                          drivers: [],
+                          maintenance: [],
+                          fuel: [],
+                      };
+        }
+
+        const sources = reportsState.sources;
+        const model = buildActiveReportModel(sources, range, filters);
+
+        /* Overview six-card KPIs — visible on Overview; still used for overview charts */
+        const overview = computeOverviewModel(sources, range, filters);
+        reportsState.lastModel = model;
+        reportsState.lastOverview = overview;
+
+        renderOverviewKpis(overview.kpis);
+
+        const overviewKpis = document.getElementById("overviewKpis");
+        if (overviewKpis) {
+            overviewKpis.hidden = filters.reportType !== "overview";
+        }
+
+        showReportView(filters.reportType);
+        renderViewKpis(filters.reportType, model);
+
+        if (typeof renderReportsCharts === "function") {
+            renderReportsCharts(filters.reportType, model, overview);
+        }
+
+        if (typeof setReportsTableConfig === "function") {
+            setReportsTableConfig(model.table, { resetPage: resetTablePage });
+        }
+
+        updateLastUpdatedIndicator();
+        updateReportsOutputMetaStrip();
+    } catch (error) {
+        console.error("refreshReportsDashboard failed:", error);
+        throw error;
+    } finally {
+        queueMicrotask(() => {
+            isRefreshingReports = false;
+        });
     }
-
-    const filters = getReportsFilterValues();
-    reportsState.filters = filters;
-    reportsState.range = range;
-    reportsState.reportType = filters.reportType;
-
-    if (refreshSources || !reportsState.sources) {
-      reportsState.sources =
-        typeof getAllReportsSourceData === "function"
-          ? getAllReportsSourceData()
-          : { vehicles: [], reservations: [], dispatches: [], drivers: [], maintenance: [], fuel: [] };
-    }
-
-    const sources = reportsState.sources;
-    const model = buildActiveReportModel(sources, range, filters);
-
-    /* Overview six-card KPIs — visible on Overview; still used for overview charts */
-    const overview = computeOverviewModel(sources, range, filters);
-    reportsState.lastModel = model;
-    reportsState.lastOverview = overview;
-
-    renderOverviewKpis(overview.kpis);
-
-    const overviewKpis = document.getElementById("overviewKpis");
-    if (overviewKpis) {
-      overviewKpis.hidden = filters.reportType !== "overview";
-    }
-
-    showReportView(filters.reportType);
-    renderViewKpis(filters.reportType, model);
-
-    if (typeof renderReportsCharts === "function") {
-      renderReportsCharts(filters.reportType, model, overview);
-    }
-
-    if (typeof setReportsTableConfig === "function") {
-      setReportsTableConfig(model.table, { resetPage: resetTablePage });
-    }
-
-    updateLastUpdatedIndicator();
-    updateReportsOutputMetaStrip();
-  } catch (error) {
-    console.error("refreshReportsDashboard failed:", error);
-  } finally {
-    queueMicrotask(() => {
-      isRefreshingReports = false;
-    });
-  }
 }

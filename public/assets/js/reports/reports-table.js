@@ -47,16 +47,16 @@ function getReportsTableSearchableRows(rows) {
 function compareReportValues(a, b, type, dir) {
   const direction = dir === "desc" ? -1 : 1;
 
-  if (type === "number") {
-    const an = Number(a);
-    const bn = Number(b);
-    const aEmpty = Number.isNaN(an);
-    const bEmpty = Number.isNaN(bn);
-    if (aEmpty && bEmpty) return 0;
-    if (aEmpty) return 1;
-    if (bEmpty) return -1;
-    if (an === bn) return 0;
-    return an < bn ? -direction : direction;
+  if (type === "number" || type === "currency" || type === "percent") {
+      const an = Number(a);
+      const bn = Number(b);
+      const aEmpty = Number.isNaN(an);
+      const bEmpty = Number.isNaN(bn);
+      if (aEmpty && bEmpty) return 0;
+      if (aEmpty) return 1;
+      if (bEmpty) return -1;
+      if (an === bn) return 0;
+      return an < bn ? -direction : direction;
   }
 
   if (type === "date") {
@@ -131,21 +131,39 @@ function applyReportsTablePresetState(preset) {
   reportsTableState.page = 1;
 }
 
+function escapeReportsTableHtml(value) {
+    return String(value ?? "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+}
+
 function formatReportCell(value, type) {
-  if (value == null || value === "") return "—";
-  if (type === "number") {
-    const num = Number(value);
-    if (Number.isNaN(num)) return String(value);
-    if (
-      String(value).includes(".") ||
-      Math.abs(num) >= 100 && String(value).match(/\d+\.\d+/)
-    ) {
-      return num.toLocaleString(undefined, { maximumFractionDigits: 2 });
+    if (value == null || value === "") {
+        return "—";
     }
-    /* currency-looking large numbers in cost fields still numeric */
-    return num.toLocaleString(undefined, { maximumFractionDigits: 2 });
-  }
-  return String(value);
+    if (type === "currency") {
+        return typeof formatReportCurrency === "function"
+            ? formatReportCurrency(value)
+            : String(value);
+    }
+    if (type === "percent") {
+        return typeof formatReportPercent === "function"
+            ? formatReportPercent(value)
+            : String(value);
+    }
+    if (type === "number") {
+        const num = Number(value);
+        if (Number.isNaN(num)) {
+            return String(value);
+        }
+        return num.toLocaleString(undefined, {
+            maximumFractionDigits: 2,
+        });
+    }
+    return String(value);
 }
 
 function updateReportsPaginationInfo(total, start, end) {
@@ -250,10 +268,12 @@ function renderReportsTable() {
             : sorted === "desc"
               ? "ph-caret-down"
               : "ph-caret-up-down";
-        return `<th class="${sortable ? "sortable" : ""}" data-field="${col.key}" ${
-          sorted ? `aria-sort="${sorted === "asc" ? "ascending" : "descending"}"` : ""
+        return `<th class="${sortable ? "sortable" : ""}" data-field="${escapeReportsTableHtml(col.key)}"" ${
+            sorted
+                ? `aria-sort="${sorted === "asc" ? "ascending" : "descending"}"`
+                : ""
         }>
-          ${col.label}
+          ${escapeReportsTableHtml(col.label)}
           ${sortable ? `<i class="ph ${icon} sort-icon" aria-hidden="true"></i>` : ""}
         </th>`;
       })
@@ -292,17 +312,12 @@ function renderReportsTable() {
           "<tr>" +
           columns
             .map((col) => {
-              let display = formatReportCell(row[col.key], col.type);
-              if (
-                col.key.toLowerCase().includes("cost") &&
-                typeof row[col.key] === "number"
-              ) {
-                display =
-                  typeof formatReportCurrency === "function"
-                    ? formatReportCurrency(row[col.key])
-                    : display;
-              }
-              return `<td>${display}</td>`;
+              const display = formatReportCell(row[col.key], col.type);
+              return `
+                <td>
+                  ${escapeReportsTableHtml(display)}
+                </td>
+              `;
             })
             .join("") +
           "</tr>"

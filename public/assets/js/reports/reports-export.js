@@ -53,89 +53,91 @@ function getReportsExportFilename(ext) {
   return slug + "-" + getReportsExportDateStamp() + "." + ext;
 }
 
-function buildReportsKpiLines(model) {
-  const k = model.kpis || {};
-  const type = model.reportType;
+function buildReportsKpiLines(model, options = {}) {
+    const k = model.kpis || {};
+    const type = model.reportType;
 
-  const cur =
-    typeof formatReportCurrency === "function"
-      ? formatReportCurrency
-      : (v) => String(v ?? 0);
-  const lit =
-    typeof formatReportLiters === "function"
-      ? formatReportLiters
-      : (v) => String(v ?? 0);
-  const pct =
-    typeof formatReportPercent === "function"
-      ? formatReportPercent
-      : (v) => String(v ?? 0);
+    const cur =
+        typeof options.currencyFormatter === "function"
+            ? options.currencyFormatter
+            : typeof formatReportCurrency === "function"
+              ? formatReportCurrency
+              : (value) => String(value ?? 0);
+    const lit =
+        typeof formatReportLiters === "function"
+            ? formatReportLiters
+            : (v) => String(v ?? 0);
+    const pct =
+        typeof formatReportPercent === "function"
+            ? formatReportPercent
+            : (v) => String(v ?? 0);
 
-  if (type === "overview") {
-    return [
-      ["Total Vehicles", k.totalVehicles ?? 0],
-      ["Available Vehicles", k.availableVehicles ?? 0],
-      ["Completed Trips", k.completedTrips ?? 0],
-      ["Active Reservations", k.activeReservations ?? 0],
-      ["Maintenance Cost", cur(k.maintenanceCost)],
-      ["Fuel Cost", cur(k.fuelCost)],
-    ];
-  }
-  if (type === "utilization") {
-    return [
-      ["Total Vehicles", k.totalVehicles ?? 0],
-      ["Vehicles Used", k.vehiclesUsed ?? 0],
-      ["Available Vehicles", k.availableVehicles ?? 0],
-      ["Utilization Rate", pct(k.utilizationRate)],
-    ];
-  }
-  if (type === "trips") {
-    return [
-      ["Total Trips", k.total ?? 0],
-      ["Completed", k.completed ?? 0],
-      ["Ongoing", k.ongoing ?? 0],
-      ["Cancelled", k.cancelled ?? 0],
-    ];
-  }
-  if (type === "reservations") {
-    return [
-      ["Total Reservations", k.total ?? 0],
-      ["Pending", k.pending ?? 0],
-      ["Approved", k.approved ?? 0],
-      ["Completed", k.completed ?? 0],
-      ["Cancelled", k.cancelled ?? 0],
-    ];
-  }
-  if (type === "maintenance") {
-    return [
-      ["Total Maintenance Records", k.total ?? 0],
-      ["Scheduled", k.scheduled ?? 0],
-      ["In Progress", k.inProgress ?? 0],
-      ["Completed", k.completed ?? 0],
-      ["Total Maintenance Cost", cur(k.totalCost)],
-    ];
-  }
-  if (type === "fuel") {
-    return [
-      ["Total Fuel Records", k.total ?? 0],
-      ["Total Fuel Consumed", lit(k.quantity)],
-      ["Total Fuel Cost", cur(k.totalCost)],
-      ["Average Cost per Liter", cur(k.averagePerLiter) + "/L"],
-    ];
-  }
-  if (type === "drivers") {
-    return [
-      ["Total Drivers", k.total ?? 0],
-      ["Active Drivers", k.active ?? 0],
-      ["Drivers with Completed Trips", k.withTrips ?? 0],
-      [
-        "Average Trips per Active Driver",
-        Number(k.avgTrips || 0).toLocaleString(undefined, {
-          maximumFractionDigits: 1,
-        }),
-      ],
-    ];
-  }
-  return Object.entries(k).map(([key, value]) => [key, value]);
+    if (type === "overview") {
+        return [
+            ["Total Vehicles", k.totalVehicles ?? 0],
+            ["Available Vehicles", k.availableVehicles ?? 0],
+            ["Completed Trips", k.completedTrips ?? 0],
+            ["Active Reservations", k.activeReservations ?? 0],
+            ["Maintenance Cost", cur(k.maintenanceCost)],
+            ["Fuel Cost", cur(k.fuelCost)],
+        ];
+    }
+    if (type === "utilization") {
+        return [
+            ["Total Vehicles", k.totalVehicles ?? 0],
+            ["Vehicles Used", k.vehiclesUsed ?? 0],
+            ["Available Vehicles", k.availableVehicles ?? 0],
+            ["Utilization Rate", pct(k.utilizationRate)],
+        ];
+    }
+    if (type === "trips") {
+        return [
+            ["Total Trips", k.total ?? 0],
+            ["Completed", k.completed ?? 0],
+            ["Ongoing", k.ongoing ?? 0],
+            ["Cancelled", k.cancelled ?? 0],
+        ];
+    }
+    if (type === "reservations") {
+        return [
+            ["Total Reservations", k.total ?? 0],
+            ["Pending", k.pending ?? 0],
+            ["Approved", k.approved ?? 0],
+            ["Completed", k.completed ?? 0],
+            ["Cancelled", k.cancelled ?? 0],
+        ];
+    }
+    if (type === "maintenance") {
+        return [
+            ["Total Maintenance Records", k.total ?? 0],
+            ["Scheduled", k.scheduled ?? 0],
+            ["In Progress", k.inProgress ?? 0],
+            ["Completed", k.completed ?? 0],
+            ["Total Maintenance Cost", cur(k.totalCost)],
+        ];
+    }
+    if (type === "fuel") {
+        return [
+            ["Total Fuel Records", k.total ?? 0],
+            ["Total Fuel Consumed", lit(k.quantity)],
+            ["Total Fuel Cost", cur(k.totalCost)],
+            ["Average Cost per Liter", cur(k.averagePerLiter) + "/L"],
+        ];
+    }
+    if (type === "drivers") {
+        return [
+            ["Total Drivers", k.total ?? 0],
+            ["Active Drivers", k.active ?? 0],
+            ["Drivers with Completed Trips", k.withTrips ?? 0],
+            [
+                "Average Trips per Active Driver",
+                Number(k.avgTrips || 0).toLocaleString(undefined, {
+                    maximumFractionDigits: 1,
+                }),
+            ],
+        ];
+    }
+    return Object.entries(k).map(([key, value]) => [key, value]);
 }
 
 function hasMeaningfulReportData(model) {
@@ -146,6 +148,58 @@ function hasMeaningfulReportData(model) {
     if (typeof v === "number") return v !== 0 && !Number.isNaN(v);
     return Boolean(v);
   });
+}
+
+function formatReportsPdfCurrency(value) {
+    const num = Number(value);
+    if (Number.isNaN(num)) {
+        return "PHP 0.00";
+    }
+    return (
+        "PHP " +
+        num.toLocaleString(undefined, {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2,
+        })
+    );
+}
+
+function normalizeReportsPdfText(value) {
+    if (value == null || value === "") {
+        return "—";
+    }
+    return String(value).replace(/₱\s*/g, "PHP ");
+}
+
+function formatReportsPdfCell(value, col) {
+    if (value == null || value === "") {
+        return "—";
+    }
+    if (col?.type === "currency") {
+        return formatReportsPdfCurrency(value);
+    }
+    const key = String(col?.key || "").toLowerCase();
+    if (
+        (key.includes("cost") ||
+            key === "costperliter" ||
+            key === "totalcost") &&
+        typeof value === "number"
+    ) {
+        return formatReportsPdfCurrency(value);
+    }
+    if (col?.type === "percent" && typeof formatReportPercent === "function") {
+        return formatReportPercent(value);
+    }
+    if (col?.type === "number") {
+        const num = Number(value);
+        if (Number.isNaN(num)) {
+            return normalizeReportsPdfText(value);
+        }
+        return num.toLocaleString(undefined, {
+            maximumFractionDigits: 2,
+        });
+    }
+    return normalizeReportsPdfText(value);
 }
 
 function formatReportsExportCell(value, col) {
@@ -401,8 +455,13 @@ function exportReportsToExcel() {
               columns.map((col) => {
                 const value = formatReportsExportCell(row[col.key], col);
                 /* Prefer raw numbers for numeric columns in Excel */
-                if (col.type === "number" && typeof row[col.key] === "number") {
-                  return row[col.key];
+                if (
+                    (col.type === "number" ||
+                        col.type === "currency" ||
+                        col.type === "percent") &&
+                    typeof row[col.key] === "number"
+                ) {
+                    return row[col.key];
                 }
                 if (
                   (col.key || "").toLowerCase().includes("cost") &&
@@ -416,16 +475,40 @@ function exportReportsToExcel() {
           ];
 
     const workbook = xlsx.utils.book_new();
-    xlsx.utils.book_append_sheet(
-      workbook,
-      xlsx.utils.aoa_to_sheet(summary),
-      "Report Summary",
-    );
-    xlsx.utils.book_append_sheet(
-      workbook,
-      xlsx.utils.aoa_to_sheet(dataSheet),
-      "Report Data",
-    );
+    const summarySheet = xlsx.utils.aoa_to_sheet(summary);
+    summarySheet["!cols"] = [{ wch: 34 }, { wch: 48 }];
+    xlsx.utils.book_append_sheet(workbook, summarySheet, "Report Summary");
+    const reportSheet = xlsx.utils.aoa_to_sheet(dataSheet);
+    reportSheet["!cols"] = (model.columns || []).map((column) => {
+        if (column.type === "currency") {
+            return { wch: 18 };
+        }
+        if (column.type === "date") {
+            return { wch: 14 };
+        }
+
+        if (
+            [
+                "vehicle",
+                "vehicleName",
+                "driverName",
+                "assignedVehicle",
+            ].includes(column.key)
+        ) {
+            return { wch: 30 };
+        }
+
+        if (
+            ["origin", "destination", "purpose", "serviceProvider"].includes(
+                column.key,
+            )
+        ) {
+            return { wch: 28 };
+        }
+        return { wch: 20 };
+    });
+
+    xlsx.utils.book_append_sheet(workbook, reportSheet, "Report Data");
     xlsx.writeFile(workbook, getReportsExportFilename("xlsx"));
     showReportsExportToast("Report exported to Excel successfully.", "success");
   } catch (error) {
@@ -470,7 +553,9 @@ function exportReportsToPdf() {
 
     const columns = model.columns || [];
     const rows = model.rows || [];
-    const kpiLines = buildReportsKpiLines(model);
+    const kpiLines = buildReportsKpiLines(model, {
+        currencyFormatter: formatReportsPdfCurrency,
+    });
     let y = 14;
 
     pdf.setFontSize(16);
@@ -516,7 +601,7 @@ function exportReportsToPdf() {
         head: [columns.map((c) => c.label)],
         body: rows.map((row) =>
           columns.map((col) => {
-            const value = formatReportsExportCell(row[col.key], col);
+            const value = formatReportsPdfCell(row[col.key], col);
             return value == null || value === "" ? "—" : String(value);
           }),
         ),

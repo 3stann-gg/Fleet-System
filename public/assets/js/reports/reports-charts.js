@@ -13,6 +13,15 @@ const reportChartPalette = [
   "#ec4899",
 ];
 
+function escapeReportChartHtml(value) {
+    return String(value ?? "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+}
+
 function setChartEmptyState(container, empty) {
   if (!container) return;
   const emptyEl = container.querySelector(".report-chart-empty");
@@ -28,7 +37,17 @@ function renderDonutChart(containerId, counts) {
   const entries = Object.entries(counts || {}).filter(([, v]) => Number(v) > 0);
   const total = entries.reduce((s, [, v]) => s + Number(v), 0);
   setChartEmptyState(container, total === 0);
-  if (total === 0) return;
+  if (total === 0) {
+      const donut = container.querySelector(".report-donut");
+      const legend = container.querySelector(".report-legend");
+      if (donut) {
+          donut.style.background = "";
+      }
+      if (legend) {
+          legend.innerHTML = "";
+      }
+      return;
+  }
 
   let cursor = 0;
   const segments = entries.map(([label, value], index) => {
@@ -55,61 +74,104 @@ function renderDonutChart(containerId, counts) {
   }
   if (legend) {
     legend.innerHTML = segments
-      .map(
-        (s) => `
+        .map(
+            (s) => `
         <li>
           <span class="report-legend-swatch" style="background:${s.color}"></span>
-          <span>${s.label}</span>
+          <span>${escapeReportChartHtml(s.label)}</span>
           <strong>${s.value}</strong>
         </li>`,
-      )
-      .join("");
+        )
+        .join("");
   }
 }
 
 function renderBarChart(containerId, items, options = {}) {
-  const container = document.getElementById(containerId);
-  if (!container) return;
+    const container = document.getElementById(containerId);
+    if (!container) {
+        return;
+    }
+    const list = (items || []).filter((item) => Number(item.value) >= 0);
+    const hasData = list.some((item) => Number(item.value) > 0);
+    setChartEmptyState(container, !hasData);
+    const body = container.querySelector(".report-bars");
+    if (!body) {
+        return;
+    }
+    if (!hasData) {
+        body.innerHTML = "";
+        return;
+    }
+    const max = Math.max(...list.map((item) => Number(item.value) || 0), 1);
+    const horizontal = options.horizontal === true;
+    body.classList.toggle("is-horizontal", horizontal);
+    const formatValue =
+        options.currency && typeof formatReportCurrency === "function"
+            ? (value) => formatReportCurrency(value)
+            : (value) =>
+                  Number(value).toLocaleString(undefined, {
+                      maximumFractionDigits: 1,
+                  });
+    body.innerHTML = list
+        .map((item, index) => {
+            const value = Number(item.value) || 0;
+            const pct =
+                value > 0 ? Math.max(4, Math.round((value / max) * 100)) : 0;
+            const color = reportChartPalette[index % reportChartPalette.length];
+            const label = item.name || item.label || "";
+            const safeLabel =
+                typeof escapeReportChartHtml === "function"
+                    ? escapeReportChartHtml(label)
+                    : String(label);
+            if (horizontal) {
+                return `
+              <div class="report-bar-row">
+                <span
+                  class="report-bar-label"
+                  title="${safeLabel}"
+                >
+                  ${safeLabel}
+                </span>
+                <div class="report-bar-track">
+                  <div
+                    class="report-bar-fill"
+                    style="
+                      width:${pct}%;
+                      background:${color};
+                    "
+                  ></div>
+                </div>
 
-  const list = (items || []).filter((i) => Number(i.value) >= 0);
-  const hasData = list.some((i) => Number(i.value) > 0);
-  setChartEmptyState(container, !hasData && list.length === 0);
-  if (!hasData && list.length === 0) return;
-  setChartEmptyState(container, !hasData);
-  if (!hasData) return;
-
-  const max = Math.max(...list.map((i) => Number(i.value) || 0), 1);
-  const body = container.querySelector(".report-bars");
-  if (!body) return;
-
-  const horizontal = options.horizontal === true;
-  body.classList.toggle("is-horizontal", horizontal);
-
-  body.innerHTML = list
-    .map((item, index) => {
-      const value = Number(item.value) || 0;
-      const pct = Math.max(4, Math.round((value / max) * 100));
-      const color = reportChartPalette[index % reportChartPalette.length];
-      if (horizontal) {
-        return `
-          <div class="report-bar-row">
-            <span class="report-bar-label" title="${item.name || item.label || ""}">${item.name || item.label || ""}</span>
-            <div class="report-bar-track">
-              <div class="report-bar-fill" style="width:${pct}%;background:${color}"></div>
+                <span class="report-bar-value">
+                  ${formatValue(value)}
+                </span>
+              </div>
+            `;
+            }
+            return `
+            <div class="report-bar-col">
+              <div class="report-bar-col-track">
+                <div
+                  class="report-bar-fill vertical"
+                  style="
+                    height:${pct}%;
+                    background:${color};
+                  "
+                ></div>
+              </div>
+              <span
+                class="report-bar-label"
+                title="${safeLabel}"
+              >
+                ${safeLabel}
+              </span>
+              <span class="report-bar-value">
+                ${formatValue(value)}
+              </span>
             </div>
-            <span class="report-bar-value">${value.toLocaleString(undefined, { maximumFractionDigits: 1 })}</span>
-          </div>`;
-      }
-      return `
-        <div class="report-bar-col">
-          <div class="report-bar-col-track">
-            <div class="report-bar-fill vertical" style="height:${pct}%;background:${color}"></div>
-          </div>
-          <span class="report-bar-label" title="${item.label || item.name || ""}">${item.label || item.name || ""}</span>
-          <span class="report-bar-value">${value.toLocaleString(undefined, { maximumFractionDigits: 1 })}</span>
-        </div>`;
-    })
-    .join("");
+          `;
+        })
+        .join("");
 }
 
 function renderGroupedCostChart(containerId, months) {
@@ -119,7 +181,13 @@ function renderGroupedCostChart(containerId, months) {
   const list = months || [];
   const hasData = list.some((m) => Number(m.fuel) > 0 || Number(m.maintenance) > 0);
   setChartEmptyState(container, !hasData);
-  if (!hasData) return;
+  if (!hasData) {
+      const body = container.querySelector(".report-bars");
+      if (body) {
+          body.innerHTML = "";
+      }
+      return;
+  }
 
   const max = Math.max(
     ...list.flatMap((m) => [Number(m.fuel) || 0, Number(m.maintenance) || 0]),
@@ -131,11 +199,14 @@ function renderGroupedCostChart(containerId, months) {
   body.classList.remove("is-horizontal");
   body.innerHTML = list
     .map((m) => {
-      const fuelPct = Math.max(3, Math.round(((Number(m.fuel) || 0) / max) * 100));
-      const mntPct = Math.max(
-        3,
-        Math.round(((Number(m.maintenance) || 0) / max) * 100),
-      );
+      const fuelValue = Number(m.fuel) || 0;
+      const maintenanceValue = Number(m.maintenance) || 0;
+      const fuelPct =
+          fuelValue > 0 ? Math.max(3, Math.round((fuelValue / max) * 100)) : 0;
+      const mntPct =
+          maintenanceValue > 0
+              ? Math.max(3, Math.round((maintenanceValue / max) * 100))
+              : 0;
       return `
         <div class="report-bar-col grouped">
           <div class="report-bar-col-track grouped">
@@ -207,13 +278,18 @@ function renderReportsCharts(reportType, model, overviewModel) {
       horizontal: true,
     });
     renderDonutChart("chartMaintenanceStatus", model.charts.status);
-    renderBarChart("chartMaintenanceCostOverTime", model.charts.costOverTime);
+    renderBarChart("chartMaintenanceCostOverTime", model.charts.costOverTime, {
+        currency: true,
+    });
     renderBarChart("chartTopMaintenanceVehicles", model.charts.topVehicles, {
-      horizontal: true,
+        horizontal: true,
+        currency: true,
     });
   } else if (reportType === "fuel") {
     renderBarChart("chartFuelQtyOverTime", model.charts.qtyOverTime);
-    renderBarChart("chartFuelCostOverTime", model.charts.costOverTime);
+    renderBarChart("chartFuelCostOverTime", model.charts.costOverTime, {
+        currency: true,
+    });
     renderBarChart("chartTopFuelVehicles", model.charts.topVehicles, {
       horizontal: true,
     });

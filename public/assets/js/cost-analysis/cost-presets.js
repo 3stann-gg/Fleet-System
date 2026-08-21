@@ -102,56 +102,74 @@ function captureCostAnalysisPreset(name) {
   };
 }
 
-function applyCostAnalysisPreset(preset) {
-  if (!preset) return false;
-
-  const setSelect = (id, value, fallback) => {
-    const el = document.getElementById(id);
-    if (!el) return;
-    if ([...el.options].some((o) => o.value === value)) {
-      el.value = value;
-    } else {
-      el.value = fallback;
+async function applyCostAnalysisPreset(preset) {
+    if (!preset) {
+        return false;
     }
-  };
+    const setSelect = (id, value, fallback) => {
+        const el = document.getElementById(id);
+        if (!el) {
+            return;
+        }
+        if ([...el.options].some((option) => option.value === value)) {
+            el.value = value;
+        } else {
+            el.value = fallback;
+        }
+    };
+    setSelect("costDateRange", preset.dateRange, "last30");
+    const start = document.getElementById("costStartDate");
+    const end = document.getElementById("costEndDate");
+    if (start) {
+        start.value = preset.customStartDate || "";
+    }
+    if (end) {
+        end.value = preset.customEndDate || "";
+    }
+    setSelect("costVehicleFilter", preset.vehicle, "all");
+    setSelect("costDepartmentFilter", preset.department, "all");
+    setSelect("costCategoryFilter", preset.category, "all");
+    setSelect("costAnalysisView", preset.analysisView, "overview");
+    if (typeof costTableState !== "undefined") {
+        costTableState.search = preset.tableSearch || "";
+        costTableState.sourceFilter = preset.tableSourceFilter || "all";
+        costTableState.categoryFilter = preset.tableCategoryFilter || "all";
+        costTableState.statusFilter = preset.tableStatusFilter || "all";
+        costTableState.sortField = preset.sortKey || null;
+        costTableState.sortDir = preset.sortDirection || null;
+        costTableState.pageSize = Number(preset.rowsPerPage) || 5;
+        costTableState.page = 1;
+    }
+    const search = document.getElementById("costTableSearch");
+    if (search) {
+        search.value = preset.tableSearch || "";
+    }
+    setSelect("costTableSourceFilter", preset.tableSourceFilter, "all");
+    setSelect("costTableCategoryFilter", preset.tableCategoryFilter, "all");
+    setSelect("costTableStatusFilter", preset.tableStatusFilter, "all");
+    const pageSize = document.getElementById("costTablePageSize");
+    if (pageSize) {
+        pageSize.value = String(Number(preset.rowsPerPage) || 5);
+    }
+    if (typeof syncCostCustomDates === "function") {
+        syncCostCustomDates();
+    }
+    if (typeof refreshCostAnalysis === "function") {
+        await refreshCostAnalysis({
+            resetTablePage: true,
+            reason: "preset-apply",
+        });
+    }
+    return true;
+}
 
-  setSelect("costDateRange", preset.dateRange, "last30");
-  const start = document.getElementById("costStartDate");
-  const end = document.getElementById("costEndDate");
-  if (start) start.value = preset.customStartDate || "";
-  if (end) end.value = preset.customEndDate || "";
-  setSelect("costVehicleFilter", preset.vehicle, "all");
-  setSelect("costDepartmentFilter", preset.department, "all");
-  setSelect("costCategoryFilter", preset.category, "all");
-  setSelect("costAnalysisView", preset.analysisView, "overview");
-
-  if (typeof costTableState !== "undefined") {
-    costTableState.search = preset.tableSearch || "";
-    costTableState.sourceFilter = preset.tableSourceFilter || "all";
-    costTableState.categoryFilter = preset.tableCategoryFilter || "all";
-    costTableState.statusFilter = preset.tableStatusFilter || "all";
-    costTableState.sortField = preset.sortKey || null;
-    costTableState.sortDir = preset.sortDirection || null;
-    costTableState.pageSize = Number(preset.rowsPerPage) || 5;
-    costTableState.page = 1;
-  }
-
-  const search = document.getElementById("costTableSearch");
-  if (search) search.value = preset.tableSearch || "";
-  setSelect("costTableSourceFilter", preset.tableSourceFilter, "all");
-  setSelect("costTableCategoryFilter", preset.tableCategoryFilter, "all");
-  setSelect("costTableStatusFilter", preset.tableStatusFilter, "all");
-  const pageSize = document.getElementById("costTablePageSize");
-  if (pageSize) pageSize.value = String(Number(preset.rowsPerPage) || 5);
-
-  if (typeof syncCostCustomDates === "function") {
-    syncCostCustomDates();
-  }
-
-  if (typeof refreshCostAnalysis === "function") {
-    refreshCostAnalysis({ resetTablePage: true, reason: "preset-apply" });
-  }
-  return true;
+function escapeCostPresetHtml(value) {
+    return String(value ?? "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
 }
 
 function renderCostPresetSelect() {
@@ -163,10 +181,7 @@ function renderCostPresetSelect() {
     '<option value="">Saved presets…</option>' +
     list
       .map((p) => {
-        const safe = p.name
-          .replace(/&/g, "&amp;")
-          .replace(/</g, "&lt;")
-          .replace(/"/g, "&quot;");
+        const safe = escapeCostPresetHtml(p.name);
         return `<option value="${p.id}">${safe}</option>`;
       })
       .join("");
@@ -261,20 +276,42 @@ function initCostAnalysisPresets() {
     saveCostAnalysisPreset();
   });
 
-  document.getElementById("applyCostPreset")?.addEventListener("click", (e) => {
-    e.preventDefault();
+  document.getElementById("applyCostPreset")?.addEventListener("click", async (event) => {
+    event.preventDefault();
     const id = select.value;
-    if (!id) return;
-    const preset = loadCostAnalysisPresets().find((p) => p.id === id);
-    if (!preset) {
-      renderCostPresetSelect();
-      return;
-    }
-    applyCostAnalysisPreset(preset);
-    if (typeof showToast === "function") {
-      showToast("Preset applied: " + preset.name, "success");
-    }
-  });
+      if (!id) {
+        return;
+      }
+      const preset = loadCostAnalysisPresets().find(
+        (item) => item.id === id,
+      );
+      if (!preset) {
+        renderCostPresetSelect();
+        return;
+      }
+      const button = document.getElementById("applyCostPreset");
+      if (button) {
+        button.disabled = true;
+      }
+      try {
+        await applyCostAnalysisPreset(preset);
+        if (typeof showToast === "function") {
+          showToast("Preset applied: " + preset.name, "success");
+        }
+      } catch (error) {
+        console.error("Unable to apply Cost Analysis preset:", error);
+        if (typeof showToast === "function") {
+          showToast(
+            error.message || "Unable to apply preset.",
+            "error",
+          );
+        }
+      } finally {
+        if (button) {
+          button.disabled = false;
+        }
+      }
+    });
 
   document.getElementById("renameCostPreset")?.addEventListener("click", (e) => {
     e.preventDefault();
@@ -297,7 +334,16 @@ function initCostAnalysisPresets() {
       }
       return;
     }
-    preset.name = name.slice(0, 60);
+    if (name.length > 60) {
+        if (typeof showToast === "function") {
+            showToast(
+                "Preset name is too long. Maximum is 60 characters.",
+                "warning",
+            );
+        }
+        return;
+    }
+    preset.name = name;
     preset.updatedAt = new Date().toISOString();
     persistCostAnalysisPresets(list);
     renderCostPresetSelect();

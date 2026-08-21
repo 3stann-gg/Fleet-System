@@ -4,138 +4,310 @@
 
 let reportsPageInitialized = false;
 
+/* ==========================================
+   FILTER OPTION HELPERS
+========================================== */
+function escapeReportOptionHtml(value) {
+    return String(value ?? "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+}
+
 function populateReportVehicleFilter(sources) {
-  const select = document.getElementById("reportVehicleFilter");
-  if (!select) return;
+    const select = document.getElementById("reportVehicleFilter");
 
-  const current = select.value || "all";
-  const names = Array.from(
-    new Set((sources.vehicles || []).map((v) => v.name).filter(Boolean)),
-  ).sort((a, b) => a.localeCompare(b));
+    if (!select) {
+        return;
+    }
 
-  select.innerHTML =
-    '<option value="all">All Vehicles</option>' +
-    names.map((n) => `<option value="${n}">${n}</option>`).join("");
+    const current = select.value || "all";
+    const names = Array.from(
+        new Set(
+            (sources?.vehicles || [])
+                .map((vehicle) => vehicle.name)
+                .filter(Boolean),
+        ),
+    ).sort((a, b) => a.localeCompare(b));
+    select.innerHTML =
+        '<option value="all">All Vehicles</option>' +
+        names
+            .map((name) => {
+                const safeName = escapeReportOptionHtml(name);
+                return `
+          <option value="${safeName}">
+            ${safeName}
+          </option>
+        `;
+            })
+            .join("");
 
-  if ([...select.options].some((o) => o.value === current)) {
-    select.value = current;
-  }
+    if ([...select.options].some((option) => option.value === current)) {
+        select.value = current;
+    }
 }
 
 function populateReportDepartmentFilter(sources) {
-  const select = document.getElementById("reportDepartmentFilter");
-  if (!select) return;
+    const select = document.getElementById("reportDepartmentFilter");
+    if (!select) {
+        return;
+    }
+    const current = select.value || "all";
+    const departments = new Set();
+    (sources?.vehicles || []).forEach((vehicle) => {
+        if (vehicle.department) {
+            departments.add(vehicle.department);
+        }
+    });
+    (sources?.reservations || []).forEach((reservation) => {
+        if (reservation.department) {
+            departments.add(reservation.department);
+        }
+    });
+    (sources?.maintenance || []).forEach((maintenance) => {
+        if (maintenance.department) {
+            departments.add(maintenance.department);
+        }
+    });
+    (sources?.fuel || []).forEach((fuel) => {
+        if (fuel.department) {
+            departments.add(fuel.department);
+        }
+    });
 
-  const current = select.value || "all";
-  const depts = new Set();
-  (sources.vehicles || []).forEach((v) => v.department && depts.add(v.department));
-  (sources.reservations || []).forEach(
-    (r) => r.department && depts.add(r.department),
-  );
+    const names = Array.from(departments).sort((a, b) => a.localeCompare(b));
+    select.innerHTML =
+        '<option value="all">All Departments</option>' +
+        names
+            .map((name) => {
+                const safeName = escapeReportOptionHtml(name);
+                return `
+          <option value="${safeName}">
+            ${safeName}
+          </option>
+        `;
+            })
+            .join("");
 
-  const names = Array.from(depts).sort((a, b) => a.localeCompare(b));
-  select.innerHTML =
-    '<option value="all">All Departments</option>' +
-    names.map((n) => `<option value="${n}">${n}</option>`).join("");
-
-  if ([...select.options].some((o) => o.value === current)) {
-    select.value = current;
-  }
+    if ([...select.options].some((option) => option.value === current)) {
+        select.value = current;
+    }
 }
+
+/* ==========================================
+   CUSTOM DATE INPUTS
+========================================== */
 
 function syncCustomDateInputs() {
-  const preset = document.getElementById("reportDateRange")?.value;
-  const start = document.getElementById("reportStartDate");
-  const end = document.getElementById("reportEndDate");
-  const wrap = document.getElementById("reportCustomDateWrap");
-  const isCustom = preset === "custom";
-
-  if (wrap) wrap.hidden = !isCustom;
-  if (start) {
-    start.disabled = !isCustom;
-    start.required = isCustom;
-  }
-  if (end) {
-    end.disabled = !isCustom;
-    end.required = isCustom;
-  }
+    const preset = document.getElementById("reportDateRange")?.value;
+    const start = document.getElementById("reportStartDate");
+    const end = document.getElementById("reportEndDate");
+    const wrap = document.getElementById("reportCustomDateWrap");
+    const isCustom = preset === "custom";
+    if (wrap) {
+        wrap.hidden = !isCustom;
+    }
+    if (start) {
+        start.disabled = !isCustom;
+        start.required = isCustom;
+    }
+    if (end) {
+        end.disabled = !isCustom;
+        end.required = isCustom;
+    }
 }
 
-function initReportsPage() {
-  if (reportsPageInitialized) return;
-  if (!document.getElementById("reportsPage")) return;
+/* ==========================================
+   REFRESH BUTTON STATE
+========================================== */
+function setReportsRefreshLoading(loading) {
+    const button = document.getElementById("refreshReports");
+    if (!button) {
+        return;
+    }
+    button.disabled = loading;
+    button.innerHTML = loading
+        ? `
+        <i class="ph ph-spinner"></i>
+        Refreshing...
+      `
+        : `
+        <i class="ph ph-arrows-clockwise"></i>
+        Refresh
+      `;
+}
 
-  reportsPageInitialized = true;
-
-  if (typeof initReportsTable === "function") {
-    initReportsTable();
-  }
-
-  /* Seed sources once for filter option population */
-  if (typeof getAllReportsSourceData === "function") {
-    const sources = getAllReportsSourceData();
-    populateReportVehicleFilter(sources);
-    populateReportDepartmentFilter(sources);
-  }
-
-  syncCustomDateInputs();
-
-  const onFilterChange = () => {
+/* ==========================================
+   PAGE INITIALIZATION
+========================================== */
+async function initReportsPage() {
+    if (reportsPageInitialized) {
+        return;
+    }
+    if (!document.getElementById("reportsPage")) {
+        return;
+    }
+    reportsPageInitialized = true;
+    /*
+  |--------------------------------------------------------------------------
+  | Initialize Table
+  |--------------------------------------------------------------------------
+  */
+    if (typeof initReportsTable === "function") {
+        initReportsTable();
+    }
+    /*
+  |--------------------------------------------------------------------------
+  | Load Initial Database Sources
+  |--------------------------------------------------------------------------
+  |
+  | We load once here so Vehicle and Department filters
+  | can be populated before the dashboard renders.
+  |
+  */
+    try {
+        if (typeof getAllReportsSourceData === "function") {
+            reportsState.sources = await getAllReportsSourceData();
+            populateReportVehicleFilter(reportsState.sources);
+            populateReportDepartmentFilter(reportsState.sources);
+        }
+    } catch (error) {
+        console.error("Unable to load Reports filter sources:", error);
+        if (typeof showToast === "function") {
+            showToast(error.message || "Unable to load Reports data.", "error");
+        }
+    }
     syncCustomDateInputs();
-    if (typeof refreshReportsDashboard === "function") {
-      refreshReportsDashboard({ resetTablePage: true, reason: "filter" });
-    }
-  };
+    /*
+  |--------------------------------------------------------------------------
+  | Global Filters
+  |--------------------------------------------------------------------------
+  */
+    const onFilterChange = async () => {
+        syncCustomDateInputs();
+        if (typeof refreshReportsDashboard !== "function") {
+            return;
+        }
+        try {
+            await refreshReportsDashboard({
+                resetTablePage: true,
+                reason: "filter",
+            });
+        } catch (error) {
+            console.error("Unable to apply Reports filters:", error);
+            if (typeof showToast === "function") {
+                showToast(
+                    error.message || "Unable to update Reports.",
+                    "error",
+                );
+            }
+        }
+    };
 
-  [
-    "reportDateRange",
-    "reportStartDate",
-    "reportEndDate",
-    "reportVehicleFilter",
-    "reportDepartmentFilter",
-    "reportTypeFilter",
-  ].forEach((id) => {
-    document.getElementById(id)?.addEventListener("change", onFilterChange);
-  });
-
-  document.getElementById("refreshReports")?.addEventListener("click", () => {
-    if (typeof getAllReportsSourceData === "function") {
-      const sources = getAllReportsSourceData();
-      populateReportVehicleFilter(sources);
-      populateReportDepartmentFilter(sources);
-    }
-    if (typeof refreshReportsDashboard === "function") {
-      refreshReportsDashboard({
-        resetTablePage: false,
-        refreshSources: true,
-        reason: "refresh",
-      });
-    }
-    if (typeof showToast === "function") {
-      showToast("Reports refreshed.", "success");
-    }
-  });
-
-  if (typeof initReportPresets === "function") {
-    initReportPresets();
-  }
-
-  if (typeof initReportsExport === "function") {
-    initReportsExport();
-  }
-
-  if (typeof refreshReportsDashboard === "function") {
-    refreshReportsDashboard({
-      resetTablePage: true,
-      refreshSources: true,
-      reason: "init",
+    [
+        "reportDateRange",
+        "reportStartDate",
+        "reportEndDate",
+        "reportVehicleFilter",
+        "reportDepartmentFilter",
+        "reportTypeFilter",
+    ].forEach((id) => {
+        document.getElementById(id)?.addEventListener("change", onFilterChange);
     });
-  }
+    /*
+  |--------------------------------------------------------------------------
+  | Manual Refresh
+  |--------------------------------------------------------------------------
+  */
+    document
+        .getElementById("refreshReports")
+        ?.addEventListener("click", async () => {
+            if (typeof refreshReportsDashboard !== "function") {
+                return;
+            }
+            setReportsRefreshLoading(true);
+            try {
+                /*
+          |--------------------------------------------------------------------------
+          | Reload real Laravel/MySQL sources
+          |--------------------------------------------------------------------------
+          */
+                await refreshReportsDashboard({
+                    resetTablePage: false,
+                    refreshSources: true,
+                    reason: "refresh",
+                });
+                /*
+          |--------------------------------------------------------------------------
+          | Rebuild filters from refreshed source state
+          |--------------------------------------------------------------------------
+          */
+                populateReportVehicleFilter(reportsState.sources);
+                populateReportDepartmentFilter(reportsState.sources);
+                if (typeof showToast === "function") {
+                    showToast("Reports refreshed.", "success");
+                }
+            } catch (error) {
+                console.error("Unable to refresh Reports:", error);
+                if (typeof showToast === "function") {
+                    showToast(
+                        error.message || "Unable to refresh Reports.",
+                        "error",
+                    );
+                }
+            } finally {
+                setReportsRefreshLoading(false);
+            }
+        });
+    /*
+  |--------------------------------------------------------------------------
+  | Presets
+  |--------------------------------------------------------------------------
+  */
+    if (typeof initReportPresets === "function") {
+        initReportPresets();
+    }
+    /*
+  |--------------------------------------------------------------------------
+  | Export
+  |--------------------------------------------------------------------------
+  */
+    if (typeof initReportsExport === "function") {
+        initReportsExport();
+    }
+
+    /*
+  |--------------------------------------------------------------------------
+  | Initial Dashboard Render
+  |--------------------------------------------------------------------------
+  | reportsState.sources was already loaded above,
+  | so we don't need another six API requests.
+  */
+    if (typeof refreshReportsDashboard === "function") {
+        try {
+            await refreshReportsDashboard({
+                resetTablePage: true,
+                refreshSources: !reportsState.sources,
+                reason: "init",
+            });
+        } catch (error) {
+            console.error("Unable to initialize Reports dashboard:", error);
+            if (typeof showToast === "function") {
+                showToast(
+                    error.message || "Unable to initialize Reports.",
+                    "error",
+                );
+            }
+        }
+    }
 }
 
-/* Auto-init when DOM is ready (include.js may also call) */
 if (document.readyState === "loading") {
-  document.addEventListener("DOMContentLoaded", () => {
-    /* include.js handles after components; keep as fallback for partial loads */
-  });
+    document.addEventListener("DOMContentLoaded", () => {
+        initReportsPage();
+    });
+} else {
+    initReportsPage();
 }

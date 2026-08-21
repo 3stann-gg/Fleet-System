@@ -117,6 +117,15 @@ function formatCostTableCell(value, type) {
   return String(value);
 }
 
+function escapeCostTableHtml(value) {
+    return String(value ?? "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+}
+
 function renderCostTable() {
   const thead = document.getElementById("costTableHead");
   const tbody = document.getElementById("costTableBody");
@@ -171,18 +180,20 @@ function renderCostTable() {
     )}">${costTableConfig.emptyMessage || "No cost records found."}</td></tr>`;
   } else {
     tbody.innerHTML = pageRows
-      .map(
-        (row) =>
-          "<tr>" +
-          columns
-            .map(
-              (col) =>
-                `<td>${formatCostTableCell(row[col.key], col.type)}</td>`,
-            )
-            .join("") +
-          "</tr>",
-      )
-      .join("");
+        .map(
+            (row) =>
+                "<tr>" +
+                columns
+                    .map(
+                        (col) =>
+                            `<td>${escapeCostTableHtml(
+                                formatCostTableCell(row[col.key], col.type),
+                            )}</td>`,
+                    )
+                    .join("") +
+                "</tr>",
+        )
+        .join("");
   }
 
   const info = document.getElementById("costTablePaginationInfo");
@@ -236,6 +247,51 @@ function renderCostTable() {
     );
     pagination.replaceChildren(frag);
   }
+}
+
+function syncCostTableFilters() {
+    const view = costAnalysisState?.analysisView || "overview";
+    const source = document.getElementById("costTableSourceFilter");
+    const category = document.getElementById("costTableCategoryFilter");
+    const status = document.getElementById("costTableStatusFilter");
+    const aggregateView = view === "vehicles" || view === "departments";
+    if (source) {
+        source.disabled = aggregateView;
+        if (aggregateView) {
+            source.value = "all";
+            costTableState.sourceFilter = "all";
+        }
+    }
+    if (category) {
+        category.disabled = aggregateView;
+        if (aggregateView) {
+            category.value = "all";
+            costTableState.categoryFilter = "all";
+        }
+    }
+    if (status) {
+        status.disabled = aggregateView;
+        if (aggregateView) {
+            status.value = "all";
+            costTableState.statusFilter = "all";
+        }
+    }
+}
+
+function setCostTableConfig(config, options = {}) {
+    costTableConfig = config || {
+        columns: [],
+        rows: [],
+        emptyMessage: "No cost records found.",
+        searchable: [],
+    };
+
+    if (options.resetPage) {
+        costTableState.page = 1;
+    }
+
+    syncCostTableFilters();
+    renderCostTable();
 }
 
 function initCostTable() {

@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', 'Reports &amp; Analytics | HIMS Fleet')
+@section('title', 'Reports & Analytics | HIMS Fleet')
 
 @section('content')
 
