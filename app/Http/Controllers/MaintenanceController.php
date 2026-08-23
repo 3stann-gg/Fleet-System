@@ -4,6 +4,9 @@ namespace App\Http\Controllers;
 
 use App\Models\Maintenance;
 use App\Models\Vehicle;
+use App\Models\FleetSetting;
+use App\Services\FleetNotificationService;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
@@ -13,15 +16,214 @@ class MaintenanceController extends Controller
     /**
      * Display a listing of maintenance records.
      */
+    private function getMaintenanceSettings(): array
+    {
+        $record = FleetSetting::query()
+            ->latest('id')
+            ->first();
+        $settings = $record?->settings ?? [];
+        $maintenanceSettings =
+            $settings['maintenance'] ?? [];
+        return [
+            'overdueWarnDays' => max(
+                1,
+                min(
+                    90,
+                    (int) (
+                        $maintenanceSettings['overdueWarnDays']
+                        ?? 3
+                    )
+                )
+            ),
+
+            'requireCost' =>
+                $maintenanceSettings['requireCost']
+                ?? true,
+
+            'defaultType' =>
+                trim(
+                    (string) (
+                        $maintenanceSettings['defaultType']
+                        ?? 'Preventive Maintenance'
+                    )
+                ) ?: 'Preventive Maintenance',
+        ];
+    }
+
+    private function getMaintenanceScheduleState(
+        ?string $nextSchedule,
+        int $warningDays
+    ): array {
+        if (!$nextSchedule) {
+            return [
+                'days' => null,
+                'overdue' => false,
+                'dueSoon' => false,
+            ];
+        }
+
+        $today = now()->startOfDay();
+
+        $schedule = Carbon::parse(
+            $nextSchedule
+        )->startOfDay();
+
+        $days =
+            $today->diffInDays(
+                $schedule,
+                false
+            );
+
+        return [
+            'days' => $days,
+            'overdue' => $days < 0,
+            'dueSoon' =>
+                $days >= 0 &&
+                $days <= $warningDays,
+        ];
+    }
+
+    private function createMaintenanceDueNotification(
+        Maintenance $maintenance,
+        int $warningDays
+    ): void {
+        if (!$maintenance->next_schedule) {
+            return;
+        }
+
+        $state =
+            $this->getMaintenanceScheduleState(
+                Carbon::parse(
+                    $maintenance->next_schedule
+                )->format('Y-m-d'),
+                $warningDays
+            );
+
+        if (
+            !$state['overdue'] &&
+            !$state['dueSoon']
+        ) {
+            return;
+        }
+
+        $vehicleLabel = trim(
+            ($maintenance->vehicle?->brand ?? '') .
+            ' ' .
+            ($maintenance->vehicle?->model ?? '')
+        );
+
+        if ($vehicleLabel === '') {
+            $vehicleLabel = 'Vehicle';
+        }
+
+        if ($state['overdue']) {
+            $daysOverdue =
+                abs($state['days']);
+
+            $message =
+                "{$vehicleLabel} maintenance {$maintenance->maintenance_number} is overdue by {$daysOverdue} day" .
+                ($daysOverdue === 1 ? '' : 's') .
+                '.';
+        } else {
+            $days =
+                $state['days'];
+
+            $when =
+                $days === 0
+                    ? 'today'
+                    : "in {$days} day" .
+                        ($days === 1 ? '' : 's');
+
+            $message =
+                "{$vehicleLabel} maintenance {$maintenance->maintenance_number} is due {$when}.";
+        }
+
+        $eventKey =
+            'maintenance_due:' .
+            $maintenance->id .
+            ':' .
+            Carbon::parse(
+                $maintenance->next_schedule
+            )->format('Y-m-d');
+
+        FleetNotificationService::createUniqueWhenEnabled(
+            'maintenanceDue',
+            $state['overdue']
+                ? 'Maintenance Overdue'
+                : 'Maintenance Due Soon',
+            $message,
+            $eventKey,
+            true,
+            route('maintenance')
+        );
+    }
+
     public function index(Request $request)
     {
+        $maintenanceSettings =
+            $this->getMaintenanceSettings();
+
+        $warningDays =
+            $maintenanceSettings['overdueWarnDays'];
+
         $maintenances = Maintenance::with('vehicle')
             ->orderBy('id', 'asc')
-            ->get();
+            ->get()
+            ->map(function ($maintenance) use ($warningDays) {
+                $daysUntilNextSchedule = null;
+                $isOverdue = false;
+                $isDueSoon = false;
+
+                if ($maintenance->next_schedule) {
+                    $today = now()->startOfDay();
+
+                    $nextSchedule =
+                        Carbon::parse(
+                            $maintenance->next_schedule
+                        )->startOfDay();
+
+                    $daysUntilNextSchedule =
+                        $today->diffInDays(
+                            $nextSchedule,
+                            false
+                        );
+
+                    $isOverdue =
+                        $daysUntilNextSchedule < 0;
+
+                    $isDueSoon =
+                        !$isOverdue &&
+                        $daysUntilNextSchedule <=
+                            $warningDays;
+                }
+
+                $maintenance->setAttribute(
+                    'days_until_next_schedule',
+                    $daysUntilNextSchedule
+                );
+
+                $maintenance->setAttribute(
+                    'maintenance_overdue',
+                    $isOverdue
+                );
+
+                $maintenance->setAttribute(
+                    'maintenance_due_soon',
+                    $isDueSoon
+                );
+
+                return $maintenance;
+            });
 
         if ($request->expectsJson()) {
             return response()->json([
-                'maintenances' => $maintenances,
+                'maintenances' =>
+                    $maintenances,
+
+                'settings' => [
+                    'overdue_warn_days' =>
+                        $warningDays,
+                ],
             ]);
         }
 
@@ -48,6 +250,15 @@ class MaintenanceController extends Controller
      */
     public function store(Request $request)
     {
+        $maintenanceSettings =
+        $this->getMaintenanceSettings();
+        if (!$request->filled('maintenance_type')) {
+            $request->merge([
+                'maintenance_type' =>
+                    $maintenanceSettings['defaultType'],
+            ]);
+        }
+
         $validator = Validator::make(
             $request->all(),
             [
@@ -140,9 +351,24 @@ class MaintenanceController extends Controller
 
         try {
             $result = DB::transaction(function () use (
-                $validator
+                $validator,
+                $maintenanceSettings
             ) {
                 $validated = $validator->validated();
+
+                if (
+                    $maintenanceSettings['requireCost'] &&
+                    ($validated['status'] ?? null) === 'Completed' &&
+                    (
+                        !isset($validated['cost']) ||
+                        $validated['cost'] === null ||
+                        $validated['cost'] === ''
+                    )
+                ) {
+                    throw new \Exception(
+                        'Cost is required when maintenance is completed.'
+                    );
+                }
 
                 $vehicle = Vehicle::lockForUpdate()
                     ->findOrFail($validated['vehicle_id']);
@@ -196,6 +422,11 @@ class MaintenanceController extends Controller
                 return $maintenance;
             });
 
+            $this->createMaintenanceDueNotification(
+                $result,
+                $maintenanceSettings['overdueWarnDays']
+            );
+
             return response()->json([
                 'success' => true,
                 'message' => 'Maintenance record added successfully.',
@@ -229,6 +460,9 @@ public function update(
     Request $request,
     Maintenance $maintenance
 ) {
+    $maintenanceSettings =
+        $this->getMaintenanceSettings();
+
     $validator = Validator::make(
         $request->all(),
         [
@@ -309,7 +543,8 @@ public function update(
     try {
         $result = DB::transaction(function () use (
             $validator,
-            $maintenance
+            $maintenance,
+            $maintenanceSettings
         ) {
             /*
             |--------------------------------------------------------------------------
@@ -318,6 +553,16 @@ public function update(
             */
             $maintenance = Maintenance::lockForUpdate()
                 ->findOrFail($maintenance->id);
+
+            $previousNextSchedule =
+                $maintenance->next_schedule
+                    ? Carbon::parse(
+                        $maintenance->next_schedule
+                    )->format('Y-m-d')
+                    : null;
+
+            $previousStatus =
+                $maintenance->status;
 
             /*
             |--------------------------------------------------------------------------
@@ -335,6 +580,19 @@ public function update(
             $currentStatus = $maintenance->status;
             $newStatus = $validated['status'];
 
+            if (
+                $maintenanceSettings['requireCost'] &&
+                $newStatus === 'Completed' &&
+                (
+                    !isset($validated['cost']) ||
+                    $validated['cost'] === null ||
+                    $validated['cost'] === ''
+                )
+            ) {
+                throw new \Exception(
+                    'Cost is required before maintenance can be completed.'
+                );
+            }
             /*
             |--------------------------------------------------------------------------
             | Maintenance Status Lifecycle
@@ -502,13 +760,50 @@ public function update(
             */
             $maintenance->load('vehicle');
 
-            return $maintenance;
+            return [
+                'maintenance' =>
+                    $maintenance,
+                'previousNextSchedule' =>
+                    $previousNextSchedule,
+                'previousStatus' =>
+                    $previousStatus,
+            ];
         });
+
+        $updatedMaintenance =
+            $result['maintenance'];
+        $currentNextSchedule =
+            $updatedMaintenance->next_schedule
+                ? Carbon::parse(
+                    $updatedMaintenance->next_schedule
+                )->format('Y-m-d')
+                : null;
+        $scheduleChanged =
+            $result['previousNextSchedule'] !==
+            $currentNextSchedule;
+        $statusChanged =
+            $result['previousStatus'] !==
+            $updatedMaintenance->status;
+
+        if (
+            $currentNextSchedule &&
+            (
+                $scheduleChanged ||
+                $statusChanged
+            )
+        ) {
+            $this->createMaintenanceDueNotification(
+                $updatedMaintenance,
+                $maintenanceSettings['overdueWarnDays']
+            );
+        }
 
         return response()->json([
             'success' => true,
-            'message' => 'Maintenance record updated successfully.',
-            'maintenance' => $result,
+            'message' =>
+                'Maintenance record updated successfully.',
+            'maintenance' =>
+                $updatedMaintenance,
         ]);
 
     } catch (\Exception $e) {

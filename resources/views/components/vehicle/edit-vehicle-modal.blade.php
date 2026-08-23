@@ -55,13 +55,16 @@
           </div>
           -->
           <div class="form-group">
-            <label for="editVehiclePlate">Plate Number</label>
+            <label for="editVehiclePlate">
+                Plate Number
+                <span id="editVehiclePlateRequiredMark">*</span>
+            </label>
             <input
               type="text"
               id="editVehiclePlate"
               name="plate_number"
               placeholder="ABC-1234"
-              required
+
             />
           </div>
 

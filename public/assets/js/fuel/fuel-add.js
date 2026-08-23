@@ -2,6 +2,106 @@
    Add Fuel Record
 ========================================== */
 
+/* ==========================================
+   Fuel Module Settings
+========================================== */
+
+window.getFuelModuleSettings =
+    window.getFuelModuleSettings ||
+    async function () {
+        const defaults = {
+            requireOdometer: true,
+            requireStation: false,
+            highCostAlert: 5000,
+        };
+
+        try {
+            const response = await fetch(
+                "/settings/data",
+                {
+                    headers: {
+                        Accept: "application/json",
+                    },
+                    credentials: "same-origin",
+                }
+            );
+
+            if (!response.ok) {
+                throw new Error(
+                    "Unable to load Fuel settings."
+                );
+            }
+            const data =
+                await response.json();
+            const settings =
+                data?.settings?.fuel;
+            if (
+                !settings ||
+                typeof settings !== "object"
+            ) {
+                return defaults;
+            }
+            return {
+                requireOdometer:
+                    settings.requireOdometer !== false,
+                requireStation:
+                    settings.requireStation === true,
+                highCostAlert:
+                    Math.max(
+                        0,
+                        Number(
+                            settings.highCostAlert ??
+                                5000
+                        )
+                    ),
+            };
+        } catch (error) {
+            console.error(
+                "Fuel settings load error:",
+                error
+            );
+            return defaults;
+        }
+    };
+
+function applyFuelAddSettings(settings) {
+    const odometer = document.getElementById("fuelOdometer");
+    const odometerMark = document.getElementById("fuelOdometerRequiredMark");
+    const station = document.getElementById("fuelStation");
+    const stationMark = document.getElementById("fuelStationRequiredMark");
+    const requireOdometer = settings.requireOdometer === true;
+    const requireStation = settings.requireStation === true;
+
+    if (odometer) {
+        odometer.required = requireOdometer;
+    }
+    if (odometerMark) {
+        odometerMark.hidden = !requireOdometer;
+    }
+    if (station) {
+        station.required = requireStation;
+    }
+    if (stationMark) {
+        stationMark.hidden = !requireStation;
+    }
+}
+
+function updateFuelHighCostWarning(settings) {
+    const total = Number(document.getElementById("fuelTotalCost")?.value);
+    const warning = document.getElementById("fuelHighCostWarning");
+    if (!warning) {
+        return;
+    }
+    const threshold = Number(settings.highCostAlert || 0);
+    if (threshold > 0 && !Number.isNaN(total) && total >= threshold) {
+        warning.hidden = false;
+        warning.textContent = `High-cost fuel transaction: total has reached the ₱${threshold.toLocaleString()} alert threshold.`;
+    } else {
+        warning.hidden = true;
+        warning.textContent = "";
+    }
+}
+
 let fuelAddInitialized = false;
 let availableFuelVehicles = [];
 
@@ -91,9 +191,10 @@ async function loadFuelVehicles() {
         | Fuel Management currently handles liquid fuel vehicles.
         |--------------------------------------------------------------------------
         */
+       // Just add Hybrid if needed
         availableFuelVehicles = vehicles.filter(
             (vehicle) =>
-                ["Diesel", "Gasoline", "Premium Gasoline", "Hybrid"].includes(
+                ["Diesel", "Gasoline", "Premium Gasoline"].includes(
                     vehicle.fuel_type,
                 ) &&
                 Array.isArray(vehicle.drivers) &&
@@ -176,7 +277,7 @@ function populateFuelVehicleDetails(vehicle) {
     }
 
     fuelTypeSelect.value = vehicle.fuel_type || "";
-    fuelTypeSelect.disabled = false;
+    fuelTypeSelect.disabled = true;
     currentFuelInput.value = formatFuelLiters(vehicle.current_fuel);
     tankCapacityInput.value = formatFuelLiters(vehicle.tank_capacity);
 
@@ -218,12 +319,16 @@ function updateFuelTotalCost() {
     totalCostInput.value = (quantity * costPerLiter).toFixed(2);
 }
 
-function initFuelAdd() {
+async function initFuelAdd() {
     const form = document.getElementById("fuelForm");
 
     if (!form || form.dataset.fuelAddInitialized === "true") {
         return;
     }
+
+    const fuelSettings = await window.getFuelModuleSettings();
+
+    applyFuelAddSettings(fuelSettings);
 
     fuelAddInitialized = true;
     form.dataset.fuelAddInitialized = "true";
@@ -236,7 +341,6 @@ function initFuelAdd() {
     |--------------------------------------------------------------------------
     */
     const fuelNumberInput = document.getElementById("fuelNumber");
-
     /*
     |--------------------------------------------------------------------------
     | Load Vehicles
@@ -262,8 +366,12 @@ function initFuelAdd() {
     | Cost calculation
     |--------------------------------------------------------------------------
     */
-    quantityInput?.addEventListener("input", updateFuelTotalCost);
-    costPerLiterInput?.addEventListener("input", updateFuelTotalCost);
+    const recalculateFuelCost = () => {
+        updateFuelTotalCost();
+        updateFuelHighCostWarning(fuelSettings);
+    };
+    quantityInput?.addEventListener("input", recalculateFuelCost);
+    costPerLiterInput?.addEventListener("input", recalculateFuelCost);
     /*
     |--------------------------------------------------------------------------
     | Submit
@@ -321,15 +429,17 @@ function initFuelAdd() {
                     | Backend recalculates total cost.
                     |--------------------------------------------------------------------------
                     */
-                cost: document.getElementById("fuelTotalCost")?.value,
-                odometer: document.getElementById("fuelOdometer")?.value,
+                // backend are the one who calculate the cost
+                //cost: document.getElementById("fuelTotalCost")?.value,
+                odometer:
+                    document.getElementById("fuelOdometer")?.value || null,
                 date: document.getElementById("fuelRefuelDate")?.value,
                 refuel_time:
                     document.getElementById("fuelRefuelTime")?.value || null,
                 fuel_type: document.getElementById("fuelType")?.value,
-                fuel_station: document
-                    .getElementById("fuelStation")
-                    ?.value.trim(),
+                fuel_station:
+                    document.getElementById("fuelStation")?.value.trim() ||
+                    null,
                 receipt_number:
                     document.getElementById("fuelReceipt")?.value.trim() ||
                     null,
@@ -377,16 +487,19 @@ function initFuelAdd() {
 
             form.reset();
 
+            applyFuelAddSettings(fuelSettings);
+
+            updateFuelHighCostWarning(fuelSettings);
+
+            populateFuelVehicleDetails(null);
+            updateFuelTotalCost();
+
             clearAllFuelErrors?.(form);
             /*
                 |--------------------------------------------------------------------------
                 | Generate a new number for the next record
                 |--------------------------------------------------------------------------
                 */
-
-            populateFuelVehicleDetails(null);
-
-            updateFuelTotalCost();
 
             if (typeof closeAddFuelModal === "function") {
                 closeAddFuelModal();
@@ -426,6 +539,6 @@ function initFuelAdd() {
     });
 }
 
-document.addEventListener("DOMContentLoaded", () => {
-    initFuelAdd();
+document.addEventListener("DOMContentLoaded", async () => {
+    await initFuelAdd();
 });

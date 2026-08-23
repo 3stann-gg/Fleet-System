@@ -28,9 +28,9 @@ class Maintenance extends Model
     ];
 
     protected $casts = [
-        'maintenance_date' => 'date',
-        'completion_date' => 'date',
-        'next_schedule' => 'date',
+        'maintenance_date' => 'date:Y-m-d',
+        'completion_date' => 'date:Y-m-d',
+        'next_schedule' => 'date:Y-m-d',
         'cost' => 'decimal:2',
         'odometer' => 'integer',
     ];

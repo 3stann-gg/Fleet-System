@@ -16,6 +16,96 @@ function getEditDriverData(row, key) {
   return value && value.trim() ? value.trim() : "";
 }
 */
+/* ==========================================
+   Driver Settings - Edit
+========================================== */
+
+async function getEditDriverSettings() {
+  if (
+    typeof window.getDriverModuleSettings ===
+    "function"
+  ) {
+    return await window.getDriverModuleSettings();
+  }
+
+  try {
+    const response = await fetch(
+      "/settings/data",
+      {
+        headers: {
+          Accept: "application/json",
+        },
+        credentials: "same-origin",
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error();
+    }
+
+    const data =
+      await response.json();
+
+    const settings =
+      data?.settings?.drivers || {};
+
+    return {
+      requireLicenseExpiry:
+        settings.requireLicenseExpiry !== false,
+
+      warnLicenseDays:
+        Math.max(
+          1,
+          Math.min(
+            180,
+            Number(
+              settings.warnLicenseDays ?? 30
+            )
+          )
+        ),
+    };
+  } catch {
+    return {
+      requireLicenseExpiry: true,
+      warnLicenseDays: 30,
+    };
+  }
+}
+
+function applyEditDriverSettings(
+  settings
+) {
+  const expiry =
+    document.getElementById(
+      "editDriverLicenseExpiry"
+    );
+  const mark =
+    document.getElementById(
+      "editDriverLicenseExpiryRequiredMark"
+    );
+  const hint =
+    document.getElementById(
+      "editDriverLicenseExpiryHint"
+    );
+  const required =
+    settings?.requireLicenseExpiry !== false;
+
+  if (expiry) {
+    expiry.required =
+      required;
+  }
+  if (mark) {
+    mark.hidden =
+      !required;
+  }
+  if (hint) {
+    hint.textContent =
+      required
+        ? "License expiry is required."
+        : `License expiry is optional. Warning threshold: ${settings.warnLicenseDays} days.`;
+  }
+}
+
 function setEditDriverFieldValue(id, value) {
   const field = document.getElementById(id);
 
@@ -244,17 +334,43 @@ function populateEditDriverModal(modal, row) {
       "editDriverNotes",
       row.dataset.notes
   );
-  setEditDriverSelectValue(
-      "editDriverStatus",
-      row.dataset.status
-  );
+  const statusSelect = document.getElementById("editDriverStatus");
+
+  const currentStatus = row.dataset.status || "";
+
+  if (statusSelect) {
+      /*
+       * Remove stale temporary On Duty option.
+       */
+      Array.from(statusSelect.options).forEach((option) => {
+          if (option.dataset.systemStatus === "true") {
+              option.remove();
+          }
+      });
+
+      if (currentStatus === "On Duty") {
+          const option = document.createElement("option");
+          option.value = "On Duty";
+          option.textContent = "On Duty (Active Trip)";
+          option.dataset.systemStatus = "true";
+          statusSelect.appendChild(option);
+          statusSelect.value = "On Duty";
+          statusSelect.disabled = true;
+          statusSelect.title =
+              "On Duty is controlled by the Dispatch lifecycle.";
+      } else {
+          statusSelect.disabled = false;
+          statusSelect.removeAttribute("title");
+          statusSelect.value = currentStatus;
+      }
+  }
   setEditDriverSelectValue(
       "editDriverAssignedVehicle",
       row.dataset.assignedVehicleId
   );
 }
 
-function initEditDriverModal() {
+async function initEditDriverModal() {
   const modal = document.getElementById("editDriverModal");
   const form = document.getElementById("editDriverForm");
   const closeButton = document.getElementById("closeEditDriverModal");
@@ -265,6 +381,10 @@ function initEditDriverModal() {
   if (!modal || !form || modal.dataset.editDriverModalInitialized === "true") {
     return;
   }
+
+  const driverSettings = await getEditDriverSettings();
+
+  applyEditDriverSettings(driverSettings);
 
   modal.dataset.editDriverModalInitialized = "true";
 
@@ -329,19 +449,28 @@ function initEditDriverModal() {
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
 
-    const requiredFields = [
-      "editDriverFirstName",
-      "editDriverLastName",
-      "editDriverEmployeeId",
-      "editDriverLicenseNumber",
-      "editDriverLicenseClass",
-      "editDriverLicenseExpiry",
-      "editDriverPhone",
-      "editDriverStatus",
-    ]
-      .map((id) => document.getElementById(id))
-      .filter(Boolean);
-    const emptyField = requiredFields.find((field) => !field.value.trim());
+    const requiredFieldIds = [
+        "editDriverFirstName",
+        "editDriverLastName",
+        "editDriverLicenseNumber",
+        "editDriverLicenseClass",
+        "editDriverPhone",
+        "editDriverStatus",
+    ];
+
+    const requiredFields = requiredFieldIds
+        .map((id) => document.getElementById(id))
+        .filter(Boolean);
+
+    const expiryField = document.getElementById("editDriverLicenseExpiry");
+
+    if (expiryField && expiryField.required) {
+        requiredFields.push(expiryField);
+    }
+
+    const emptyField = requiredFields.find(
+        (field) => !String(field.value || "").trim(),
+    );
 
     if (emptyField) {
       if (typeof setDriverFieldValidationMessage === "function") {
@@ -441,8 +570,19 @@ function initEditDriverModal() {
 
         if (response.status === 422) {
             console.log(data.errors);
-            return;
 
+            const firstError = data.errors
+                ? Object.values(data.errors).flat()[0]
+                : null;
+
+            window.showToast(
+                firstError ||
+                    data.message ||
+                    "Please check the driver information.",
+                "error",
+            );
+
+            return;
         }
         if (data.success) {
             loadDrivers();
@@ -465,6 +605,6 @@ function initEditDriverModal() {
   });
 }
 
-document.addEventListener("DOMContentLoaded", () => {
-    initEditDriverModal();
-})
+document.addEventListener("DOMContentLoaded", async () => {
+    await initEditDriverModal();
+});

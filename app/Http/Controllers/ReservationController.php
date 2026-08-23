@@ -6,10 +6,51 @@ use App\Models\Reservation;
 use App\Models\Vehicle;
 use App\Models\Driver;
 use Illuminate\Http\Request;
+use App\Models\FleetSetting;
+use App\Services\FleetNotificationService;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\Validator;
 
 class ReservationController extends Controller
-{
+{   
+    private function getReservationSettings(): array
+    {
+        $record = FleetSetting::query()
+            ->latest('id')
+            ->first();
+        $settings = $record?->settings ?? [];
+        $reservationSettings =
+            $settings['reservations'] ?? [];
+        return [
+            'requireApproval' =>
+                $reservationSettings['requireApproval'] ?? true,
+            'allowSameDay' =>
+                $reservationSettings['allowSameDay'] ?? true,
+            'maxAdvanceDays' =>
+                max(
+                    1,
+                    min(
+                        365,
+                        (int) (
+                            $reservationSettings['maxAdvanceDays']
+                            ?? 30
+                        )
+                    )
+                ),
+            'defaultDurationHours' =>
+                max(
+                    1,
+                    min(
+                        72,
+                        (int) (
+                            $reservationSettings['defaultDurationHours']
+                            ?? 2
+                        )
+                    )
+                ),
+        ];
+    }
+
     private function validateVehicleAndDriverAvailability(
         ?int $vehicleId,
         ?int $driverId
@@ -199,6 +240,19 @@ class ReservationController extends Controller
      */
     public function store(Request $request)
     {
+        $reservationSettings =
+            $this->getReservationSettings();
+        $minimumDate =
+            $reservationSettings['allowSameDay']
+                ? now()->toDateString()
+                : now()->addDay()->toDateString();
+        $maximumDate =
+            now()
+                ->addDays(
+                    $reservationSettings['maxAdvanceDays']
+                )
+                ->toDateString();
+
         $validator = Validator::make(
             $request->all(),
             [
@@ -238,7 +292,8 @@ class ReservationController extends Controller
                 'schedule_date' => [
                     'required',
                     'date',
-                    'after_or_equal:today',
+                    'after_or_equal:' . $minimumDate,
+                    'before_or_equal:' . $maximumDate,
                 ],
                 'schedule_time' => [
                     'required',
@@ -248,8 +303,8 @@ class ReservationController extends Controller
                     'in:Low,Normal,High,Emergency',
                 ],
                 'status' => [
-                    'required',
-                    'in:Pending,Approved,Scheduled,Completed,Rejected,Cancelled',
+                    'nullable',
+                    'in:Pending,Approved',
                 ],
                 'contact_number' => [
                     'nullable',
@@ -260,6 +315,17 @@ class ReservationController extends Controller
                     'nullable',
                     'string',
                 ],
+            ],
+            [
+                'schedule_date.after_or_equal' =>
+                    $reservationSettings['allowSameDay']
+                        ? 'Reservation date cannot be earlier than today.'
+                        : 'Same-day reservations are disabled. Please select a future date.',
+
+                'schedule_date.before_or_equal' =>
+                    'Reservation date cannot be more than ' .
+                    $reservationSettings['maxAdvanceDays'] .
+                    ' days in advance.',
             ]
         );
 
@@ -274,7 +340,10 @@ class ReservationController extends Controller
         try {
             $validated = $validator->validated();
             
-            $validated['status'] = 'Pending';
+            $validated['status'] =
+                $reservationSettings['requireApproval']
+                    ? 'Pending'
+                    : 'Approved';
             
             $validated['reservation_number'] = $validated['reservation_number']
                 ?? $this->generateReservationNumber();
@@ -292,6 +361,16 @@ class ReservationController extends Controller
                 'vehicle',
                 'driver'
             ]);
+
+            if ($reservation->status === 'Pending') {
+                FleetNotificationService::createWhenEnabled(
+                    'reservationPending',
+                    'Pending Reservation',
+                    "Reservation {$reservation->reservation_number} is waiting for approval.",
+                    true,
+                    route('reservation.index')
+                );
+            }
 
             return response()->json([
                 'success' => true,
@@ -329,6 +408,42 @@ class ReservationController extends Controller
         Request $request,
         Reservation $reservation
     ) {
+        $reservation->load([
+                'routePlan',
+                'vehicle',
+                'driver',
+                'dispatch',
+        ]);
+        if ($reservation->dispatch) {
+            return response()->json([
+                'success' => false,
+                'message' =>
+                    'This reservation can no longer be modified because a dispatch has already been created.',
+            ], 422);
+        }
+        if ($reservation->routePlan) {
+            return response()->json([
+                'success' => false,
+                'message' =>
+                    'This reservation can no longer be modified because a route plan has already been created.',
+            ], 422);
+        }
+
+        $reservationSettings =
+            $this->getReservationSettings();
+
+        $minimumDate =
+            $reservationSettings['allowSameDay']
+                ? now()->toDateString()
+                : now()->addDay()->toDateString();
+
+        $maximumDate =
+            now()
+                ->addDays(
+                    $reservationSettings['maxAdvanceDays']
+                )
+                ->toDateString();
+
         $validator = Validator::make(
             $request->all(),
             [
@@ -368,7 +483,8 @@ class ReservationController extends Controller
                 'schedule_date' => [
                     'required',
                     'date',
-                    'after_or_equal:today',
+                    'after_or_equal:' . $minimumDate,
+                    'before_or_equal:' . $maximumDate,
                 ],
                 'schedule_time' => [
                     'required',
@@ -412,24 +528,7 @@ class ReservationController extends Controller
             $reservation->update(
                 $validated
             );
-
-            $reservation->load([
-                'routePlan',
-                'vehicle',
-                'driver'
-            ]);
-            
-            if ($reservation->dispatch) {
-                throw new \Exception(
-                    'This reservation can no longer be modified because a dispatch has already been created.'
-                );
-            }
-            if ($reservation->routePlan) {
-                throw new \Exception(
-                    'This reservation can no longer be modified because a route plan has already been created.'
-                );
-            }
-
+                    
             return response()->json([
                 'success' => true,
                 'message' => 'Reservation updated successfully.',

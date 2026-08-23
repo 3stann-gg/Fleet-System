@@ -86,7 +86,12 @@
           </div>
 
           <div class="form-group">
-            <label for="editMaintenanceCost">Cost</label>
+            <label for="editMaintenanceCost">
+                Cost
+                <span
+                    id="editMaintenanceCostRequiredMark"
+                >*</span>
+            </label>
             <input
               type="number"
               id="editMaintenanceCost"

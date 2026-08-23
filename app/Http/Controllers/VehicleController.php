@@ -5,13 +5,49 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use App\Models\Vehicle;
 use App\Models\Driver;
+use App\Models\FleetSetting;
+use Illuminate\Validation\Rule;
 use Illuminate\Support\Facades\Validator;
 
 class VehicleController extends Controller
-{
+{   
     /**
      * Display a listing of the resource.
      */
+
+    private function getVehicleSettings(): array
+    {
+        $record = FleetSetting::query()
+            ->latest('id')
+            ->first();
+
+        $settings = $record?->settings ?? [];
+
+        $vehicleSettings = $settings['vehicles'] ?? [];
+
+        $allowedStatuses = [
+            'Available',
+            'On Trip',
+            'Maintenance',
+            'Out of Service',
+        ];
+
+        $defaultStatus =
+            $vehicleSettings['defaultStatus'] ?? 'Available';
+
+        if (!in_array($defaultStatus, $allowedStatuses, true)) {
+            $defaultStatus = 'Available';
+        }
+
+        return [
+            'requirePlateNumber' =>
+                $vehicleSettings['requirePlateNumber'] ?? true,
+
+            'defaultStatus' =>
+                $defaultStatus,
+        ];
+    }
+
     public function index(Request $request)
     {
         $query = Vehicle::with('drivers');
@@ -111,11 +147,30 @@ class VehicleController extends Controller
      * Store a newly created resource in storage.
      */
     public function store(Request $request)
-    {
+    {   
+        $vehicleSettings = $this->getVehicleSettings();
+        $requirePlateNumber =
+            (bool) $vehicleSettings['requirePlateNumber'];
+        if (!$request->filled('status')) {
+            $request->merge([
+                'status' => $vehicleSettings['defaultStatus'],
+            ]);
+        }
+
         $validator = Validator::make(
             $request->all(),
             [
-                'plate_number'      => 'required|unique:vehicles,plate_number',
+                'plate_number' => [
+                    $requirePlateNumber
+                        ? 'required'
+                        : 'nullable',
+                    'string',
+                    'max:255',
+                    Rule::unique(
+                        'vehicles',
+                        'plate_number'
+                    ),
+                ],
                 'vehicle_type'      => 'required',
                 'brand'             => 'required',
                 'model'             => 'required',
@@ -139,7 +194,15 @@ class VehicleController extends Controller
                     'numeric',
                     'min:0',
                 ],
-                'status'            => 'required',
+                'status' => [
+                    'required',
+                    Rule::in([
+                        'Available',
+                        'On Trip',
+                        'Maintenance',
+                        'Out of Service',
+                    ]),
+                ],
                 'assigned_driver_id'=> 'nullable|exists:drivers,id',
                 'notes'             => 'nullable|string',
             ]
@@ -203,13 +266,25 @@ class VehicleController extends Controller
      * Update the specified resource in storage.
      */
     public function update(Request $request, Vehicle $vehicle)
-    {
+    {   
+        $vehicleSettings =
+            $this->getVehicleSettings();
+        $requirePlateNumber =
+            (bool) $vehicleSettings['requirePlateNumber'];
+
         $validator = Validator::make(
             $request->all(),
             [
                 'plate_number' => [
-                    'required',
-                    'unique:vehicles,plate_number,' . $vehicle->id,
+                    $requirePlateNumber
+                        ? 'required'
+                        : 'nullable',
+                    'string',
+                    'max:255',
+                    Rule::unique(
+                        'vehicles',
+                        'plate_number'
+                    )->ignore($vehicle->id),
                 ],
                 'vehicle_type' => [
                     'required',

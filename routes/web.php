@@ -10,6 +10,9 @@ use App\Http\Controllers\MaintenanceController;
 use App\Http\Controllers\FuelLogController;
 use App\Http\Controllers\RoutePlanController;
 use App\Http\Controllers\CostBudgetController;
+use App\Http\Controllers\SettingsController;
+use App\Http\Controllers\FleetNotificationController;
+use App\Http\Controllers\FleetSearchController;
 
 
 Route::get('/', function () {
@@ -31,6 +34,18 @@ require __DIR__.'/auth.php';
 |--------------------------------------------------------------------------
 */
 Route::middleware(['auth', 'verified'])->group(function () {
+
+Route::get('/notifications', [FleetNotificationController::class, 'index'])
+    ->name('notifications.index');
+
+Route::patch('/notifications/read-all', [FleetNotificationController::class, 'markAllRead'])
+    ->name('notifications.readAll');
+
+Route::patch('/notifications/{notification}/read', [FleetNotificationController::class, 'markRead'])
+    ->name('notifications.read');
+
+Route::get('/fleet-search', [FleetSearchController::class, 'search'])
+    ->name('fleet.search');
 
     /*
     |--------------------------------------------------------------------------
@@ -305,6 +320,15 @@ Route::middleware(['auth', 'verified'])->group(function () {
     | SETTINGS
     |--------------------------------------------------------------------------
     */
-    Route::view('/settings', 'settings.index')
+    Route::get('/settings', [SettingsController::class, 'index'])
         ->name('settings');
+
+    Route::get('/settings/data', [SettingsController::class, 'show'])
+        ->name('settings.data');
+
+    Route::put('/settings', [SettingsController::class, 'update'])
+        ->name('settings.update');
+
+    Route::post('/settings/reset', [SettingsController::class, 'reset'])
+        ->name('settings.reset');
 });

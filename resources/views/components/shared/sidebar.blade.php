@@ -65,7 +65,7 @@
         <li>
           <a
             href="{{ route('fleet') }}"
-            class="nav-link {{ request()->routeIs('fleet') ? 'active' : '' }}"
+            class="nav-link {{ request()->routeIs('fleet', 'vehicles.*') ? 'active' : '' }}"
             data-page="vehicles"
             data-tooltip="Vehicles"
           >
@@ -89,7 +89,7 @@
         <li>
           <a
             href="{{ route('dispatch') }}"
-            class="nav-link {{ request()->routeIs('dispatch') ? 'active' : '' }}"
+            class="nav-link {{ request()->routeIs('dispatch', 'dispatch.*') ? 'active' : '' }}"
             data-page="dispatch"
             data-tooltip="Dispatch"
           >
@@ -105,7 +105,7 @@
         <li>
           <a
             href="{{ route('driver') }}"
-            class="nav-link {{ request()->routeIs('driver') ? 'active' : '' }}"
+            class="nav-link {{ request()->routeIs('driver', 'drivers.*') ? 'active' : '' }}"
             data-page="driver"
             data-tooltip="Drivers"
           >
@@ -117,7 +117,7 @@
         <li>
           <a
             href="{{ route('maintenance') }}"
-            class="nav-link {{ request()->routeIs('maintenance') ? 'active' : '' }}"
+            class="nav-link {{ request()->routeIs('maintenance', 'maintenance.*') ? 'active' : '' }}"
             data-page="maintenance"
             data-tooltip="Maintenance"
           >
@@ -129,7 +129,7 @@
         <li>
           <a
             href="{{ route('fuel') }}"
-            class="nav-link {{ request()->routeIs('fuel') ? 'active' : '' }}"
+            class="nav-link {{ request()->routeIs('fuel', 'fuel.*') ? 'active' : '' }}"
             data-page="fuel"
             data-tooltip="Fuel Management"
           >
@@ -141,7 +141,7 @@
         <li>
           <a
             href="{{ route('route-planning') }}"
-            class="nav-link {{ request()->routeIs('route-planning') ? 'active' : '' }}"
+            class="nav-link {{ request()->routeIs('route-planning', 'route-planning.*') ? 'active' : '' }}"
             data-page="route-planning"
             data-tooltip="Route Planning"
           >
@@ -157,7 +157,7 @@
         <li>
           <a
             href="{{ route('cost-analysis') }}"
-            class="nav-link {{ request()->routeIs('cost-analysis') ? 'active' : '' }}"
+            class="nav-link {{ request()->routeIs('cost-analysis', 'cost-analysis.*') ? 'active' : '' }}"
             data-page="cost-analysis"
             data-tooltip="Cost Analysis"
           >
@@ -185,7 +185,7 @@
         <li>
           <a
             href="{{ route('settings') }}"
-            class="nav-link {{ request()->routeIs('settings') ? 'active' : '' }}"
+            class="nav-link {{ request()->routeIs('settings', 'settings.*') ? 'active' : '' }}"
             data-page="settings"
             data-tooltip="Settings"
           >
@@ -199,6 +199,65 @@
     <!-- Footer — User Profile -->
     <div class="sidebar-footer">
       <div class="sidebar-profile-wrap">
+        @auth
+            @php
+                $user = Auth::user();
+
+                $userName = $user->name ?? 'User';
+                $userRole = $user->role ?? 'user';
+
+                $initialSourceFirst =
+                    $user->first_name ?: $user->name;
+
+                $initialSourceLast =
+                    $user->last_name ?: '';
+
+                $firstInitial = strtoupper(
+                    substr(
+                        trim($initialSourceFirst ?? ''),
+                        0,
+                        1
+                    )
+                );
+
+                $lastInitial = strtoupper(
+                    substr(
+                        trim($initialSourceLast ?? ''),
+                        0,
+                        1
+                    )
+                );
+
+                $userInitials =
+                    trim(
+                        $firstInitial .
+                        $lastInitial
+                    );
+
+                if ($userInitials === '') {
+                    $userInitials = 'U';
+                }
+
+                $profilePhotoUrl =
+                    $user->profile_photo
+                        ? asset(
+                            'storage/' .
+                            $user->profile_photo
+                        )
+                        : null;
+
+                $roleLabel =
+                    $user->role
+                        ? ucwords(
+                            str_replace(
+                                ['_', '-'],
+                                ' ',
+                                $user->role
+                            )
+                        )
+                        : 'Staff';
+            @endphp
+        @endauth
         <button
           type="button"
           class="sidebar-profile"
@@ -207,16 +266,22 @@
           aria-haspopup="menu"
           aria-expanded="false"
           aria-controls="sidebarProfileMenu"
-          aria-label="Tristan Dave, Fleet Administrator"
+          aria-label="{{ $userName ?? 'User' }}, {{ ucfirst($userRole ?? 'user') }}"
         >
           @auth
-              @php
-                  $userName = Auth::user()->name ?? 'User';
-                  $userRole = Auth::user()->role ?? 'user';
-              @endphp
-
-              <span class="profile-avatar" aria-hidden="true">
-                  {{ strtoupper(substr($userName, 0, 2)) }}
+              <span
+                  class="profile-avatar"
+                  aria-hidden="true"
+              >
+                  @if ($profilePhotoUrl)
+                      <img                        
+                          src="{{ $profilePhotoUrl }}"
+                          alt=""
+                          class="profile-avatar-image"
+                      >
+                  @else
+                      {{ $userInitials }}
+                  @endif
               </span>
 
               <span class="profile-info">
@@ -225,7 +290,7 @@
                   </span>
 
                   <span class="profile-role">
-                      {{ ucfirst($userRole) }}
+                      {{ $roleLabel }}
                   </span>
               </span>
           @endauth

@@ -313,3 +313,112 @@
     font-size: 17px;
   }
 }
+
+
+/* Navbar notification */
+.navbar-right .icon-btn {
+  position: relative;
+}
+
+.navbar-notification-badge {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  border-radius: 999px;
+  border: 2px solid var(--navbar-bg);
+
+  background: #dc2626;
+  color: #ffffff;
+
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+
+  pointer-events: none;
+}
+
+.navbar-notification-badge[hidden] {
+  display: none;
+}
+
+.navbar-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.navbar-notification-read-all {
+  flex-shrink: 0;
+
+  padding: 0;
+
+  border: none;
+  background: transparent;
+
+  color: var(--color-primary);
+
+  font-family: var(--font-family);
+  font-size: var(--font-size-meta);
+  font-weight: var(--font-semibold);
+
+  cursor: pointer;
+}
+
+.navbar-notification-read-all:hover {
+  text-decoration: underline;
+}
+
+.navbar-notification-read-all:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.navbar-notification-read-all:disabled {
+  color: var(--color-text-muted);
+  opacity: 0.6;
+  cursor: default;
+  text-decoration: none;
+}
+
+.navbar-notification-item:hover {
+  background: var(--color-surface-hover);
+}
+
+/* New / unread notification */
+.navbar-notification-item.is-unread {
+  background: rgba(0, 168, 107, 0.14);
+  font-weight: var(--font-semibold);
+}
+
+/* IMPORTANT: unread must also react on hover */
+.navbar-notification-item.is-unread:hover {
+  background: var(--color-surface-hover);
+}
+
+/* Read notification */
+.navbar-notification-item.is-read {
+  background: transparent;
+}
+
+.navbar-notification-item.is-read:hover {
+  background: var(--color-surface-hover);
+}
+
+.navbar-panel[hidden] {
+  display: none !important;
+}
+
+.navbar-panel.is-open:not([hidden]) {
+  display: block;
+}

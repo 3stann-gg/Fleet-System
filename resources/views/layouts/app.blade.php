@@ -36,6 +36,7 @@
     @include('components.shared.toast')
     <!--
     <script src="{{ asset('assets/js/core/auth.js') }}"></script>-->
+    <script src="{{ asset('assets/js/components/navbar.js') }}"></script>
     <script src="{{ asset('assets/js/core/toast.js') }}"></script>
     <script src="{{ asset('assets/js/core/main.js') }}"></script>
     

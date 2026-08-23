@@ -4,12 +4,37 @@ namespace App\Http\Controllers;
 
 use App\Models\Dispatch;
 use App\Models\Reservation;
+use App\Models\FleetSetting;
+use App\Services\FleetNotificationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 
 class DispatchController extends Controller
-{
+{   
+    private function getDispatchSettings(): array
+    {
+        $record = FleetSetting::query()
+            ->latest('id')
+            ->first();
+        $settings =
+            $record?->settings ?? [];
+        $dispatchSettings =
+            $settings['dispatch'] ?? [];
+        return [
+            'showCompletedDays' =>
+                max(
+                    1,
+                    min(
+                        90,
+                        (int) (
+                            $dispatchSettings['showCompletedDays']
+                            ?? 7
+                        )
+                    )
+                ),
+        ];
+    }
     /**
      * Set vehicle and driver statuses when the trip starts.
      */
@@ -106,17 +131,57 @@ class DispatchController extends Controller
      */
     public function index(Request $request)
     {
-        $dispatches = Dispatch::with([
+        $dispatchSettings =
+            $this->getDispatchSettings();
+        $completedCutoff =
+            now()->subDays(
+                $dispatchSettings['showCompletedDays']
+            );
+        $query = Dispatch::with([
             'reservation.vehicle',
             'reservation.driver',
             'reservation.routePlan.stops',
-        ])
+        ]);
+        /*
+        |--------------------------------------------------------------------------
+        | Completed Trip Visibility
+        |--------------------------------------------------------------------------
+        | Active / Cancelled dispatches remain visible.
+        | Completed dispatches are shown only within the number
+        | of days configured in Fleet Settings.
+        */
+        $query->where(function ($query) use ($completedCutoff) {
+            $query
+                ->where(
+                    'trip_status',
+                    '!=',
+                    'Completed'
+                )
+                ->orWhere(function ($completed) use ($completedCutoff) {
+                    $completed
+                        ->where(
+                            'trip_status',
+                            'Completed'
+                        )
+                        ->where(
+                            'updated_at',
+                            '>=',
+                            $completedCutoff
+                        );
+                });
+        });
+        $dispatches = $query
             ->orderBy('id', 'asc')
             ->get();
 
         if ($request->expectsJson()) {
             return response()->json([
                 'dispatches' => $dispatches,
+
+                'settings' => [
+                    'show_completed_days' =>
+                        $dispatchSettings['showCompletedDays'],
+                ],
             ]);
         }
 
@@ -326,6 +391,14 @@ class DispatchController extends Controller
 
                 return $dispatch;
             });
+
+            FleetNotificationService::createWhenEnabled(
+                'dispatchUpdates',
+                'Dispatch Created',
+                "Dispatch {$dispatch->dispatch_number} was created and is currently Pending.",
+                true,
+                route('dispatch')
+            );
 
             return response()->json([
                 'success' => true,
@@ -624,13 +697,42 @@ class DispatchController extends Controller
                     'reservation.routePlan.stops',
                 ]);
 
-                return $dispatch;
+                return [
+                    'dispatch' =>
+                        $dispatch,
+                    'previousStatus' =>
+                        $currentStatus,
+                    'newStatus' =>
+                        $newStatus,
+                ];
             });
+
+            $updatedDispatch =
+                $result['dispatch'];
+            $previousStatus =
+                $result['previousStatus'];
+            $newStatus =
+                $result['newStatus'];
+
+            if (
+                $previousStatus !==
+                $newStatus
+            ) {
+                FleetNotificationService::createWhenEnabled(
+                    'dispatchUpdates',
+                    'Dispatch Status Updated',
+                    "Dispatch {$updatedDispatch->dispatch_number} changed from {$previousStatus} to {$newStatus}.",
+                    true,
+                    route('dispatch')
+                );
+            }
 
             return response()->json([
                 'success' => true,
-                'message' => 'Dispatch updated successfully.',
-                'dispatch' => $result,
+                'message' =>
+                    'Dispatch updated successfully.',
+                'dispatch' =>
+                    $updatedDispatch,
             ]);
 
         } catch (\Exception $e) {

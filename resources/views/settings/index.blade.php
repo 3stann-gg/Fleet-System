@@ -205,9 +205,9 @@
                       <label for="settingsVehicleDefaultStatus">Default status</label>
                       <select id="settingsVehicleDefaultStatus">
                         <option value="Available">Available</option>
-                        <option value="In Use">In Use</option>
+                        <option value="On Trip">On Trip</option>
                         <option value="Maintenance">Maintenance</option>
-                        <option value="Inactive">Inactive</option>
+                        <option value="Out of Service">Out of Service</option>
                       </select>
                     </div>
                     <div class="form-group">
@@ -248,7 +248,7 @@
                 </section>
 
                 <!-- Dispatch -->
-                <section class="card settings-card" id="settingsDispatch">
+                <!--<section class="card settings-card" id="settingsDispatch">
                   <div class="card-header">
                     <div>
                       <h3><i class="ph ph-truck" aria-hidden="true"></i> Dispatch</h3>
@@ -280,6 +280,50 @@
                       <input type="number" id="settingsDispCompletedDays" min="1" max="90" step="1" />
                     </div>
                   </div>
+                </section>-->
+                <section
+                    class="card settings-card"
+                    id="settingsDispatch"
+                >
+                    <div class="card-header">
+                        <div>
+                            <h3>
+                                <i
+                                    class="ph ph-truck"
+                                    aria-hidden="true"
+                                ></i>
+                                Dispatch
+                            </h3>
+
+                            <p class="card-subtitle">
+                                Dispatch queue and completed-trip visibility.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="settings-form-grid">
+                        <div class="form-group">
+                            <label for="settingsDispCompletedDays">
+                                Show completed trips (days)
+                            </label>
+
+                            <input
+                                type="number"
+                                id="settingsDispCompletedDays"
+                                min="1"
+                                max="90"
+                                step="1"
+                            />
+                        </div>
+                    </div>
+
+                    <p class="settings-note">
+                        Vehicle and driver assignments are inherited from the
+                        approved reservation. Dispatch priority is also inherited
+                        from the reservation and route-planning workflow.
+                        Vehicle and driver availability checks remain enforced
+                        for trip safety.
+                    </p>
                 </section>
 
                 <!-- Drivers -->
@@ -304,9 +348,9 @@
                     <div class="form-group">
                       <label for="settingsDriverStatus">Default status</label>
                       <select id="settingsDriverStatus">
-                        <option value="Active">Active</option>
-                        <option value="Inactive">Inactive</option>
+                        <option value="Available">Available</option>
                         <option value="On Leave">On Leave</option>
+                        <option value="Inactive">Inactive</option>
                       </select>
                     </div>
                   </div>
@@ -334,8 +378,8 @@
                     <div class="form-group">
                       <label for="settingsMntDefaultType">Default type</label>
                       <select id="settingsMntDefaultType">
-                        <option value="Preventive">Preventive</option>
-                        <option value="Corrective">Corrective</option>
+                        <option value="Preventive Maintenance">Preventive Maintenance</option>
+                        <option value="Corrective Repair">Corrective Repair</option>
                         <option value="Inspection">Inspection</option>
                       </select>
                     </div>
@@ -369,34 +413,35 @@
                 </section>
 
                 <!-- Routes -->
-                <section class="card settings-card" id="settingsRoutes">
-                  <div class="card-header">
-                    <div>
-                      <h3><i class="ph ph-map-trifold" aria-hidden="true"></i> Route Planning</h3>
-                      <p class="card-subtitle">Optimization and archival defaults.</p>
+                <section
+                    class="card settings-card"
+                    id="settingsRoutes"
+                >
+                    <div class="card-header">
+                        <div>
+                            <h3>
+                                <i
+                                    class="ph ph-map-trifold"
+                                    aria-hidden="true"
+                                ></i>
+                                Route Planning
+                            </h3>
+                            <p class="card-subtitle">
+                                Configure route planning preferences.
+                            </p>
+                        </div>
                     </div>
-                  </div>
-                  <div class="settings-check-list">
-                    <label class="settings-check">
-                      <input type="checkbox" id="settingsRoutePreferOpt" />
-                      <span>Prefer optimized routes</span>
-                    </label>
-                    <label class="settings-check">
-                      <input type="checkbox" id="settingsRouteArchive" />
-                      <span>Archive completed routes by default</span>
-                    </label>
-                  </div>
-                  <div class="settings-form-grid settings-form-grid--follow">
-                    <div class="form-group">
-                      <label for="settingsRoutePriority">Default priority</label>
-                      <select id="settingsRoutePriority">
-                        <option value="Low">Low</option>
-                        <option value="Medium">Medium</option>
-                        <option value="High">High</option>
-                        <option value="Emergency">Emergency</option>
-                      </select>
+                    <div class="settings-check-list">
+                        <label class="settings-check">
+                            <input
+                                type="checkbox"
+                                id="settingsRoutePreferOpt"
+                            />
+                            <span>
+                                Prefer optimized routes
+                            </span>
+                        </label>
                     </div>
-                  </div>
                 </section>
 
                 <!-- Cost Analysis -->

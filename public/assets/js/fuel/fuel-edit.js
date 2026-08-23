@@ -2,6 +2,63 @@
    Edit Fuel Record
 ========================================== */
 
+async function getEditFuelSettings() {
+    if (typeof window.getFuelModuleSettings === "function") {
+        return await window.getFuelModuleSettings();
+    }
+    try {
+        const response = await fetch("/settings/data", {
+            headers: {
+                Accept: "application/json",
+            },
+            credentials: "same-origin",
+        });
+        if (!response.ok) {
+            throw new Error();
+        }
+        const data = await response.json();
+        const settings = data?.settings?.fuel || {};
+        return {
+            requireStation: settings.requireStation === true,
+
+            highCostAlert: Math.max(0, Number(settings.highCostAlert ?? 5000)),
+        };
+    } catch {
+        return {
+            requireStation: false,
+            highCostAlert: 5000,
+        };
+    }
+}
+
+function applyEditFuelSettings(settings) {
+    const station = document.getElementById("editFuelStation");
+    const mark = document.getElementById("editFuelStationRequiredMark");
+    const required = settings.requireStation === true;
+    if (station) {
+        station.required = required;
+    }
+    if (mark) {
+        mark.hidden = !required;
+    }
+}
+
+function updateEditFuelHighCostWarning(settings) {
+    const total = Number(document.getElementById("editFuelTotalCost")?.value);
+    const warning = document.getElementById("editFuelHighCostWarning");
+    if (!warning) {
+        return;
+    }
+    const threshold = Number(settings.highCostAlert || 0);
+    if (threshold > 0 && !Number.isNaN(total) && total >= threshold) {
+        warning.hidden = false;
+        warning.textContent = `High-cost fuel transaction: total has reached the ₱${threshold.toLocaleString()} alert threshold.`;
+    } else {
+        warning.hidden = true;
+        warning.textContent = "";
+    }
+}
+
 let editFuelInitialized = false;
 
 
@@ -135,6 +192,10 @@ function populateEditFuelForm(row) {
     }
 
     syncFuelTotalCostFields("editFuel");
+
+    document
+        .getElementById("editFuelCostPerLiter")
+        ?.dispatchEvent(new Event("input"));
 }
 
 function openEditFuelModal(row) {
@@ -203,7 +264,7 @@ async function updateFuelRecord(form, fuelId) {
 
         refuel_time: getValue("editFuelRefuelTime") || null,
         cost_per_liter: getValue("editFuelCostPerLiter"),
-        fuel_station: getValue("editFuelStation").trim(),
+        fuel_station: getValue("editFuelStation").trim() || null,
         receipt_number: getValue("editFuelReceipt").trim() || null,
         payment_method: getValue("editFuelPayment") || null,
         notes: getValue("editFuelNotes").trim() || null,
@@ -238,7 +299,7 @@ async function updateFuelRecord(form, fuelId) {
     return data.fuelLog;
 }
 
-function initEditFuelModal() {
+async function initEditFuelModal() {
     if (editFuelInitialized) {
         return;
     }
@@ -248,6 +309,10 @@ function initEditFuelModal() {
     if (!modal) {
         return;
     }
+
+    const fuelSettings = await getEditFuelSettings();
+
+    applyEditFuelSettings(fuelSettings);
 
     editFuelInitialized = true;
 
@@ -285,6 +350,14 @@ function initEditFuelModal() {
     });
 
     bindFuelTotalCostCalculation("editFuel");
+
+    document
+        .getElementById("editFuelCostPerLiter")
+        ?.addEventListener("input", () => {
+            requestAnimationFrame(() => {
+                updateEditFuelHighCostWarning(fuelSettings);
+            });
+        });
 }
 
 function initFuelEdit() {

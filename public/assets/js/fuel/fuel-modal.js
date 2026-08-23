@@ -287,21 +287,23 @@ function validateFuelForm(form) {
         fail(fields.totalCost, "Total cost is invalid.");
     }
 
-    const odometer = Number.parseFloat(fields.odometer?.value);
+   const odometerValue = fields.odometer?.value?.trim() ?? "";
 
-    if (
-        !fields.odometer ||
-        fields.odometer.value === "" ||
-        Number.isNaN(odometer)
-    ) {
-        fail(fields.odometer, "Odometer reading is required.");
-    } else if (odometer < 0) {
-        fail(fields.odometer, "Odometer cannot be negative.");
-    }
+   const odometer = Number.parseFloat(odometerValue);
 
-    if (!fields.station || !fields.station.value.trim()) {
+   if (fields.odometer?.required && odometerValue === "") {
+       fail(fields.odometer, "Odometer reading is required.");
+   } else if (odometerValue !== "" && Number.isNaN(odometer)) {
+       fail(fields.odometer, "Odometer reading is invalid.");
+   } else if (odometerValue !== "" && odometer < 0) {
+       fail(fields.odometer, "Odometer cannot be negative.");
+   }
+
+    const stationValue = fields.station?.value?.trim() ?? "";
+
+    if (fields.station?.required && stationValue === "") {
         fail(fields.station, "Fuel station is required.");
-    } else if (fields.station.value.trim().length > 255) {
+    } else if (stationValue.length > 255) {
         fail(fields.station, "Fuel station name is too long.");
     }
 
@@ -404,6 +406,13 @@ async function openAddFuelModal() {
     */
 
     syncFuelTotalCostFields("fuel");
+
+    const highCostWarning = document.getElementById("fuelHighCostWarning");
+
+    if (highCostWarning) {
+        highCostWarning.hidden = true;
+        highCostWarning.textContent = "";
+    }
 
     /*
     |--------------------------------------------------------------------------

@@ -76,7 +76,7 @@
         </div>
 
           <div class="form-group">
-            <label for="editDriverEmployeeId">Employee ID *</label>
+            <label for="editDriverEmployeeId">Driver ID *</label>
             <input
                 type="text"
                 id="editDriverEmployeeId"
@@ -103,13 +103,17 @@
           </div>
 
           <div class="form-group">
-            <label for="editDriverLicenseExpiry">License Expiry *</label>
+            <label for="editDriverLicenseExpiry">
+                License Expiry
+                <span id="editDriverLicenseExpiryRequiredMark">*</span>
+            </label>
             <input
                 type="date"
                 id="editDriverLicenseExpiry"
                 name="license_expiry"
                 required
             >
+            
           </div>
 
           <div class="form-group">
@@ -118,8 +122,13 @@
                 type="tel"
                 id="editDriverPhone"
                 name="contact_number"
-                required
             >
+            <small
+                class="form-hint"
+                id="editDriverLicenseExpiryHint"
+            >
+                License expiry is required.
+            </small>
           </div>
 
           <div class="form-group">
@@ -143,7 +152,7 @@
 
           <div class="form-group">
             <label for="editDriverExperience">Experience (Years)</label>
-            <input type="number" id="editDriverExperience" name="email" min="0" />
+            <input type="number" id="editDriverExperience" name="experience" min="0" />
           </div>
 
           <div class="form-group">
@@ -155,7 +164,6 @@
             >
               <option value="">Select Status</option>
               <option value="Available">Available</option>
-              <option value="On Duty">On Duty</option>
               <option value="On Leave">On Leave</option>
               <option value="Inactive">Inactive</option>
             </select>

@@ -29,7 +29,7 @@ class FuelLog extends Model
         'cost_per_liter' => 'decimal:2',
         'cost' => 'decimal:2',
         'odometer' => 'decimal:2',
-        'date' => 'date',
+        'date' => 'date:Y-m-d',
     ];
 
     public function vehicle(): BelongsTo

@@ -2,6 +2,139 @@
    Maintenance Add
 ========================================== */
 
+/* ==========================================
+   Maintenance Module Settings
+========================================== */
+window.getMaintenanceModuleSettings =
+    window.getMaintenanceModuleSettings ||
+    async function () {
+        const defaults = {
+            overdueWarnDays: 3,
+            requireCost: true,
+            defaultType:
+                "Preventive Maintenance",
+        };
+
+        try {
+            const response = await fetch(
+                "/settings/data",
+                {
+                    headers: {
+                        Accept: "application/json",
+                    },
+                    credentials: "same-origin",
+                }
+            );
+            if (!response.ok) {
+                throw new Error(
+                    "Unable to load Maintenance settings."
+                );
+            }
+            const data =
+                await response.json();
+            const settings =
+                data?.settings?.maintenance;
+
+            if (
+                !settings ||
+                typeof settings !== "object"
+            ) {
+                return defaults;
+            }
+            const allowedTypes = [
+                "Preventive Maintenance",
+                "Corrective Repair",
+                "Inspection",
+                "Oil Change",
+                "Tire Service",
+                "Brake Service",
+                "Engine Service",
+                "Other",
+            ];
+            return {
+                overdueWarnDays:
+                    Math.max(
+                        1,
+                        Math.min(
+                            90,
+                            Number(
+                                settings.overdueWarnDays
+                                ?? 3
+                            )
+                        )
+                    ),
+
+                requireCost:
+                    settings.requireCost !== false,
+
+                defaultType:
+                    allowedTypes.includes(
+                        settings.defaultType
+                    )
+                        ? settings.defaultType
+                        : defaults.defaultType,
+            };
+        } catch (error) {
+            console.error(
+                "Maintenance settings load error:",
+                error
+            );
+
+            return defaults;
+        }
+    };
+    
+function applyMaintenanceAddSettings(
+    settings
+) {
+    const serviceType =
+        document.getElementById(
+            "maintenanceServiceType"
+        );
+    const status =
+        document.getElementById(
+            "maintenanceStatus"
+        );
+    const cost =
+        document.getElementById(
+            "maintenanceCost"
+        );
+    const costMark =
+        document.getElementById(
+            "maintenanceCostRequiredMark"
+        );
+    /*
+    |--------------------------------------------------------------------------
+    | Default Maintenance Type
+    |--------------------------------------------------------------------------
+    */
+    if (
+        serviceType &&
+        !serviceType.value
+    ) {
+        serviceType.value =
+            settings.defaultType;
+    }
+    /*
+    |--------------------------------------------------------------------------
+    | Cost Requirement
+    |--------------------------------------------------------------------------
+    */
+    const completed =
+        status?.value === "Completed";
+    const costRequired =
+        settings.requireCost &&
+        completed;
+    if (cost) {
+        cost.required =
+            costRequired;
+    }
+    if (costMark) {
+        costMark.hidden =
+            !costRequired;
+    }
+}
+
 let availableMaintenanceVehicles = [];
 let maintenanceAddInitialized = false;
 
@@ -337,7 +470,7 @@ async function saveMaintenance(form) {
             document.getElementById("maintenanceScheduledDate")?.value || "",
         completion_date:
             document.getElementById("maintenanceCompletionDate")?.value || null,
-        cost: document.getElementById("maintenanceCost")?.value || 0,
+        cost: document.getElementById("maintenanceCost")?.value || null,
         priority: document.getElementById("maintenancePriority")?.value || "",
         status: document.getElementById("maintenanceStatus")?.value || "",
         odometer: document.getElementById("maintenanceOdometer")?.value || null,
@@ -384,7 +517,7 @@ async function saveMaintenance(form) {
 }
 
 
-function initMaintenanceAdd() {
+async function initMaintenanceAdd() {
     if (maintenanceAddInitialized) {
         return;
     }
@@ -402,7 +535,17 @@ function initMaintenanceAdd() {
         return;
     }
 
+    const maintenanceSettings = await window.getMaintenanceModuleSettings();
+
+    applyMaintenanceAddSettings(maintenanceSettings);
+
     maintenanceAddInitialized = true;
+
+    document
+        .getElementById("maintenanceStatus")
+        ?.addEventListener("change", () => {
+            applyMaintenanceAddSettings(maintenanceSettings);
+        });
 
     loadAvailableMaintenanceVehicles();
 
@@ -442,6 +585,9 @@ function initMaintenanceAdd() {
             await loadAvailableMaintenanceVehicles();
 
             form.reset();
+
+            applyMaintenanceAddSettings(maintenanceSettings);
+
             form.querySelectorAll(".is-invalid").forEach((field) => {
                 field.classList.remove("is-invalid");
             });
@@ -493,6 +639,6 @@ function initMaintenanceAdd() {
     });
 }
 
-document.addEventListener("DOMContentLoaded", () => {
-    initMaintenanceAdd();
+document.addEventListener("DOMContentLoaded", async () => {
+    await initMaintenanceAdd();
 });

@@ -149,7 +149,7 @@ function initDriverForm() {
   setDriverSelectOptions(status, [
     { label: "Select Status", value: "" },
     { label: "Available", value: "Available" },
-    { label: "On Duty", value: "On Duty" },
+    //{ label: "On Duty", value: "On Duty" },
     { label: "On Leave", value: "On Leave" },
     { label: "Inactive", value: "Inactive" },
   ]);

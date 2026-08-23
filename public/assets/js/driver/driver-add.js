@@ -1,6 +1,126 @@
 /* ==========================================
-   Add Driver 
+   Add Driver :)
 ========================================== */
+
+/* ==========================================
+   Driver Module Settings
+========================================== */
+
+window.getDriverModuleSettings =
+  window.getDriverModuleSettings ||
+  async function () {
+    const defaults = {
+      requireLicenseExpiry: true,
+      warnLicenseDays: 30,
+      defaultStatus: "Available",
+    };
+
+    try {
+      const response = await fetch(
+        "/settings/data",
+        {
+          headers: {
+            Accept: "application/json",
+          },
+          credentials: "same-origin",
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(
+          "Unable to load Driver settings."
+        );
+      }
+
+      const data = await response.json();
+
+      const settings =
+        data?.settings?.drivers;
+
+      if (
+        !settings ||
+        typeof settings !== "object"
+      ) {
+        return defaults;
+      }
+
+      const allowedStatuses = [
+        "Available",
+        "On Leave",
+        "Inactive",
+      ];
+
+      return {
+        requireLicenseExpiry:
+          settings.requireLicenseExpiry !== false,
+
+        warnLicenseDays: Math.max(
+          1,
+          Math.min(
+            180,
+            Number(
+              settings.warnLicenseDays ?? 30
+            )
+          )
+        ),
+
+        defaultStatus:
+          allowedStatuses.includes(
+            settings.defaultStatus
+          )
+            ? settings.defaultStatus
+            : defaults.defaultStatus,
+      };
+    } catch (error) {
+      console.error(
+        "Driver settings load error:",
+        error
+      );
+
+      return defaults;
+    }
+  };
+
+function applyDriverAddSettings(settings) {
+  const expiry =
+    document.getElementById(
+      "driverLicenseExpiry"
+    );
+
+  const expiryMark =
+    document.getElementById(
+      "driverLicenseExpiryRequiredMark"
+    );
+  const expiryHint =
+    document.getElementById(
+      "driverLicenseExpiryHint"
+    );
+  const status =
+    document.getElementById(
+      "driverStatus"
+    );
+  const expiryRequired =
+    settings?.requireLicenseExpiry !== false;
+
+  if (expiry) {
+    expiry.required = expiryRequired;
+  }
+  if (expiryMark) {
+    expiryMark.hidden =
+      !expiryRequired;
+  }
+  if (expiryHint) {
+    expiryHint.textContent =
+      expiryRequired
+        ? "License expiry is required."
+        : `License expiry is optional. Expiry warnings use the configured ${settings.warnLicenseDays}-day threshold.`;
+  }
+  if (status && !status.value) {
+    status.value =
+      settings?.defaultStatus ||
+      "Available";
+  }
+}
 
 function setDriverFieldValidationMessage(field) {
   field.setCustomValidity("Please complete this required field.");
@@ -15,35 +135,51 @@ function setDriverFieldValidationMessage(field) {
   field.focus();
 }
 
-function initDriverAdd() {
+async function initDriverAdd() {
   const form = document.getElementById("driverForm");
 
   if (!form || form.dataset.driverAddInitialized === "true") return;
 
-  const requiredFieldIds = [
-    "driverFirstName",
-    "driverLastName",
-    "driverLicenseNumber",
-    "driverLicenseClass",
-    "driverLicenseExpiry",
-    "driverPhone",
-    "driverStatus",
-];
-  const requiredFields = requiredFieldIds
-    .map((id) => document.getElementById(id))
-    .filter(Boolean);
+  const driverSettings = await window.getDriverModuleSettings();
 
-  requiredFields.forEach((field) => {
-    field.required = true;
+  applyDriverAddSettings(driverSettings);
+
+  const alwaysRequiredFieldIds = [
+      "driverFirstName",
+      "driverLastName",
+      "driverLicenseNumber",
+      "driverLicenseClass",
+      "driverPhone",
+      "driverStatus",
+  ];
+
+  const alwaysRequiredFields = alwaysRequiredFieldIds
+      .map((id) => document.getElementById(id))
+      .filter(Boolean);
+
+  alwaysRequiredFields.forEach((field) => {
+      field.required = true;
   });
+
+  function getRequiredDriverFields() {
+      const fields = [...alwaysRequiredFields];
+      const expiry = document.getElementById("driverLicenseExpiry");
+      if (expiry && expiry.required) {
+          fields.push(expiry);
+      }
+
+      return fields;
+  }
 
   form.dataset.driverAddInitialized = "true";
 
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
 
+    const requiredFields = getRequiredDriverFields();
+
     const emptyField = requiredFields.find(
-      (field) => !field.value.trim(),
+        (field) => !String(field.value || "").trim(),
     );
 
     if (emptyField) {
@@ -152,6 +288,8 @@ function initDriverAdd() {
             
             form.reset();
 
+            applyDriverAddSettings(driverSettings);
+
             if (typeof resetDriverImagePreview === "function") {
                 resetDriverImagePreview();
             }
@@ -170,6 +308,6 @@ function initDriverAdd() {
   });
 }
 
-document.addEventListener("DOMContentLoaded", () => {
-    initDriverAdd();
+document.addEventListener("DOMContentLoaded", async () => {
+    await initDriverAdd();
 });

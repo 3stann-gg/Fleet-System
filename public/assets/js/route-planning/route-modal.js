@@ -18,6 +18,62 @@ let routeFormMode = "add"; // add | edit
 let routeEditingId = null;
 let routeDeleteTargetId = null;
 
+/* ==========================================
+   Route Planning Settings
+========================================== */
+
+let routeModuleSettings = {
+    preferOptimized: true,
+};
+
+async function loadRouteModuleSettings() {
+    const defaults = {
+        preferOptimized: true,
+    };
+    try {
+        const response = await fetch(
+            "/settings/data",
+            {
+                headers: {
+                    Accept: "application/json",
+                },
+                credentials: "same-origin",
+            }
+        );
+
+        if (!response.ok) {
+            throw new Error(
+                "Unable to load Route Planning settings."
+            );
+        }
+
+        const data = await response.json();
+        const settings =
+            data?.settings?.routes;
+
+        if (
+            !settings ||
+            typeof settings !== "object"
+        ) {
+            routeModuleSettings = defaults;
+            return routeModuleSettings;
+        }
+
+        routeModuleSettings = {
+            preferOptimized:
+                settings.preferOptimized !== false,
+        };
+        return routeModuleSettings;
+    } catch (error) {
+        console.error(
+            "Route settings load error:",
+            error
+        );
+        routeModuleSettings = defaults;
+        return routeModuleSettings;
+    }
+}
+
 let routeLastOptimization = null;
 
 /* ==========================================
@@ -541,26 +597,29 @@ function applyOptimizationToForm(result) {
     if (summary) {
         summary.hidden = false;
         summary.innerHTML = `
-      <strong>Simulated Route Optimization</strong>
-      <p>
-        Strategy:
-        ${escapeRouteHtml(result.optimizationStrategy)}
-        · Score:
-        ${escapeRouteHtml(result.optimizationScore)}
-      </p>
-      <p>
-        Distance:
-        ${escapeRouteHtml(formatRouteDistance(result.estimatedDistance))}
-        · Time:
-        ${escapeRouteHtml(result.estimatedTravelTime)}
-      </p>
-      <p>
-        Assigned vehicle:
-        ${escapeRouteHtml(result.recommendedVehicle || "—")}
-        · Driver:
-        ${escapeRouteHtml(result.recommendedDriver || "—")}
-      </p>
-    `;
+            <strong>Google Maps Route Optimization</strong>
+
+            <p>
+                Strategy:
+                ${escapeRouteHtml(result.optimizationStrategy)}
+                · Score:
+                ${escapeRouteHtml(result.optimizationScore)}
+            </p>
+
+            <p>
+                Distance:
+                ${escapeRouteHtml(formatRouteDistance(result.estimatedDistance))}
+                · Time:
+                ${escapeRouteHtml(result.estimatedTravelTime)}
+            </p>
+
+            <p>
+                Assigned vehicle:
+                ${escapeRouteHtml(result.recommendedVehicle || "—")}
+                · Driver:
+                ${escapeRouteHtml(result.recommendedDriver || "—")}
+            </p>
+        `;
     }
 }
 
@@ -1116,14 +1175,72 @@ function closeDeleteRouteModal() {
 }
 
 async function saveRouteFromForm() {
+    const form = document.getElementById("routeForm");
+    if (!form) {
+        return;
+    }
+    /*
+    |--------------------------------------------------------------------------
+    | Prefer optimized routes
+    |--------------------------------------------------------------------------
+    |
+    | If enabled, automatically attempt optimization when the current
+    | route has no valid optimization result.
+    |
+    | This is a preference, not a hard requirement.
+    |
+    */
+    let data = collectRouteFormData();
+    const needsOptimization =
+        data.origin &&
+        data.destination &&
+        (data.estimatedDistance === "" ||
+            data.estimatedTravelTimeMinutes === "");
+    if (routeModuleSettings.preferOptimized && needsOptimization) {
+        try {
+            await runRouteOptimization({
+                showSuccessToast: false,
+            });
+            /*
+            |--------------------------------------------------------------------------
+            | Recollect because optimization updated the fields + stop order
+            |--------------------------------------------------------------------------
+            */
+            data = collectRouteFormData();
+        } catch (error) {
+            console.warn(
+                "Preferred route optimization was unavailable:",
+                error,
+            );
+            /*
+            |--------------------------------------------------------------------------
+            | Draft / Planned routes may continue.
+            | Ready For Dispatch will still fail normal validation below.
+            |--------------------------------------------------------------------------
+            */
+            if (data.status === "Ready For Dispatch") {
+                if (typeof showToast === "function") {
+                    showToast(
+                        error.message ||
+                            "Route optimization is required before this route can be marked Ready For Dispatch.",
+                        "error",
+                    );
+                }
+                return;
+            }
+        }
+    }
     if (!validateRouteForm()) {
         return;
     }
-
-    const form = document.getElementById("routeForm");
-    const data = collectRouteFormData();
+    /*
+    |--------------------------------------------------------------------------
+    | Collect again after validation / possible optimization
+    |--------------------------------------------------------------------------
+    */
+    data = collectRouteFormData();
     clearRouteFieldErrors(form);
-    const submitButton = form?.querySelector('[type="submit"]');
+    const submitButton = form.querySelector('[type="submit"]');
     if (submitButton) {
         submitButton.disabled = true;
     }
@@ -1267,6 +1384,47 @@ async function duplicateRouteFromView(routeId) {
     }
 }
 
+async function runRouteOptimization({ showSuccessToast = true } = {}) {
+    const data = collectRouteFormData();
+    if (!data.origin || !data.destination) {
+        throw new Error(
+            "Origin and destination are required before optimizing.",
+        );
+    }
+    const result = await optimizeRouteWithGoogle(data);
+    applyOptimizationToForm(result);
+    /*
+    |--------------------------------------------------------------------------
+    | Apply optimized stop order to form
+    |--------------------------------------------------------------------------
+    */
+    if (Array.isArray(result.optimizedStops)) {
+        renderRouteStops(result.optimizedStops);
+    }
+    /*
+    |--------------------------------------------------------------------------
+    | Update Google Map preview
+    |--------------------------------------------------------------------------
+    */
+    if (typeof renderGoogleRoute === "function") {
+        await renderGoogleRoute({
+            origin: data.origin,
+            destination: data.destination,
+            stops: result.optimizedStops || data.stops,
+            estimatedDistance: result.estimatedDistance,
+            estimatedTravelTime: result.estimatedTravelTime,
+            optimizationStrategy: result.optimizationStrategy,
+            optimizationScore: result.optimizationScore,
+            status: data.status || "Draft",
+        });
+    }
+
+    if (showSuccessToast && typeof showToast === "function") {
+        showToast("Google Maps route optimization complete.", "success");
+    }
+    return result;
+}
+
 function initRoutePlanningModals() {
     if (routeModalsInitialized) {
         return;
@@ -1361,53 +1519,23 @@ function initRoutePlanningModals() {
     document
         .getElementById("optimizeRouteBtn")
         ?.addEventListener("click", async () => {
-            const data = collectRouteFormData();
-            if (!data.origin || !data.destination) {
-                if (typeof showToast === "function") {
-                    showToast(
-                        "Enter origin and destination before optimizing.",
-                        "warning",
-                    );
-                }
-                return;
-            }
             const optimizeButton = document.getElementById("optimizeRouteBtn");
             const originalHtml = optimizeButton?.innerHTML;
             try {
                 if (optimizeButton) {
                     optimizeButton.disabled = true;
+
                     optimizeButton.innerHTML = `
                         <i class="ph ph-spinner"></i>
                         Optimizing...
                     `;
                 }
-                const result = await optimizeRouteWithGoogle(data);
-                applyOptimizationToForm(result);
-                /*
-                |--------------------------------------------------------------------------
-                | Update main Google Map preview
-                |--------------------------------------------------------------------------
-                */
-                if (typeof renderGoogleRoute === "function") {
-                    await renderGoogleRoute({
-                        origin: data.origin,
-                        destination: data.destination,
-                        stops: result.optimizedStops || data.stops,
-                        estimatedDistance: result.estimatedDistance,
-                        estimatedTravelTime: result.estimatedTravelTime,
-                        optimizationStrategy: result.optimizationStrategy,
-                        optimizationScore: result.optimizationScore,
-                        status: data.status || "Draft",
-                    });
-                }
-                if (typeof showToast === "function") {
-                    showToast(
-                        "Google Maps route optimization complete.",
-                        "success",
-                    );
-                }
+                await runRouteOptimization({
+                    showSuccessToast: true,
+                });
             } catch (error) {
                 console.error("Google Maps route optimization failed:", error);
+
                 if (typeof showToast === "function") {
                     showToast(
                         error.message ||
@@ -1418,6 +1546,7 @@ function initRoutePlanningModals() {
             } finally {
                 if (optimizeButton) {
                     optimizeButton.disabled = false;
+
                     if (originalHtml !== undefined) {
                         optimizeButton.innerHTML = originalHtml;
                     }
@@ -1657,15 +1786,19 @@ function initRoutePlanningModals() {
 
 async function initRoutePlanningPage() {
     const page = document.getElementById("routePlanningPage");
+
     if (!page) {
         return;
     }
     if (page.dataset.init === "true") {
         return;
     }
+
     page.dataset.init = "true";
+    await loadRouteModuleSettings();
     initRoutePlanningPipeline();
     initRoutePlanningModals();
+
     if (typeof initRouteTemplates === "function") {
         initRouteTemplates();
     }

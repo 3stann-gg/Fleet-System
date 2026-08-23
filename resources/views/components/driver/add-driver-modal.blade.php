@@ -99,13 +99,22 @@
           </div>
 
           <div class="form-group">
-            <label for="driverLicenseExpiry">License Expiry *</label>
+            <label for="driverLicenseExpiry">
+                License Expiry
+                <span id="driverLicenseExpiryRequiredMark">*</span>
+            </label>
             <input
                 type="date"
                 id="driverLicenseExpiry"
                 name="license_expiry"
                 required
             />
+            <small
+                class="form-hint"
+                id="driverLicenseExpiryHint"
+            >
+                License expiry is required.
+            </small>
           </div>
 
           <div class="form-group">
@@ -152,7 +161,6 @@
             <select id="driverStatus" name="status" required>
               <option value="">Select Status</option>
               <option value="Available">Available</option>
-              <option value="On Duty">On Duty</option>
               <option value="On Leave">On Leave</option>
               <option value="Inactive">Inactive</option>
             </select>

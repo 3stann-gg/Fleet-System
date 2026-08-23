@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use App\Models\FuelLog;
 use App\Models\Vehicle;
 use App\Models\Driver;
+use App\Models\FleetSetting;
+use App\Services\FleetNotificationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
@@ -14,8 +16,39 @@ class FuelLogController extends Controller
     /**
      * Display a listing of fuel records.
      */
+
+    private function getFuelSettings(): array
+    {
+        $record = FleetSetting::query()
+            ->latest('id')
+            ->first();
+        $settings = $record?->settings ?? [];
+        $fuelSettings =
+            $settings['fuel'] ?? [];
+        return [
+            'requireOdometer' =>
+                $fuelSettings['requireOdometer'] ?? true,
+            'requireStation' =>
+                $fuelSettings['requireStation'] ?? false,
+            'highCostAlert' =>
+                max(
+                    0,
+                    (float) (
+                        $fuelSettings['highCostAlert']
+                        ?? 5000
+                    )
+                ),
+        ];
+    }
+
     public function index(Request $request)
     {
+        $fuelSettings =
+            $this->getFuelSettings();
+
+        $highCostAlert =
+            $fuelSettings['highCostAlert'];
+
         $fuelLogs = FuelLog::with([
             'vehicle',
             'driver',
@@ -23,10 +56,32 @@ class FuelLogController extends Controller
             ->orderBy('date', 'desc')
             ->orderBy('refuel_time', 'desc')
             ->orderBy('id', 'desc')
-            ->get();
+            ->get()
+            ->map(function ($fuelLog) use ($highCostAlert) {
+                $cost =
+                    (float) $fuelLog->cost;
+
+                $fuelLog->setAttribute(
+                    'high_cost_alert',
+                    $highCostAlert > 0 &&
+                    $cost >= $highCostAlert
+                );
+
+                $fuelLog->setAttribute(
+                    'high_cost_threshold',
+                    $highCostAlert
+                );
+
+                return $fuelLog;
+            });
 
         return response()->json([
             'fuelLogs' => $fuelLogs,
+
+            'settings' => [
+                'high_cost_alert' =>
+                    $highCostAlert,
+            ],
         ]);
     }
 
@@ -35,6 +90,13 @@ class FuelLogController extends Controller
      */
     public function store(Request $request)
     {
+        $fuelSettings =
+        $this->getFuelSettings();
+        $requireOdometer =
+            (bool) $fuelSettings['requireOdometer'];
+        $requireStation =
+            (bool) $fuelSettings['requireStation'];
+
         $validator = Validator::make(
             $request->all(),
             [
@@ -43,7 +105,7 @@ class FuelLogController extends Controller
                     'exists:vehicles,id',
                 ],
                 'driver_id' => [
-                    'nullable',
+                    'required',
                     'exists:drivers,id',
                 ],
                 'fuel_amount' => [
@@ -56,13 +118,15 @@ class FuelLogController extends Controller
                     'numeric',
                     'min:0.01',
                 ],
-                'cost' => [
-                    'required',
+                /*'cost' => [
+                    'nullable',
                     'numeric',
                     'min:0',
-                ],
+                ],*/
                 'odometer' => [
-                    'required',
+                    $requireOdometer
+                        ? 'required'
+                        : 'nullable',
                     'numeric',
                     'min:0',
                 ],
@@ -79,7 +143,9 @@ class FuelLogController extends Controller
                     'in:Diesel,Gasoline,Premium Gasoline',
                 ],
                 'fuel_station' => [
-                    'required',
+                    $requireStation
+                        ? 'required'
+                        : 'nullable',
                     'string',
                     'max:255',
                 ],
@@ -109,7 +175,8 @@ class FuelLogController extends Controller
 
         try {
             $fuelLog = DB::transaction(function () use (
-                $validator
+                $validator,
+                $fuelSettings
             ) {
                 $validated = $validator->validated();
                 
@@ -195,12 +262,17 @@ class FuelLogController extends Controller
                 |--------------------------------------------------------------------------
                 */
                 if (
-                    (float) $validated['odometer'] <
-                    (float) $vehicle->current_odometer
+                    isset($validated['odometer']) &&
+                    $validated['odometer'] !== null
                 ) {
-                    throw new \Exception(
-                        'Odometer reading cannot be lower than the vehicle\'s current mileage.'
-                    );
+                    if (
+                        (float) $validated['odometer'] <
+                        (float) $vehicle->current_odometer
+                    ) {
+                        throw new \Exception(
+                            'Odometer reading cannot be lower than the vehicle\'s current mileage.'
+                        );
+                    }
                 }
                 /*
                 |--------------------------------------------------------------------------
@@ -233,13 +305,22 @@ class FuelLogController extends Controller
                 | Update Vehicle Current Fuel + Mileage
                 |--------------------------------------------------------------------------
                 */
-                $vehicle->update([
+                $vehicleUpdate = [
                     'current_fuel' =>
                         $newFuelLevel,
+                ];
 
-                    'current_odometer' =>
-                        $validated['odometer'],
-                ]);
+                if (
+                    isset($validated['odometer']) &&
+                    $validated['odometer'] !== null
+                ) {
+                    $vehicleUpdate['current_odometer'] =
+                        $validated['odometer'];
+                }
+
+                $vehicle->update(
+                    $vehicleUpdate
+                );
                 /*
                 |--------------------------------------------------------------------------
                 | Load Relationships
@@ -250,8 +331,50 @@ class FuelLogController extends Controller
                     'driver',
                 ]);
 
+                $fuelLog->setAttribute(
+                    'high_cost_alert',
+                    $fuelSettings['highCostAlert'] > 0 &&
+                    $calculatedCost >= $fuelSettings['highCostAlert']
+                );
+
+                $fuelLog->setAttribute(
+                    'high_cost_threshold',
+                    $fuelSettings['highCostAlert']
+                );
+
                 return $fuelLog;
             });
+
+            $threshold =
+                (float) $fuelSettings['highCostAlert'];
+            $fuelCost =
+                (float) $fuelLog->cost;
+
+            if (
+                $threshold > 0 &&
+                $fuelCost >= $threshold
+            ) {
+                $vehicleLabel = trim(
+                    ($fuelLog->vehicle?->brand ?? '') .
+                    ' ' .
+                    ($fuelLog->vehicle?->model ?? '')
+                );
+
+                if ($vehicleLabel === '') {
+                    $vehicleLabel = 'selected vehicle';
+                }
+
+                FleetNotificationService::createWhenEnabled(
+                    'fuelHighCost',
+                    'High Fuel Cost',
+                    "Fuel record {$fuelLog->fuel_number} for {$vehicleLabel} reached ₱" .
+                    number_format($fuelCost, 2) .
+                    ", exceeding the configured ₱" .
+                    number_format($threshold, 2) .
+                    ' alert threshold.',
+                    false
+                );
+            }
 
             return response()->json([
                 'success' => true,
@@ -291,6 +414,11 @@ class FuelLogController extends Controller
      */
     public function update(Request $request, FuelLog $fuelLog)
     {
+        $fuelSettings =
+            $this->getFuelSettings();
+        $requireStation =
+            (bool) $fuelSettings['requireStation'];
+
         $validator = Validator::make(
             $request->all(),
             [
@@ -308,7 +436,9 @@ class FuelLogController extends Controller
                     'min:0.01',
                 ],
                 'fuel_station' => [
-                    'required',
+                    $requireStation
+                        ? 'required'
+                        : 'nullable',
                     'string',
                     'max:255',
                 ],
@@ -351,6 +481,9 @@ class FuelLogController extends Controller
 
                 $validated = $validator->validated();
 
+                $previousCost =
+                    (float) $fuelLog->cost;
+
                 /*
                 |--------------------------------------------------------------------------
                 | Recalculate Total Cost
@@ -391,8 +524,49 @@ class FuelLogController extends Controller
                     'driver',
                 ]);
 
-                return $fuelLog;
+                return [
+                    'fuelLog' =>
+                        $fuelLog,
+                    'previousCost' =>
+                        $previousCost,
+                ];
             });
+            $fuelLogResult =
+                $result['fuelLog'];
+            $previousCost =
+                (float) $result['previousCost'];
+            $threshold =
+                (float) $fuelSettings['highCostAlert'];
+            $newCost =
+                (float) $result->cost;
+
+            if (
+                $threshold > 0 &&
+                $previousCost < $threshold &&
+                $newCost >= $threshold
+            ) {
+                $vehicleLabel = trim(
+                    ($result->vehicle?->brand ?? '') .
+                    ' ' .
+                    ($result->vehicle?->model ?? '')
+                );
+
+                if ($vehicleLabel === '') {
+                    $vehicleLabel = 'selected vehicle';
+                }
+
+                FleetNotificationService::createWhenEnabled(
+                    'fuelHighCost',
+                    'High Fuel Cost',
+                    "Fuel record {$fuelLog->fuel_number} for {$vehicleLabel} reached ₱" .
+                    number_format($fuelCost, 2) .
+                    ", exceeding the configured ₱" .
+                    number_format($threshold, 2) .
+                    ' alert threshold.',
+                    false,
+                    route('fuel')
+                );
+            }
 
             return response()->json([
                 'success' => true,

@@ -2,6 +2,110 @@
    Add Vehicle
 ========================================== */
 
+/* ==========================================
+   Vehicle Module Settings
+========================================== */
+window.getVehicleModuleSettings =
+  window.getVehicleModuleSettings ||
+  async function () {
+    const defaults = {
+      requirePlateNumber: true,
+      defaultStatus: "Available",
+    };
+
+    try {
+      const response =
+        await fetch(
+          "/settings/data",
+          {
+            headers: {
+              Accept: "application/json",
+            },
+            credentials: "same-origin",
+          }
+        );
+
+      if (!response.ok) {
+        throw new Error(
+          "Unable to load vehicle settings."
+        );
+      }
+      const data =
+        await response.json();
+      const settings =
+        data?.settings?.vehicles;
+      if (
+        !settings ||
+        typeof settings !== "object"
+      ) {
+        return defaults;
+      }
+      const allowedStatuses = [
+        "Available",
+        "On Trip",
+        "Maintenance",
+        "Out of Service",
+      ];
+      return {
+        requirePlateNumber:
+          settings.requirePlateNumber !==
+          false,
+        defaultStatus:
+          allowedStatuses.includes(
+            settings.defaultStatus
+          )
+            ? settings.defaultStatus
+            : defaults.defaultStatus,
+      };
+    } catch (error) {
+      console.error(
+        "Vehicle settings load error:",
+        error
+      );
+      return defaults;
+    }
+  };
+
+function applyVehicleAddSettings(
+  settings
+) {
+  const plate =
+    document.getElementById(
+      "vehiclePlate"
+    );
+  const plateMark =
+    document.getElementById(
+      "vehiclePlateRequiredMark"
+    );
+  const status =
+    document.getElementById(
+      "vehicleStatus"
+    );
+  const requirePlate =
+    settings?.requirePlateNumber !==
+    false;
+  if (plate) {
+    plate.required =
+      requirePlate;
+  }
+  if (plateMark) {
+    plateMark.hidden =
+      !requirePlate;
+  }
+  /*
+   * Only set default when no status
+   * has been selected yet.
+   */
+  if (
+    status &&
+    !status.value
+  ) {
+    status.value =
+      settings?.defaultStatus ||
+      "Available";
+  }
+}
+
 async function loadAvailableDrivers(selectedId = null) {
     const select = document.getElementById("vehicleDriver");
 
@@ -116,15 +220,17 @@ function validateVehicleFuelFields() {
 }
 
 
-function initVehicleAdd() {
+async function initVehicleAdd() {
     const form = document.getElementById("vehicleForm");
 
     if (!form || form.dataset.vehicleAddInitialized === "true") {
         return;
     }
 
-    const requiredFields = [
-        "vehiclePlate",
+    const vehicleSettings = await window.getVehicleModuleSettings();
+    applyVehicleAddSettings(vehicleSettings);
+
+    const alwaysRequiredFields = [
         "vehicleType",
         "vehicleBrand",
         "vehicleModel",
@@ -138,9 +244,18 @@ function initVehicleAdd() {
         .map((id) => document.getElementById(id))
         .filter(Boolean);
 
-    requiredFields.forEach((field) => {
+    alwaysRequiredFields.forEach((field) => {
         field.required = true;
     });
+
+    function getRequiredVehicleFields() {
+        const fields = [...alwaysRequiredFields];
+        const plate = document.getElementById("vehiclePlate");
+        if (plate && plate.required) {
+            fields.unshift(plate);
+        }
+        return fields;
+    }
 
     form.dataset.vehicleAddInitialized = "true";
 
@@ -176,6 +291,8 @@ function initVehicleAdd() {
 
     form.addEventListener("submit", async (event) => {
         event.preventDefault();
+
+        const requiredFields = getRequiredVehicleFields();
 
         const emptyField = requiredFields.find(
             (field) => String(field.value ?? "").trim() === "",
@@ -266,6 +383,8 @@ function initVehicleAdd() {
 
             form.reset();
 
+            applyVehicleAddSettings(vehicleSettings);
+
             if (typeof resetVehicleImagePreview === "function") {
                 resetVehicleImagePreview();
             }
@@ -332,7 +451,7 @@ function initVehicleAdd() {
 }
 
 
-document.addEventListener("DOMContentLoaded", () => {
-    initVehicleAdd();
+document.addEventListener("DOMContentLoaded", async () => {
+    await initVehicleAdd();
     loadAvailableDrivers();
 });

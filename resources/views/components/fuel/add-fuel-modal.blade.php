@@ -124,23 +124,33 @@
           <div class="form-group">
             <label for="fuelTotalCost">Total Cost *</label>
             <input type="number" id="fuelTotalCost" min="0" step="0.01" readonly required />
+            <small
+                id="fuelHighCostWarning"
+                class="form-hint"
+                hidden
+            ></small>
           </div>
 
           <div class="form-group">
-            <label for="fuelOdometer">Odometer Reading *</label>
+            <label for="fuelOdometer">
+                Odometer Reading
+                <span id="fuelOdometerRequiredMark">*</span>
+            </label>
             <input
               type="number"
               id="fuelOdometer"
               min="0"
               step="1"
               placeholder="Kilometers"
-              required
             />
           </div>
 
           <div class="form-group">
-            <label for="fuelStation">Fuel Station *</label>
-            <input type="text" id="fuelStation" placeholder="Enter fuel station" required />
+            <label for="fuelStation">
+                Fuel Station
+                <span id="fuelStationRequiredMark">*</span>
+            </label>
+            <input type="text" id="fuelStation" placeholder="Enter fuel station" />
           </div>
 
           <div class="form-group">

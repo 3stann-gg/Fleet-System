@@ -53,13 +53,16 @@
         </div>
         <div class="form-grid">
           <div class="form-group">
-            <label for="vehiclePlate">Plate Number *</label>
+            <label for="vehiclePlate">
+                Plate Number
+                <span id="vehiclePlateRequiredMark">*</span>
+            </label>
             <input
                 type="text"
                 id="vehiclePlate"
                 name="plate_number"
                 placeholder="ABC-1234"
-                required
+  
             />
           </div>
 

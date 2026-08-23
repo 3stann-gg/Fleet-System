@@ -406,34 +406,55 @@ function buildVehicleAggregates(filtered, vehicles) {
 }
 
 function buildDepartmentAggregates(filtered) {
-  const map = new Map();
-  filtered.forEach((r) => {
-    const key = r.department || "Unassigned";
-    if (!map.has(key)) {
-      map.set(key, {
-        department: key,
-        fuelCost: 0,
-        maintenanceCost: 0,
-        tripCost: 0,
-        otherCost: 0,
-        totalCost: 0,
-      });
-    }
-    const row = map.get(key);
-    const c = Number(r.totalCost) || 0;
-    row.totalCost += c;
-    if (r.category === "Fuel") row.fuelCost += c;
-    else if (r.category === "Maintenance") row.maintenanceCost += c;
-    else if (r.category === "Trip Operations") row.tripCost += c;
-    else row.otherCost += c;
-  });
-  const total = sumCost(filtered) || 1;
-  return Array.from(map.values())
-    .map((row) => ({
-      ...row,
-      costShare: (row.totalCost / total) * 100,
-    }))
-    .sort((a, b) => b.totalCost - a.totalCost);
+    const map = new Map();
+    const includeUnassigned =
+        window.costAnalysisModuleSettings?.includeUnassignedDepartment !==
+        false;
+    filtered.forEach((r) => {
+        const rawDepartment = String(r.department || "").trim();
+        /*
+        |--------------------------------------------------------------------------
+        | Optional Unassigned Group
+        |--------------------------------------------------------------------------
+        */
+        if (!rawDepartment && !includeUnassigned) {
+            return;
+        }
+        const key = rawDepartment || "Unassigned";
+        if (!map.has(key)) {
+            map.set(key, {
+                department: key,
+                fuelCost: 0,
+                maintenanceCost: 0,
+                tripCost: 0,
+                otherCost: 0,
+                totalCost: 0,
+            });
+        }
+
+        const row = map.get(key);
+        const cost = Number(r.totalCost) || 0;
+        row.totalCost += cost;
+        if (r.category === "Fuel") {
+            row.fuelCost += cost;
+        } else if (r.category === "Maintenance") {
+            row.maintenanceCost += cost;
+        } else if (r.category === "Trip Operations") {
+            row.tripCost += cost;
+        } else {
+            row.otherCost += cost;
+        }
+    });
+    const departmentTotal =
+        Array.from(map.values()).reduce((sum, row) => sum + row.totalCost, 0) ||
+        1;
+    return Array.from(map.values())
+        .map((row) => ({
+            ...row,
+
+            costShare: (row.totalCost / departmentTotal) * 100,
+        }))
+        .sort((a, b) => b.totalCost - a.totalCost);
 }
 
 function renderOverviewKpis(kpis) {
@@ -498,9 +519,14 @@ function renderBudgetPanel(kpis, options = {}) {
 
   const mismatch = document.getElementById("costBudgetMismatchNote");
   if (mismatch) {
-    const showMismatch =
-      configuredBudget != null && configuredBudget >= 0 && !matching;
-    mismatch.hidden = !showMismatch;
+      const allowMismatchNote =
+          window.costAnalysisModuleSettings?.showBudgetMismatch !== false;
+      const showMismatch =
+          allowMismatchNote &&
+          configuredBudget != null &&
+          configuredBudget >= 0 &&
+          !matching;
+      mismatch.hidden = !showMismatch;
   }
 
   const catWarn = document.getElementById("costCategoryBudgetWarn");
@@ -738,10 +764,19 @@ async function refreshCostAnalysis(options = {}) {
           renderDepartmentViewKpis(deptRows);
           const note = document.getElementById("deptAvailabilityNote");
           if (note) {
-              const unassigned = deptRows.find(
-                  (d) => d.department === "Unassigned",
+              const includeUnassigned =
+                  window.costAnalysisModuleSettings
+                      ?.includeUnassignedDepartment !== false;
+              const unassigned = includeUnassigned
+                  ? deptRows.find(
+                        (department) => department.department === "Unassigned",
+                    )
+                  : null;
+              note.hidden = !(
+                  includeUnassigned &&
+                  unassigned &&
+                  unassigned.totalCost > 0
               );
-              note.hidden = !(unassigned && unassigned.totalCost > 0);
           }
       } else if (filters.analysisView === "trips") {
           renderTripViewState(filtered, trips);
@@ -958,10 +993,17 @@ function populateCostFilterOptions(sources, filtered) {
       if (r.department) depts.add(r.department);
     });
     const names = Array.from(depts).sort((a, b) => a.localeCompare(b));
+    const includeUnassigned =
+        window.costAnalysisModuleSettings?.includeUnassignedDepartment !==
+        false;
     deptSelect.innerHTML =
-      '<option value="all">All Departments</option>' +
-      names.map((n) => `<option value="${n}">${n}</option>`).join("") +
-      '<option value="Unassigned">Unassigned</option>';
+        '<option value="all">All Departments</option>' +
+        names
+            .map((name) => `<option value="${name}">${name}</option>`)
+            .join("") +
+        (includeUnassigned
+            ? '<option value="Unassigned">Unassigned</option>'
+            : "");
     if ([...deptSelect.options].some((o) => o.value === current)) {
       deptSelect.value = current;
     }

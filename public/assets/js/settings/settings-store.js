@@ -8,81 +8,79 @@ const HIMS_FLEET_SETTINGS_VERSION = 1;
 
 function getDefaultFleetSettings() {
   return {
-    version: HIMS_FLEET_SETTINGS_VERSION,
-    general: {
-      organizationName: "Hospital Information Management System",
-      fleetUnitName: "Fleet & Transportation",
-      contactEmail: "",
-      contactPhone: "",
-      defaultLandingPage: "dashboard",
-      /* Preference only — modules still use local page-size controls */
-      defaultRowsPerPage: 10,
-    },
-    regional: {
-      currencyCode: "PHP",
-      currencySymbol: "₱",
-      dateFormat: "YYYY-MM-DD",
-      timeFormat: "24h",
-      distanceUnit: "km",
-      volumeUnit: "L",
-    },
-    vehicles: {
-      requirePlateNumber: true,
-      requireDepartment: true,
-      defaultStatus: "Available",
-      lowUtilizationThreshold: 40,
-    },
-    reservations: {
-      requireApproval: true,
-      allowSameDay: true,
-      defaultDurationHours: 2,
-      maxAdvanceDays: 30,
-    },
-    dispatch: {
-      autoAssignDriver: false,
-      requireVehicleCheck: true,
-      defaultPriority: "Medium",
-      showCompletedDays: 7,
-    },
-    drivers: {
-      requireLicenseExpiry: true,
-      warnLicenseDays: 30,
-      defaultStatus: "Active",
-    },
-    maintenance: {
-      overdueWarnDays: 3,
-      requireCost: true,
-      defaultType: "Preventive",
-    },
-    fuel: {
-      requireOdometer: true,
-      requireStation: false,
-      highCostAlert: 5000,
-    },
-    routes: {
-      preferOptimized: true,
-      archiveCompleted: false,
-      defaultPriority: "Medium",
-    },
-    costAnalysis: {
-      defaultDateRange: "last30",
-      showBudgetMismatch: true,
-      includeUnassignedDepartment: true,
-    },
-    notifications: {
-      maintenanceDue: true,
-      licenseExpiring: true,
-      reservationPending: true,
-      fuelHighCost: false,
-      dispatchUpdates: true,
-      /* Preference flag only — no push/SW/polling */
-      browserNotifications: false,
-    },
-    dataManagement: {
-      confirmDestructive: true,
-      retainExportHistory: false,
-    },
-    updatedAt: null,
+      version: HIMS_FLEET_SETTINGS_VERSION,
+      general: {
+          organizationName: "Hospital Information Management System",
+          fleetUnitName: "Fleet & Transportation",
+          contactEmail: "",
+          contactPhone: "",
+          defaultLandingPage: "dashboard",
+          /* Preference only — modules still use local page-size controls */
+          defaultRowsPerPage: 10,
+      },
+      regional: {
+          currencyCode: "PHP",
+          currencySymbol: "₱",
+          dateFormat: "YYYY-MM-DD",
+          timeFormat: "24h",
+          distanceUnit: "km",
+          volumeUnit: "L",
+      },
+      vehicles: {
+          requirePlateNumber: true,
+          requireDepartment: false,
+          defaultStatus: "Available",
+          lowUtilizationThreshold: 40,
+      },
+      reservations: {
+          requireApproval: true,
+          allowSameDay: true,
+          defaultDurationHours: 2,
+          maxAdvanceDays: 30,
+      },
+      dispatch: {
+          autoAssignDriver: false,
+          requireVehicleCheck: true,
+          defaultPriority: "Normal",
+          showCompletedDays: 7,
+      },
+      drivers: {
+          requireLicenseExpiry: true,
+          warnLicenseDays: 30,
+          defaultStatus: "Available",
+      },
+      maintenance: {
+          overdueWarnDays: 3,
+          requireCost: true,
+          defaultType: "Preventive Maintenance",
+      },
+      fuel: {
+          requireOdometer: true,
+          requireStation: false,
+          highCostAlert: 5000,
+      },
+      routes: {
+          preferOptimized: true,
+      },
+      costAnalysis: {
+          defaultDateRange: "last30",
+          showBudgetMismatch: true,
+          includeUnassignedDepartment: true,
+      },
+      notifications: {
+          maintenanceDue: true,
+          licenseExpiring: true,
+          reservationPending: true,
+          fuelHighCost: false,
+          dispatchUpdates: true,
+          /* Preference flag only — no push/SW/polling */
+          browserNotifications: false,
+      },
+      dataManagement: {
+          confirmDestructive: true,
+          retainExportHistory: false,
+      },
+      updatedAt: null,
   };
 }
 
@@ -123,155 +121,156 @@ function normalizeFleetSettings(raw) {
     : defaults.general.defaultLandingPage;
 
   return {
-    version: HIMS_FLEET_SETTINGS_VERSION,
-    general: {
-      organizationName: String(
-        g.organizationName ?? defaults.general.organizationName,
-      ).slice(0, 120),
-      fleetUnitName: String(
-        g.fleetUnitName ?? defaults.general.fleetUnitName,
-      ).slice(0, 80),
-      contactEmail: String(g.contactEmail ?? "").slice(0, 120),
-      contactPhone: String(g.contactPhone ?? "").slice(0, 40),
-      defaultLandingPage: landing,
-      defaultRowsPerPage: [5, 10, 20, 25, 50].includes(
-        Number(g.defaultRowsPerPage),
-      )
-        ? Number(g.defaultRowsPerPage)
-        : defaults.general.defaultRowsPerPage,
-    },
-    regional: {
-      currencyCode: String(r.currencyCode || "PHP")
-        .toUpperCase()
-        .slice(0, 8),
-      currencySymbol: String(r.currencySymbol || "₱").slice(0, 4),
-      dateFormat: ["YYYY-MM-DD", "MM/DD/YYYY", "DD/MM/YYYY"].includes(
-        r.dateFormat,
-      )
-        ? r.dateFormat
-        : defaults.regional.dateFormat,
-      timeFormat: r.timeFormat === "12h" ? "12h" : "24h",
-      distanceUnit: r.distanceUnit === "mi" ? "mi" : "km",
-      volumeUnit: r.volumeUnit === "gal" ? "gal" : "L",
-    },
-    vehicles: {
-      requirePlateNumber: v.requirePlateNumber !== false,
-      requireDepartment: v.requireDepartment !== false,
-      defaultStatus: ["Available", "In Use", "Maintenance", "Inactive"].includes(
-        v.defaultStatus,
-      )
-        ? v.defaultStatus
-        : defaults.vehicles.defaultStatus,
-      lowUtilizationThreshold: clampNumber(
-        v.lowUtilizationThreshold,
-        0,
-        100,
-        defaults.vehicles.lowUtilizationThreshold,
-      ),
-    },
-    reservations: {
-      requireApproval: res.requireApproval !== false,
-      allowSameDay: res.allowSameDay !== false,
-      defaultDurationHours: clampNumber(
-        res.defaultDurationHours,
-        1,
-        72,
-        defaults.reservations.defaultDurationHours,
-      ),
-      maxAdvanceDays: clampNumber(
-        res.maxAdvanceDays,
-        1,
-        365,
-        defaults.reservations.maxAdvanceDays,
-      ),
-    },
-    dispatch: {
-      autoAssignDriver: d.autoAssignDriver === true,
-      requireVehicleCheck: d.requireVehicleCheck !== false,
-      defaultPriority: ["Low", "Medium", "High", "Emergency"].includes(
-        d.defaultPriority,
-      )
-        ? d.defaultPriority
-        : defaults.dispatch.defaultPriority,
-      showCompletedDays: clampNumber(
-        d.showCompletedDays,
-        1,
-        90,
-        defaults.dispatch.showCompletedDays,
-      ),
-    },
-    drivers: {
-      requireLicenseExpiry: dr.requireLicenseExpiry !== false,
-      warnLicenseDays: clampNumber(
-        dr.warnLicenseDays,
-        1,
-        180,
-        defaults.drivers.warnLicenseDays,
-      ),
-      defaultStatus: ["Active", "Inactive", "On Leave"].includes(dr.defaultStatus)
-        ? dr.defaultStatus
-        : defaults.drivers.defaultStatus,
-    },
-    maintenance: {
-      overdueWarnDays: clampNumber(
-        m.overdueWarnDays,
-        0,
-        30,
-        defaults.maintenance.overdueWarnDays,
-      ),
-      requireCost: m.requireCost !== false,
-      defaultType: ["Preventive", "Corrective", "Inspection"].includes(
-        m.defaultType,
-      )
-        ? m.defaultType
-        : defaults.maintenance.defaultType,
-    },
-    fuel: {
-      requireOdometer: f.requireOdometer !== false,
-      requireStation: f.requireStation === true,
-      highCostAlert: clampNumber(
-        f.highCostAlert,
-        0,
-        1000000,
-        defaults.fuel.highCostAlert,
-      ),
-    },
-    routes: {
-      preferOptimized: rt.preferOptimized !== false,
-      archiveCompleted: rt.archiveCompleted === true,
-      defaultPriority: ["Low", "Medium", "High", "Emergency"].includes(
-        rt.defaultPriority,
-      )
-        ? rt.defaultPriority
-        : defaults.routes.defaultPriority,
-    },
-    costAnalysis: {
-      defaultDateRange: [
-        "today",
-        "last7",
-        "last30",
-        "thisMonth",
-        "thisQuarter",
-        "thisYear",
-      ].includes(c.defaultDateRange)
-        ? c.defaultDateRange
-        : defaults.costAnalysis.defaultDateRange,
-      showBudgetMismatch: c.showBudgetMismatch !== false,
-      includeUnassignedDepartment: c.includeUnassignedDepartment !== false,
-    },
-    notifications: {
-      maintenanceDue: n.maintenanceDue !== false,
-      licenseExpiring: n.licenseExpiring !== false,
-      reservationPending: n.reservationPending !== false,
-      fuelHighCost: n.fuelHighCost === true,
-      dispatchUpdates: n.dispatchUpdates !== false,
-      browserNotifications: n.browserNotifications === true,
-    },
-    dataManagement: {
-      confirmDestructive: dm.confirmDestructive !== false,
-      retainExportHistory: dm.retainExportHistory === true,
-    },
-    updatedAt: raw.updatedAt || null,
+      version: HIMS_FLEET_SETTINGS_VERSION,
+      general: {
+          organizationName: String(
+              g.organizationName ?? defaults.general.organizationName,
+          ).slice(0, 120),
+          fleetUnitName: String(
+              g.fleetUnitName ?? defaults.general.fleetUnitName,
+          ).slice(0, 80),
+          contactEmail: String(g.contactEmail ?? "").slice(0, 120),
+          contactPhone: String(g.contactPhone ?? "").slice(0, 40),
+          defaultLandingPage: landing,
+          defaultRowsPerPage: [5, 10, 20, 25, 50].includes(
+              Number(g.defaultRowsPerPage),
+          )
+              ? Number(g.defaultRowsPerPage)
+              : defaults.general.defaultRowsPerPage,
+      },
+      regional: {
+          currencyCode: String(r.currencyCode || "PHP")
+              .toUpperCase()
+              .slice(0, 8),
+          currencySymbol: String(r.currencySymbol || "₱").slice(0, 4),
+          dateFormat: ["YYYY-MM-DD", "MM/DD/YYYY", "DD/MM/YYYY"].includes(
+              r.dateFormat,
+          )
+              ? r.dateFormat
+              : defaults.regional.dateFormat,
+          timeFormat: r.timeFormat === "12h" ? "12h" : "24h",
+          distanceUnit: r.distanceUnit === "mi" ? "mi" : "km",
+          volumeUnit: r.volumeUnit === "gal" ? "gal" : "L",
+      },
+      vehicles: {
+          requirePlateNumber: v.requirePlateNumber !== false,
+          requireDepartment: v.requireDepartment !== false,
+          defaultStatus: [
+              "Available",
+              "On Trip",
+              "Maintenance",
+              "Out of Service",
+          ].includes(v.defaultStatus)
+              ? v.defaultStatus
+              : defaults.vehicles.defaultStatus,
+          lowUtilizationThreshold: clampNumber(
+              v.lowUtilizationThreshold,
+              0,
+              100,
+              defaults.vehicles.lowUtilizationThreshold,
+          ),
+      },
+      reservations: {
+          requireApproval: res.requireApproval !== false,
+          allowSameDay: res.allowSameDay !== false,
+          defaultDurationHours: clampNumber(
+              res.defaultDurationHours,
+              1,
+              72,
+              defaults.reservations.defaultDurationHours,
+          ),
+          maxAdvanceDays: clampNumber(
+              res.maxAdvanceDays,
+              1,
+              365,
+              defaults.reservations.maxAdvanceDays,
+          ),
+      },
+      dispatch: {
+          autoAssignDriver: d.autoAssignDriver === true,
+          requireVehicleCheck: d.requireVehicleCheck !== false,
+          defaultPriority: ["Low", "Medium", "High", "Emergency"].includes(
+              d.defaultPriority,
+          )
+              ? d.defaultPriority
+              : defaults.dispatch.defaultPriority,
+          showCompletedDays: clampNumber(
+              d.showCompletedDays,
+              1,
+              90,
+              defaults.dispatch.showCompletedDays,
+          ),
+      },
+      drivers: {
+          requireLicenseExpiry: dr.requireLicenseExpiry !== false,
+          warnLicenseDays: clampNumber(
+              dr.warnLicenseDays,
+              1,
+              180,
+              defaults.drivers.warnLicenseDays,
+          ),
+          defaultStatus: ["Available", "On Leave", "Inactive"].includes(
+              dr.defaultStatus,
+          )
+              ? dr.defaultStatus
+              : defaults.drivers.defaultStatus,
+      },
+      maintenance: {
+          overdueWarnDays: clampNumber(
+              m.overdueWarnDays,
+              0,
+              30,
+              defaults.maintenance.overdueWarnDays,
+          ),
+          requireCost: m.requireCost !== false,
+          defaultType: [
+              "Preventive Maintenance",
+              "Corrective Repair",
+              "Inspection",
+          ].includes(m.defaultType)
+              ? m.defaultType
+              : defaults.maintenance.defaultType,
+      },
+      fuel: {
+          requireOdometer: f.requireOdometer !== false,
+          requireStation: f.requireStation === true,
+          highCostAlert: clampNumber(
+              f.highCostAlert,
+              0,
+              1000000,
+              defaults.fuel.highCostAlert,
+          ),
+      },
+      routes: {
+          preferOptimized: rt.preferOptimized !== false,
+      },
+      costAnalysis: {
+          defaultDateRange: [
+              "today",
+              "last7",
+              "last30",
+              "thisMonth",
+              "thisQuarter",
+              "thisYear",
+          ].includes(c.defaultDateRange)
+              ? c.defaultDateRange
+              : defaults.costAnalysis.defaultDateRange,
+          showBudgetMismatch: c.showBudgetMismatch !== false,
+          includeUnassignedDepartment: c.includeUnassignedDepartment !== false,
+      },
+      notifications: {
+          maintenanceDue: n.maintenanceDue !== false,
+          licenseExpiring: n.licenseExpiring !== false,
+          reservationPending: n.reservationPending !== false,
+          fuelHighCost: n.fuelHighCost === true,
+          dispatchUpdates: n.dispatchUpdates !== false,
+          browserNotifications: n.browserNotifications === true,
+      },
+      dataManagement: {
+          confirmDestructive: dm.confirmDestructive !== false,
+          retainExportHistory: dm.retainExportHistory === true,
+      },
+      updatedAt: raw.updatedAt || null,
   };
 }
 
@@ -388,37 +387,204 @@ function validateFleetSettingsImportPayload(raw, fileSize) {
   };
 }
 
-function loadFleetSettings() {
+
+/* ==========================================
+   Database-backed Fleet Settings API
+========================================== */
+
+async function loadFleetSettings() {
   try {
-    const raw = localStorage.getItem(HIMS_FLEET_SETTINGS_KEY);
-    if (!raw) return getDefaultFleetSettings();
-    return normalizeFleetSettings(JSON.parse(raw));
+    const response = await fetch("/settings/data", {
+      method: "GET",
+      headers: {
+        Accept: "application/json",
+      },
+      credentials: "same-origin",
+    });
+
+    if (!response.ok) {
+      throw new Error(
+        `Unable to load settings (${response.status})`
+      );
+    }
+
+    const data = await response.json();
+
+    if (!data.settings) {
+      return getDefaultFleetSettings();
+    }
+
+    const normalized =
+      normalizeFleetSettings(data.settings);
+
+    if (data.updated_at) {
+      normalized.updatedAt =
+        data.updated_at;
+    }
+
+    return normalized;
   } catch (error) {
-    console.error("Malformed fleet settings storage:", error);
+    console.error(
+      "Unable to load Fleet settings:",
+      error
+    );
+
+    if (
+      typeof showToast ===
+      "function"
+    ) {
+      showToast(
+        "Unable to load Fleet settings.",
+        "error"
+      );
+    }
+
     return getDefaultFleetSettings();
   }
 }
 
-function persistFleetSettings(settings) {
+async function persistFleetSettings(
+  settings
+) {
   try {
-    const normalized = normalizeFleetSettings(settings);
-    normalized.updatedAt = new Date().toISOString();
-    localStorage.setItem(HIMS_FLEET_SETTINGS_KEY, JSON.stringify(normalized));
-    return normalized;
-  } catch (error) {
-    console.error("Unable to persist fleet settings:", error);
-    if (typeof showToast === "function") {
-      showToast("Unable to save settings (storage unavailable).", "error");
+    const normalized =
+      normalizeFleetSettings(settings);
+
+    const csrfToken =
+      document
+        .querySelector(
+          'meta[name="csrf-token"]'
+        )
+        ?.getAttribute("content");
+
+    const response = await fetch(
+      "/settings",
+      {
+        method: "PUT",
+        credentials: "same-origin",
+
+        headers: {
+          Accept: "application/json",
+          "Content-Type":
+            "application/json",
+
+          "X-CSRF-TOKEN":
+            csrfToken || "",
+
+          "X-Requested-With":
+            "XMLHttpRequest",
+        },
+
+        body: JSON.stringify({
+          settings: normalized,
+        }),
+      }
+    );
+
+    const data =
+      await response.json();
+
+    if (!response.ok) {
+      const message =
+        data?.message ||
+        "Unable to save settings.";
+
+      throw new Error(message);
     }
+
+    const saved =
+      normalizeFleetSettings(
+        data.settings ||
+          normalized
+      );
+
+    if (data.updated_at) {
+      saved.updatedAt =
+        data.updated_at;
+    }
+
+    return saved;
+  } catch (error) {
+    console.error(
+      "Unable to persist Fleet settings:",
+      error
+    );
+
+    if (
+      typeof showToast ===
+      "function"
+    ) {
+      showToast(
+        error.message ||
+          "Unable to save Fleet settings.",
+        "error"
+      );
+    }
+
     return null;
   }
 }
 
-function clearFleetSettingsStorage() {
+async function resetFleetSettingsStorage() {
   try {
-    localStorage.removeItem(HIMS_FLEET_SETTINGS_KEY);
+    const csrfToken =
+      document
+        .querySelector(
+          'meta[name="csrf-token"]'
+        )
+        ?.getAttribute("content");
+
+    const response = await fetch(
+      "/settings/reset",
+      {
+        method: "POST",
+        credentials: "same-origin",
+
+        headers: {
+          Accept: "application/json",
+
+          "X-CSRF-TOKEN":
+            csrfToken || "",
+
+          "X-Requested-With":
+            "XMLHttpRequest",
+        },
+      }
+    );
+
+    const data =
+      await response.json();
+
+    if (!response.ok) {
+      throw new Error(
+        data?.message ||
+          "Unable to reset settings."
+      );
+    }
+
     return true;
-  } catch {
+  } catch (error) {
+    console.error(
+      "Unable to reset Fleet settings:",
+      error
+    );
+
+    if (
+      typeof showToast ===
+      "function"
+    ) {
+      showToast(
+        error.message ||
+          "Unable to reset settings.",
+        "error"
+      );
+    }
+
     return false;
   }
 }
+
+
+
+
+

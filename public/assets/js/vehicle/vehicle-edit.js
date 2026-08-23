@@ -2,6 +2,74 @@
    Edit Vehicle Modal
 ========================================== */
 
+/* ==========================================
+   Vehicle Module Settings
+========================================== */
+
+async function getEditVehicleSettings() {
+    if (
+        typeof window.getVehicleModuleSettings ===
+        "function"
+    ) {
+        return await window.getVehicleModuleSettings();
+    }
+    try {
+        const response =
+            await fetch(
+                "/settings/data",
+                {
+                    headers: {
+                        Accept:
+                            "application/json",
+                    },
+                    credentials:
+                        "same-origin",
+                }
+            );
+
+        if (!response.ok) {
+            throw new Error();
+        }
+        const data =
+            await response.json();
+        return {
+            requirePlateNumber:
+                data?.settings?.vehicles
+                    ?.requirePlateNumber !==
+                false,
+        };
+    } catch {
+        return {
+            requirePlateNumber: true,
+        };
+    }
+}
+
+function applyEditVehicleSettings(
+    settings
+) {
+    const plate =
+        document.getElementById(
+            "editVehiclePlate"
+        );
+    const mark =
+        document.getElementById(
+            "editVehiclePlateRequiredMark"
+        );
+    const required =
+        settings
+            ?.requirePlateNumber !==
+        false;
+    if (plate) {
+        plate.required =
+            required;
+    }
+    if (mark) {
+        mark.hidden =
+            !required;
+    }
+}
+
 function populateEditDriverDropdown(drivers, vehicle) {
     const select = document.getElementById("editVehicleDriver");
 
@@ -195,7 +263,7 @@ function validateEditVehicleFuelFields() {
     return true;
 }
 
-function initEditVehicleModal() {
+async function initEditVehicleModal() {
     const modal = document.getElementById("editVehicleModal");
     const form = document.getElementById("editVehicleForm");
     const closeButton = document.getElementById("closeEditVehicleModal");
@@ -208,6 +276,10 @@ function initEditVehicleModal() {
     ) {
         return;
     }
+
+    const vehicleSettings = await getEditVehicleSettings();
+
+    applyEditVehicleSettings(vehicleSettings);
 
     modal.dataset.editVehicleModalInitialized = "true";
 
@@ -397,6 +469,6 @@ function initEditVehicleModal() {
 }
 
 
-document.addEventListener("DOMContentLoaded", () => {
-    initEditVehicleModal();
+document.addEventListener("DOMContentLoaded", async () => {
+    await initEditVehicleModal();
 });

@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Reservation;
 use App\Models\RoutePlan;
+use App\Models\FleetSetting;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
@@ -13,6 +14,25 @@ class RoutePlanController extends Controller
     /**
      * Display route plans.
      */
+    private function getRouteSettings(): array
+    {
+        $record = FleetSetting::query()
+            ->latest('id')
+            ->first();
+
+        $settings =
+            $record?->settings ?? [];
+
+        $routeSettings =
+            $settings['routes'] ?? [];
+
+        return [
+            'preferOptimized' =>
+                $routeSettings['preferOptimized']
+                ?? true,
+        ];
+    }
+    
     public function index(Request $request)
     {
         $query = RoutePlan::with([

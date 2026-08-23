@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use App\Models\Reservation;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Driver extends Model
 {
@@ -22,6 +23,10 @@ class Driver extends Model
         'photo',
         'assigned_vehicle_id',
         'status',
+    ];
+
+    protected $casts = [
+        'license_expiry' => 'date:Y-m-d',
     ];
 
     public function vehicle()

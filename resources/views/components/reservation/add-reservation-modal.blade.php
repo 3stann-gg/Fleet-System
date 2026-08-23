@@ -121,7 +121,7 @@
 
           <div class="form-group">
             <label for="reservationStatus">Status *</label>
-            <select id="reservationStatus" required>
+            <!--<select id="reservationStatus" required>
               <option value="">Select Status</option>
               <option value="Pending">Pending</option>
               <option value="Approved">Approved</option>
@@ -129,7 +129,20 @@
               <option value="Completed">Completed</option>
               <option value="Rejected">Rejected</option>
               <option value="Cancelled">Cancelled</option>
+            </select>-->
+            <select
+                id="reservationStatus"
+                disabled
+            >
+                <option value="Pending">Pending</option>
+                <option value="Approved">Approved</option>
             </select>
+            <small
+                class="form-hint"
+                id="reservationStatusHint"
+            >
+                Initial status is controlled by Reservation Settings.
+            </small>
           </div>
 
           <div class="form-group">

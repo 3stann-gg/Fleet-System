@@ -30,6 +30,10 @@ class Reservation extends Model
         'notes',
     ];
 
+    protected $casts = [
+        'schedule_date' => 'date:Y-m-d',
+    ];
+
     public function vehicle()
     {
         return $this->belongsTo(Vehicle::class);

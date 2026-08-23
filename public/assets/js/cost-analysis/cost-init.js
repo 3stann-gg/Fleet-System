@@ -2,6 +2,87 @@
    Cost Analysis page initialization
 ========================================== */
 
+/* ==========================================
+   Cost Analysis Settings
+========================================== */
+window.costAnalysisModuleSettings = {
+    defaultDateRange: "last30",
+    showBudgetMismatch: true,
+    includeUnassignedDepartment: true,
+};
+
+async function loadCostAnalysisSettings() {
+    const defaults = {
+        defaultDateRange: "last30",
+        showBudgetMismatch: true,
+        includeUnassignedDepartment: true,
+    };
+    try {
+        const response = await fetch(
+            "/settings/data",
+            {
+                headers: {
+                    Accept: "application/json",
+                },
+                credentials: "same-origin",
+            }
+        );
+
+        if (!response.ok) {
+            throw new Error(
+                "Unable to load Cost Analysis settings."
+            );
+        }
+
+        const data = await response.json();
+        const settings =
+            data?.settings?.costAnalysis;
+        if (
+            !settings ||
+            typeof settings !== "object"
+        ) {
+            window.costAnalysisModuleSettings =
+                defaults;
+
+            return defaults;
+        }
+
+        const allowedRanges = [
+            "today",
+            "last7",
+            "last30",
+            "thisMonth",
+            "thisQuarter",
+            "thisYear",
+        ];
+
+        window.costAnalysisModuleSettings = {
+            defaultDateRange:
+                allowedRanges.includes(
+                    settings.defaultDateRange
+                )
+                    ? settings.defaultDateRange
+                    : defaults.defaultDateRange,
+            showBudgetMismatch:
+                settings.showBudgetMismatch !== false,
+            includeUnassignedDepartment:
+                settings.includeUnassignedDepartment !==
+                false,
+        };
+
+        return window.costAnalysisModuleSettings;
+    } catch (error) {
+        console.error(
+            "Cost Analysis settings load error:",
+            error
+        );
+        window.costAnalysisModuleSettings =
+            defaults;
+
+        return defaults;
+    }
+}
+
 let costAnalysisPageInitialized = false;
 
 /* ==========================================
@@ -62,6 +143,14 @@ async function initCostAnalysisPage() {
     }
 
     costAnalysisPageInitialized = true;
+
+    const costSettings = await loadCostAnalysisSettings();
+
+    const dateRangeSelect = document.getElementById("costDateRange");
+
+    if (dateRangeSelect) {
+        dateRangeSelect.value = costSettings.defaultDateRange;
+    }
 
     /*
     |--------------------------------------------------------------------------

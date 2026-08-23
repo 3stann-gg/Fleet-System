@@ -2,30 +2,132 @@
 
 namespace App\Http\Requests;
 
-use App\Models\User;
-use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
 class ProfileUpdateRequest extends FormRequest
 {
-    /**
-     * Get the validation rules that apply to the request.
-     *
-     * @return array<string, ValidationRule|array<mixed>|string>
-     */
+    public function authorize(): bool
+    {
+        return true;
+    }
+
     public function rules(): array
     {
+        $user = $this->user();
+
         return [
-            'name' => ['required', 'string', 'max:255'],
+            'first_name' => [
+                'required',
+                'string',
+                'max:60',
+            ],
+            'middle_name' => [
+                'nullable',
+                'string',
+                'max:60',
+            ],
+            'last_name' => [
+                'required',
+                'string',
+                'max:60',
+            ],
+            'name' => [
+                'required',
+                'string',
+                'max:120',
+            ],
             'email' => [
                 'required',
                 'string',
-                'lowercase',
                 'email',
-                'max:255',
-                Rule::unique(User::class)->ignore($this->user()->id),
+                'max:120',
+                Rule::unique('users', 'email')
+                    ->ignore($user->id),
             ],
+            'employee_id' => [
+                'nullable',
+                'string',
+                'max:40',
+                Rule::unique('users', 'employee_id')
+                    ->ignore($user->id),
+            ],
+            'department' => [
+                'required',
+                'string',
+                'max:120',
+            ],
+            'job_title' => [
+                'required',
+                'string',
+                'max:120',
+            ],
+            'mobile_number' => [
+                'nullable',
+                'string',
+                'max:40',
+            ],
+            'office_extension' => [
+                'nullable',
+                'string',
+                'max:20',
+            ],
+            'office_location' => [
+                'nullable',
+                'string',
+                'max:200',
+            ],
+            'profile_photo' => [
+                'nullable',
+                'image',
+                'mimes:jpg,jpeg,png,webp',
+                'max:2048',
+            ],
+            'remove_profile_photo' => [
+                'nullable',
+                'boolean',
+            ],
+        ];
+    }
+
+    public function messages(): array
+    {
+        return [
+            'first_name.required' =>
+                'First name is required.',
+
+            'last_name.required' =>
+                'Last name is required.',
+
+            'name.required' =>
+                'Display name is required.',
+
+            'email.required' =>
+                'Email address is required.',
+
+            'email.email' =>
+                'Enter a valid email address.',
+
+            'email.unique' =>
+                'This email address is already in use.',
+
+            'employee_id.unique' =>
+                'This employee ID is already in use.',
+
+            'department.required' =>
+                'Department is required.',
+
+            'job_title.required' =>
+                'Job title is required.',
+
+            'profile_photo.image' =>
+                'The profile photo must be a valid image.',
+
+            'profile_photo.mimes' =>
+                'Profile photo must be JPG, JPEG, PNG, or WEBP.',
+
+            'profile_photo.max' =>
+                'Profile photo must not exceed 2 MB.',
         ];
     }
 }

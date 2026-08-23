@@ -79,7 +79,7 @@
                 <select class="filter-select" id="routePriorityFilter" aria-label="Filter by priority">
                   <option value="all">All Priorities</option>
                   <option value="Low">Low</option>
-                  <option value="Medium">Medium</option>
+                  <option value="Normal">Normal</option>
                   <option value="High">High</option>
                   <option value="Emergency">Emergency</option>
                 </select>

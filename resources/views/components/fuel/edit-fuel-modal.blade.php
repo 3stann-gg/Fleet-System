@@ -109,6 +109,11 @@
           <div class="form-group">
             <label for="editFuelTotalCost">Total Cost *</label>
             <input type="number" id="editFuelTotalCost" min="0" step="0.01" readonly />
+            <small
+                id="editFuelHighCostWarning"
+                class="form-hint"
+                hidden
+            ></small>
           </div>
 
           <div class="form-group">
@@ -117,8 +122,11 @@
           </div>
 
           <div class="form-group">
-            <label for="editFuelStation">Fuel Station *</label>
-            <input type="text" id="editFuelStation" required />
+            <label for="editFuelStation">
+                Fuel Station
+                <span id="editFuelStationRequiredMark">*</span>
+            </label>
+            <input type="text" id="editFuelStation" />
           </div>
 
           <div class="form-group">

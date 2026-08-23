@@ -1,4 +1,141 @@
 
+/* ==========================================
+   Reservation Module Settings
+========================================== */
+window.getReservationModuleSettings =
+    window.getReservationModuleSettings ||
+    async function () {
+        const defaults = {
+            requireApproval: true,
+            allowSameDay: true,
+            maxAdvanceDays: 30,
+            defaultDurationHours: 2,
+        };
+        try {
+            const response = await fetch(
+                "/settings/data",
+                {
+                    headers: {
+                        Accept: "application/json",
+                    },
+                    credentials: "same-origin",
+                }
+            );
+            if (!response.ok) {
+                throw new Error(
+                    "Unable to load reservation settings."
+                );
+            }
+            const data = await response.json();
+            const settings =
+                data?.settings?.reservations;
+            if (
+                !settings ||
+                typeof settings !== "object"
+            ) {
+                return defaults;
+            }
+
+            return {
+                requireApproval:
+                    settings.requireApproval !== false,
+                allowSameDay:
+                    settings.allowSameDay !== false,
+                maxAdvanceDays: Math.max(
+                    1,
+                    Math.min(
+                        365,
+                        Number(
+                            settings.maxAdvanceDays ?? 30
+                        )
+                    )
+                ),
+                defaultDurationHours: Math.max(
+                    1,
+                    Math.min(
+                        72,
+                        Number(
+                            settings.defaultDurationHours ?? 2
+                        )
+                    )
+                ),
+            };
+        } catch (error) {
+            console.error(
+                "Reservation settings load error:",
+                error
+            );
+            return defaults;
+        }
+    };
+
+function reservationFormatDate(date) {
+    const year =
+        date.getFullYear();
+    const month =
+        String(
+            date.getMonth() + 1
+        ).padStart(2, "0");
+    const day =
+        String(
+            date.getDate()
+        ).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+}
+
+function applyReservationAddSettings(settings) {
+    const dateInput =
+        document.getElementById(
+            "reservationDate"
+        );
+    const statusSelect =
+        document.getElementById(
+            "reservationStatus"
+        );
+    const statusHint =
+        document.getElementById(
+            "reservationStatusHint"
+        );
+    const today =
+        new Date();
+    const minimumDate =
+        new Date(today);
+    if (!settings.allowSameDay) {
+        minimumDate.setDate(
+            minimumDate.getDate() + 1
+        );
+    }
+    const maximumDate =
+        new Date(today);
+    maximumDate.setDate(
+        maximumDate.getDate() +
+        settings.maxAdvanceDays
+    );
+    if (dateInput) {
+        dateInput.min =
+            reservationFormatDate(
+                minimumDate
+            );
+        dateInput.max =
+            reservationFormatDate(
+                maximumDate
+            );
+    }
+    const initialStatus =
+        settings.requireApproval
+            ? "Pending"
+            : "Approved";
+    if (statusSelect) {
+        statusSelect.value =
+            initialStatus;
+    }
+    if (statusHint) {
+        statusHint.textContent =
+            settings.requireApproval
+                ? "New reservations require approval and will start as Pending."
+                : "Approval is disabled. New reservations will start as Approved.";
+    }
+}
 
 async function loadNextReservationNumber() {
     const numberInput = document.getElementById("reservationNumber");
@@ -112,12 +249,16 @@ async function loadReservationOptions() {
     }
 }
 
-function initReservationAdd() {
+async function initReservationAdd() {
     const modal = document.getElementById("addReservationModal");
     const form = document.getElementById("reservationForm");
 
     if (!modal || !form) return;
     if (form.dataset.reservationAddInitialized === "true") return;
+
+    const reservationSettings = await window.getReservationModuleSettings();
+
+    applyReservationAddSettings(reservationSettings);
 
     form.dataset.reservationAddInitialized = "true";
 
@@ -149,8 +290,7 @@ function initReservationAdd() {
                 document.getElementById("reservationTime").value,
             priority:
                 document.getElementById("reservationPriority").value,
-            status:
-                document.getElementById("reservationStatus").value,
+            // no need status, source of truth is backend
             contact_number:
                 document.getElementById("reservationContact").value.trim(),
             notes:
@@ -209,6 +349,11 @@ function initReservationAdd() {
                 // Reset form
                 form.reset();
 
+                applyReservationAddSettings(reservationSettings);
+                await loadNextReservationNumber();
+                await loadReservationOptions();
+
+
                 if (typeof clearAllReservationErrors === "function") {
                     clearAllReservationErrors(form);
                 }
@@ -242,7 +387,8 @@ function initReservationAdd() {
     });
 }
 
-document.addEventListener("DOMContentLoaded", () => {
-    initReservationAdd();
-    loadNextReservationNumber();
+document.addEventListener("DOMContentLoaded", async () => {
+    await initReservationAdd();
+    await loadNextReservationNumber();
+    await loadReservationOptions();
 });

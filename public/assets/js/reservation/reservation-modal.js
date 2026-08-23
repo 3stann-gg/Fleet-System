@@ -132,14 +132,21 @@ function validateReservationForm(form) {
     if (!firstInvalid) firstInvalid = reservationDate;
     isValid = false;
   } else {
-    const today = new Date().toISOString().split("T")[0];
-    if (reservationDate.value < today) {
-      showReservationFieldError(
-        reservationDate,
-        "Schedule Date cannot be in the past.",
-      );
-      if (!firstInvalid) firstInvalid = reservationDate;
-      isValid = false;
+    if (date.value && date.min && date.value < date.min) {
+        showReservationFieldError(
+            date,
+            "Selected date is earlier than the allowed reservation date.",
+        );
+
+        return false;
+    }
+    if (date.value && date.max && date.value > date.max) {
+        showReservationFieldError(
+            date,
+            "Selected date exceeds the maximum advance booking period.",
+        );
+
+        return false;
     }
   }
 

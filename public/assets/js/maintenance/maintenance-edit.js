@@ -2,6 +2,56 @@
    Maintenance Edit
 ========================================== */
 
+/* ==========================================
+   Maintenance Module Settings
+========================================== */
+async function getEditMaintenanceSettings() {
+    if (typeof window.getMaintenanceModuleSettings === "function") {
+        return await window.getMaintenanceModuleSettings();
+    }
+
+    try {
+        const response = await fetch("/settings/data", {
+            headers: {
+                Accept: "application/json",
+            },
+            credentials: "same-origin",
+        });
+
+        if (!response.ok) {
+            throw new Error();
+        }
+        const data = await response.json();
+        const settings = data?.settings?.maintenance || {};
+        return {
+            requireCost: settings.requireCost !== false,
+            overdueWarnDays: Math.max(
+                1,
+                Math.min(90, Number(settings.overdueWarnDays ?? 3)),
+            ),
+        };
+    } catch {
+        return {
+            requireCost: true,
+            overdueWarnDays: 3,
+        };
+    }
+}
+
+function applyEditMaintenanceSettings(settings) {
+    const status = document.getElementById("editMaintenanceStatus");
+    const cost = document.getElementById("editMaintenanceCost");
+    const mark = document.getElementById("editMaintenanceCostRequiredMark");
+    const completed = status?.value === "Completed";
+    const required = settings.requireCost && completed;
+    if (cost) {
+        cost.required = required;
+    }
+    if (mark) {
+        mark.hidden = !required;
+    }
+}
+
 let editMaintenanceInitialized = false;
 
 function formatEditMaintenanceVehicle(vehicle) {
@@ -163,7 +213,9 @@ async function populateEditMaintenanceForm(row, maintenanceData = null) {
         );
         setValue("editMaintenanceCost", maintenance.cost);
         setValue("editMaintenancePriority", maintenance.priority);
-        setValue("editMaintenanceStatus", maintenance.status);
+        document
+            .getElementById("editMaintenanceStatus")
+            ?.dispatchEvent(new Event("change"));
         setValue("editMaintenanceOdometer", maintenance.odometer);
         setValue("editMaintenanceDescription", maintenance.description);
         setValue("editMaintenancePartsUsed", maintenance.parts_used);
@@ -256,7 +308,7 @@ async function updateMaintenanceRecord(form, maintenanceId) {
         technician: getValue("editMaintenanceTechnician").trim(),
         maintenance_date: getValue("editMaintenanceScheduledDate"),
         completion_date: getValue("editMaintenanceCompletionDate") || null,
-        cost: getValue("editMaintenanceCost") || 0,
+        cost: getValue("editMaintenanceCost") || null,
         priority: getValue("editMaintenancePriority"),
         status: getValue("editMaintenanceStatus"),
         odometer: getValue("editMaintenanceOdometer") || null,
@@ -295,7 +347,7 @@ async function updateMaintenanceRecord(form, maintenanceId) {
     return data.maintenance;
 }
 
-function initMaintenanceEdit() {
+async function initMaintenanceEdit() {
     if (editMaintenanceInitialized) {
         return;
     }
@@ -307,7 +359,17 @@ function initMaintenanceEdit() {
         return;
     }
 
+    const maintenanceSettings = await getEditMaintenanceSettings();
+
+    applyEditMaintenanceSettings(maintenanceSettings);
+
     editMaintenanceInitialized = true;
+
+    document
+        .getElementById("editMaintenanceStatus")
+        ?.addEventListener("change", () => {
+            applyEditMaintenanceSettings(maintenanceSettings);
+        });
 
     document.addEventListener("click", (event) => {
         const editBtn = event.target.closest(".action-btn.edit-maintenance");
@@ -436,6 +498,6 @@ function initMaintenanceEdit() {
     });
 }
 
-document.addEventListener("DOMContentLoaded", () => {
-    initMaintenanceEdit();
+document.addEventListener("DOMContentLoaded", async () => {
+    await initMaintenanceEdit();
 });

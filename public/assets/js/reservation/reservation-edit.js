@@ -1,4 +1,53 @@
 
+async function getEditReservationSettings() {
+    if (typeof window.getReservationModuleSettings === "function") {
+        return await window.getReservationModuleSettings();
+    }
+
+    try {
+        const response = await fetch("/settings/data", {
+            headers: {
+                Accept: "application/json",
+            },
+            credentials: "same-origin",
+        });
+
+        if (!response.ok) {
+            throw new Error();
+        }
+        const data = await response.json();
+        const settings = data?.settings?.reservations || {};
+        return {
+            allowSameDay: settings.allowSameDay !== false,
+            maxAdvanceDays: Math.max(
+                1,
+                Math.min(365, Number(settings.maxAdvanceDays ?? 30)),
+            ),
+        };
+    } catch {
+        return {
+            allowSameDay: true,
+            maxAdvanceDays: 30,
+        };
+    }
+}
+
+function applyEditReservationDateSettings(settings) {
+    const dateInput = document.getElementById("editReservationDate");
+    if (!dateInput) {
+        return;
+    }
+    const today = new Date();
+    const minimumDate = new Date(today);
+    if (!settings.allowSameDay) {
+        minimumDate.setDate(minimumDate.getDate() + 1);
+    }
+    const maximumDate = new Date(today);
+    maximumDate.setDate(maximumDate.getDate() + settings.maxAdvanceDays);
+    dateInput.min = reservationFormatDate(minimumDate);
+    dateInput.max = reservationFormatDate(maximumDate);
+}
+
 async function loadEditReservationOptions(selectedVehicleId = null) {
     const vehicleSelect = document.getElementById("editReservationVehicle");
     const driverSelect = document.getElementById("editReservationDriver");
@@ -97,11 +146,15 @@ function updateEditReservationDriver(vehicles, vehicleId, driverSelect) {
     driverSelect.appendChild(option);
 }
 
-function initEditReservationModal() {
+async function initEditReservationModal() {
   const modal = document.getElementById("editReservationModal");
   if (!modal || modal.dataset.editReservationModalInitialized === "true") {
     return;
   }
+
+  const reservationSettings = await getEditReservationSettings();
+
+  applyEditReservationDateSettings(reservationSettings);
 
   modal.dataset.editReservationModalInitialized = "true";
   const getRowText = (row, selector) => {
@@ -267,14 +320,35 @@ function initEditReservationModal() {
         if (!firstInvalid) firstInvalid = reservationDate;
         isValid = false;
       } else {
-        const today = new Date().toISOString().split("T")[0];
-        if (reservationDate.value < today) {
-          showReservationFieldError(
-            reservationDate,
-            "Schedule Date cannot be in the past.",
-          );
-          if (!firstInvalid) firstInvalid = reservationDate;
-          isValid = false;
+        if (
+            reservationDate.value &&
+            reservationDate.min &&
+            reservationDate.value < reservationDate.min
+        ) {
+            showReservationFieldError(
+                reservationDate,
+                reservationSettings.allowSameDay
+                    ? "Schedule Date cannot be in the past."
+                    : "Same-day reservations are disabled. Please select a future date.",
+            );
+            if (!firstInvalid) {
+                firstInvalid = reservationDate;
+            }
+            isValid = false;
+        }
+        if (
+            reservationDate.value &&
+            reservationDate.max &&
+            reservationDate.value > reservationDate.max
+        ) {
+            showReservationFieldError(
+                reservationDate,
+                `Reservation cannot be scheduled more than ${reservationSettings.maxAdvanceDays} days in advance.`,
+            );
+            if (!firstInvalid) {
+                firstInvalid = reservationDate;
+            }
+            isValid = false;
         }
       }
 
@@ -393,7 +467,7 @@ function initEditReservationModal() {
           );
       }
 
-      closeEditReservationModal();
+      //closeEditReservationModal();
 
       //if (typeof showToast === "function") {
       //  showToast("Reservation updated successfully.", "success");
@@ -402,6 +476,6 @@ function initEditReservationModal() {
   }
 }
 
-document.addEventListener("DOMContentLoaded", () => {
-    initEditReservationModal();
-})
+document.addEventListener("DOMContentLoaded", async () => {
+    await initEditReservationModal();
+});
