@@ -64,7 +64,9 @@
                   </div>
                   <div class="stat-content">
                     <span class="kpi-label">Available Vehicles</span>
-                    <h2 class="kpi-value">28</h2>
+                    <h2 class="kpi-value">
+                        {{ number_format($availableVehicles) }}
+                    </h2>
                     <div class="kpi-meta">
                       <span class="kpi-trend kpi-trend--steady">Stable</span>
                       <span class="kpi-support">Ready for assignment</span>
@@ -78,7 +80,9 @@
                   </div>
                   <div class="stat-content">
                     <span class="kpi-label">Active Dispatches</span>
-                    <h2 class="kpi-value">14</h2>
+                    <h2 class="kpi-value">
+                        {{ number_format($activeDispatches) }}
+                    </h2>
                     <div class="kpi-meta">
                       <span class="kpi-trend kpi-trend--up">In progress</span>
                       <span class="kpi-support">Trips currently running</span>
@@ -92,7 +96,9 @@
                   </div>
                   <div class="stat-content">
                     <span class="kpi-label">Drivers On Duty</span>
-                    <h2 class="kpi-value">18</h2>
+                    <h2 class="kpi-value">
+                        {{ number_format($driversOnDuty) }}
+                    </h2>
                     <div class="kpi-meta">
                       <span class="kpi-trend kpi-trend--steady">On shift</span>
                       <span class="kpi-support">Active driver pool</span>
@@ -102,15 +108,25 @@
 
                 <article class="stat-card dashboard-kpi">
                   <div class="stat-icon" aria-hidden="true">
-                    <i class="ph-fill ph-gas-pump"></i>
+                      <i class="ph-fill ph-gas-pump"></i>
                   </div>
                   <div class="stat-content">
-                    <span class="kpi-label">Fuel Efficiency</span>
-                    <h2 class="kpi-value">92%</h2>
-                    <div class="kpi-meta">
-                      <span class="kpi-trend kpi-trend--steady">Within target</span>
-                      <span class="kpi-support">Fleet efficiency index</span>
-                    </div>
+                      <span class="kpi-label">
+                          Average Fuel Level
+                      </span>
+                      <h2 class="kpi-value">
+                          {{ $averageFuelLevel }}%
+                      </h2>
+                      <div class="kpi-meta">
+                          <span
+                              class="kpi-trend {{ $averageFuelLevel < 30 ? 'kpi-trend--up' : 'kpi-trend--steady' }}"
+                          >
+                              {{ $averageFuelLevel < 30 ? 'Low fuel' : 'Within range' }}
+                          </span>
+                          <span class="kpi-support">
+                              Current fleet tank average
+                          </span>
+                      </div>
                   </div>
                 </article>
               </div>
@@ -142,21 +158,39 @@
                     </button>
                   </div>
                   <div
-                    class="chart-placeholder"
-                    role="img"
-                    aria-label="Bar chart placeholder for weekly fleet activity"
+                      class="chart-placeholder"
+                      role="img"
+                      aria-label="Weekly fleet dispatch activity"
                   >
-                    <div class="bar" style="--bar-h: 65%"></div>
-                    <div class="bar" style="--bar-h: 85%"></div>
-                    <div class="bar" style="--bar-h: 45%"></div>
-                    <div class="bar" style="--bar-h: 95%"></div>
-                    <div class="bar" style="--bar-h: 75%"></div>
-                    <div class="bar" style="--bar-h: 55%"></div>
-                    <div class="bar" style="--bar-h: 90%"></div>
+                      @foreach ($weeklyActivity as $activity)
+
+                          @php
+                              $height = $activity['total'] > 0
+                                  ? max(
+                                      8,
+                                      round(
+                                          (
+                                              $activity['total'] /
+                                              $weeklyActivityMax
+                                          ) * 100
+                                      )
+                                  )
+                                  : 3;
+                          @endphp
+                          <div
+                              class="bar"
+                              style="--bar-h: {{ $height }}%"
+                              title="{{ $activity['day'] }}: {{ $activity['total'] }} dispatches"
+                          ></div>
+                      @endforeach
                   </div>
+
                   <div class="chart-legend" aria-hidden="true">
-                    <span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span>
-                    <span>Fri</span><span>Sat</span><span>Sun</span>
+                      @foreach ($weeklyActivity as $activity)
+                          <span>
+                              {{ $activity['day'] }}
+                          </span>
+                      @endforeach
                   </div>
                 </div>
 
@@ -166,39 +200,73 @@
                       <h3>Today’s Dispatch Queue</h3>
                       <p class="card-subtitle">Priority trips awaiting completion</p>
                     </div>
-                    <span class="badge-green">8 Active</span>
+                    <span class="badge-green">
+                        {{ $activeDispatches }} Active
+                    </span>
                   </div>
                   <div class="dispatch-list">
-                    <div class="dispatch-item">
-                      <div class="dispatch-dot green" aria-hidden="true"></div>
-                      <div class="dispatch-body">
-                        <div class="dispatch-row">
-                          <strong>Emergency Patient Transfer</strong>
-                          <span class="status-chip status-chip--success">Active</span>
-                        </div>
-                        <small>Ambulance 03 · Juan Dela Cruz</small>
-                      </div>
-                    </div>
-                    <div class="dispatch-item">
-                      <div class="dispatch-dot yellow" aria-hidden="true"></div>
-                      <div class="dispatch-body">
-                        <div class="dispatch-row">
-                          <strong>Laboratory Sample Delivery</strong>
-                          <span class="status-chip status-chip--warning">En route</span>
-                        </div>
-                        <small>Van 02 · Maria Santos</small>
-                      </div>
-                    </div>
-                    <div class="dispatch-item">
-                      <div class="dispatch-dot red" aria-hidden="true"></div>
-                      <div class="dispatch-body">
-                        <div class="dispatch-row">
-                          <strong>Vehicle Maintenance Pickup</strong>
-                          <span class="status-chip status-chip--danger">Urgent</span>
-                        </div>
-                        <small>Service Vehicle 01</small>
-                      </div>
-                    </div>
+                      @forelse ($dispatchQueue as $dispatch)
+                          @php
+                              $reservation = $dispatch->reservation;
+                              $vehicle = $reservation?->vehicle;
+                              $driver = $reservation?->driver;
+                              $statusClass = match ($dispatch->trip_status) {
+                                  'Assigned' => 'status-chip--success',
+                                  'En Route' => 'status-chip--warning',
+                                  'Arrived' => 'status-chip--success',
+                                  default => 'status-chip--warning',
+                              };
+                              $dotClass = match ($dispatch->trip_status) {
+                                  'Assigned' => 'green',
+                                  'En Route' => 'yellow',
+                                  'Arrived' => 'green',
+                                  default => 'yellow',
+                              };
+                              $title =
+                                  $reservation?->request_type
+                                  ?: $dispatch->dispatch_number;
+                              $vehicleName =
+                                  $vehicle?->display_label
+                                  ?? 'No vehicle';
+                              $driverName = trim(
+                                  ($driver?->first_name ?? '') .
+                                  ' ' .
+                                  ($driver?->last_name ?? '')
+                              );
+                          @endphp
+                          <div
+                              class="dispatch-item"
+                              data-dispatch-id="{{ $dispatch->id }}"
+                          >
+                              <div
+                                  class="dispatch-dot {{ $dotClass }}"
+                                  aria-hidden="true"
+                              ></div>
+                              <div class="dispatch-body">
+                                  <div class="dispatch-row">
+                                      <strong>
+                                          {{ $title }}
+                                      </strong>
+                                      <span
+                                          class="status-chip {{ $statusClass }}"
+                                      >
+                                          {{ $dispatch->trip_status }}
+                                      </span>
+                                  </div>
+                                  <small>
+                                      {{ $vehicleName }}
+
+                                      @if ($driverName !== '')
+                                          · {{ $driverName }}
+                                      @endif
+                                  </small>
+                              </div>
+                          </div>
+                      @empty
+                          <div class="dashboard-empty-state">
+                              No active dispatches scheduled today.
+                          </div>
+                      @endforelse
                   </div>
                 </div>
               </div>
@@ -238,33 +306,94 @@
                         </tr>
                       </thead>
                       <tbody>
-                        <tr>
-                          <td>Ambulance-01</td>
-                          <td>Juan Dela Cruz</td>
-                          <td><span class="status available">Available</span></td>
-                          <td>85%</td>
-                          <td>
-                            <button type="button" class="table-btn">View</button>
-                          </td>
-                        </tr>
-                        <tr>
-                          <td>Van-02</td>
-                          <td>Maria Santos</td>
-                          <td><span class="status trip">On Trip</span></td>
-                          <td>62%</td>
-                          <td>
-                            <button type="button" class="table-btn">View</button>
-                          </td>
-                        </tr>
-                        <tr>
-                          <td>SUV-03</td>
-                          <td>Pedro Cruz</td>
-                          <td><span class="status maintenance">Maintenance</span></td>
-                          <td>40%</td>
-                          <td>
-                            <button type="button" class="table-btn">View</button>
-                          </td>
-                        </tr>
+                        @forelse ($vehicles as $vehicle)
+                            @php
+                                $statusClass = match ($vehicle->status) {
+                                    'Available' => 'available',
+                                    'On Trip' => 'trip',
+                                    'Maintenance' => 'maintenance',
+                                    default => 'inactive',
+                                };
+                                $assignedDriver =
+                                    $vehicle->drivers->first();
+                                $driverName =
+                                    $assignedDriver
+                                        ? trim(
+                                            ($assignedDriver->first_name ?? '')
+                                            . ' '
+                                            . ($assignedDriver->last_name ?? '')
+                                        )
+                                        : 'Unassigned';
+                                $vehicleLabel = trim(
+                                    ($vehicle->brand ?? '')
+                                    . ' '
+                                    . ($vehicle->model ?? '')
+                                );
+                                if ($vehicleLabel === '') {
+                                    $vehicleLabel =
+                                        $vehicle->vehicle_type
+                                        ?? 'Vehicle';
+                                }
+                                $fuelPercent = null;
+                                if (
+                                    $vehicle->tank_capacity !== null &&
+                                    (float) $vehicle->tank_capacity > 0 &&
+                                    $vehicle->current_fuel !== null
+                                ) {
+                                    $fuelPercent = min(
+                                        100,
+                                        max(
+                                            0,
+                                            round(
+                                                (
+                                                    (float) $vehicle->current_fuel
+                                                    / (float) $vehicle->tank_capacity
+                                                ) * 100
+                                            )
+                                        )
+                                    );
+                                }
+                            @endphp
+                            <tr>
+                                <td>
+                                    <strong>
+                                        {{ $vehicleLabel }}
+                                    </strong>
+                                    @if ($vehicle->vehicle_type)
+                                        <small class="d-block">
+                                            {{ $vehicle->vehicle_type }}
+                                        </small>
+                                    @endif
+                                </td>
+                                <td>
+                                    {{ $driverName }}
+                                </td>
+                                <td>
+                                    <span class="status {{ $statusClass }}">
+                                        {{ $vehicle->status }}
+                                    </span>
+                                </td>
+                                <td>
+                                    {{ $fuelPercent !== null
+                                        ? $fuelPercent . '%'
+                                        : '—' }}
+                                </td>
+                                <td>
+                                    <button
+                                        type="button"
+                                        class="table-btn"
+                                    >
+                                        View
+                                    </button>
+                                </td>
+                            </tr>
+                        @empty
+                            <tr>
+                                <td colspan="5">
+                                    No vehicle records found.
+                                </td>
+                            </tr>
+                        @endforelse
                       </tbody>
                     </table>
                   </div>
@@ -277,43 +406,106 @@
                       <p class="card-subtitle">Service items requiring attention</p>
                     </div>
                   </div>
-                  <div class="maintenance-list">
-                    <div class="maintenance-item critical">
-                      <div class="maintenance-icon" aria-hidden="true">
-                        <i class="ph-fill ph-warning-circle"></i>
-                      </div>
-                      <div class="maintenance-body">
-                        <div class="dispatch-row">
-                          <strong>Oil Change Due</strong>
-                          <span class="status-chip status-chip--danger">Critical</span>
-                        </div>
-                        <small>Ambulance-01</small>
-                      </div>
-                    </div>
-                    <div class="maintenance-item warning">
-                      <div class="maintenance-icon" aria-hidden="true">
-                        <i class="ph-fill ph-wrench"></i>
-                      </div>
-                      <div class="maintenance-body">
-                        <div class="dispatch-row">
-                          <strong>Brake Inspection</strong>
-                          <span class="status-chip status-chip--warning">Due soon</span>
-                        </div>
-                        <small>Van-02</small>
-                      </div>
-                    </div>
-                    <div class="maintenance-item success">
-                      <div class="maintenance-icon" aria-hidden="true">
-                        <i class="ph-fill ph-shield-check"></i>
-                      </div>
-                      <div class="maintenance-body">
-                        <div class="dispatch-row">
-                          <strong>Insurance Updated</strong>
-                          <span class="status-chip status-chip--success">Complete</span>
-                        </div>
-                        <small>SUV-03</small>
-                      </div>
-                    </div>
+                 <div class="maintenance-list">
+                      @forelse ($maintenanceAlerts as $maintenance)
+                          @php
+                              $maintenanceDate = $maintenance->maintenance_date;
+                              $daysUntilMaintenance = $maintenanceDate
+                                  ? today()->diffInDays(
+                                      $maintenanceDate,
+                                      false
+                                  )
+                                  : null;
+                              $isCriticalPriority = in_array(
+                                  $maintenance->priority,
+                                  ['Emergency', 'High'],
+                                  true
+                              );
+                              $isPastOrToday =
+                                  $maintenanceDate &&
+                                  $maintenanceDate->lte(today());
+                              $isDueSoon =
+                                  $maintenanceDate &&
+                                  $daysUntilMaintenance > 0 &&
+                                  $daysUntilMaintenance <= 3;
+                              if (
+                                  $maintenance->status === 'In Progress' &&
+                                  $isCriticalPriority
+                              ) {
+                                  $severity = 'critical';
+                                  $severityLabel = 'Critical';
+                                  $chipClass = 'status-chip--danger';
+                                  $icon = 'ph-warning-circle';
+                              } elseif (
+                                  $maintenance->status === 'Scheduled' &&
+                                  $isPastOrToday
+                              ) {
+                                  $severity = 'critical';
+                                  $severityLabel = 'Critical';
+                                  $chipClass = 'status-chip--danger';
+                                  $icon = 'ph-warning-circle';
+                              } elseif (
+                                  $maintenance->status === 'Scheduled' &&
+                                  $isDueSoon
+                              ) {
+                                  $severity = 'warning';
+                                  $severityLabel = 'Due soon';
+                                  $chipClass = 'status-chip--warning';
+                                  $icon = 'ph-wrench';
+                              } elseif (
+                                  $maintenance->status === 'In Progress'
+                              ) {
+                                  $severity = 'warning';
+                                  $severityLabel = 'In Progress';
+                                  $chipClass = 'status-chip--warning';
+                                  $icon = 'ph-wrench';
+                              } else {
+                                  $severity = 'success';
+                                  $severityLabel = 'Scheduled';
+                                  $chipClass = 'status-chip--success';
+                                  $icon = 'ph-calendar-check';
+                              }
+
+                              $vehicle = $maintenance->vehicle;
+
+                              $vehicleName =
+                                  $maintenance->vehicle?->display_label
+                                  ?? 'Vehicle';
+                          @endphp
+                          <div
+                              class="maintenance-item {{ $severity }}"
+                              data-maintenance-id="{{ $maintenance->id }}"
+                          >
+                              <div
+                                  class="maintenance-icon"
+                                  aria-hidden="true"
+                              >
+                                  <i class="ph-fill {{ $icon }}"></i>
+                              </div>
+                              <div class="maintenance-body">
+                                  <div class="dispatch-row">
+                                      <strong>
+                                          {{ $maintenance->maintenance_type }}
+                                      </strong>
+                                      <span
+                                          class="status-chip {{ $chipClass }}"
+                                      >
+                                          {{ $severityLabel }}
+                                      </span>
+                                  </div>
+                                  <small>
+                                      {{ $vehicleName }}
+                                      @if ($maintenanceDate)
+                                          · {{ $maintenanceDate->format('M d, Y') }}
+                                      @endif
+                                  </small>
+                              </div>
+                          </div>
+                      @empty
+                          <div class="dashboard-empty-state">
+                              No active maintenance alerts.
+                          </div>
+                      @endforelse
                   </div>
                 </div>
               </div>
@@ -359,42 +551,54 @@
                     </div>
                   </div>
                   <div class="activity-list">
-                    <div class="activity-item">
-                      <div class="activity-icon success" aria-hidden="true">
-                        <i class="ph-fill ph-check-circle"></i>
+                  @forelse ($recentActivity as $activity)
+                      @php
+                          $icon = match (true) {
+                              str_contains(
+                                  strtolower($activity->title),
+                                  'maintenance'
+                              ) => 'ph-warning-circle',
+                              str_contains(
+                                  strtolower($activity->title),
+                                  'dispatch'
+                              ) => 'ph-truck',
+                              str_contains(
+                                  strtolower($activity->title),
+                                  'fuel'
+                              ) => 'ph-gas-pump',
+                              str_contains(
+                                  strtolower($activity->title),
+                                  'driver'
+                              ) => 'ph-user',
+                              default => 'ph-check-circle',
+                          };
+                      @endphp
+                      <div
+                          class="activity-item"
+                          @if ($activity->link)
+                              data-href="{{ $activity->link }}"
+                          @endif
+                      >
+                          <div
+                              class="activity-icon primary"
+                              aria-hidden="true"
+                          >
+                              <i class="ph-fill {{ $icon }}"></i>
+                          </div>
+                          <div class="activity-body">
+                              <strong>
+                                  {{ $activity->title }}
+                              </strong>
+                              <small>
+                                  {{ $activity->created_at?->diffForHumans() ?? 'Recently' }}
+                              </small>
+                          </div>
                       </div>
-                      <div class="activity-body">
-                        <strong>Ambulance-01 dispatched</strong>
-                        <small>2 minutes ago</small>
+                  @empty
+                      <div class="dashboard-empty-state">
+                          No recent activity.
                       </div>
-                    </div>
-                    <div class="activity-item">
-                      <div class="activity-icon primary" aria-hidden="true">
-                        <i class="ph-fill ph-car"></i>
-                      </div>
-                      <div class="activity-body">
-                        <strong>Vehicle returned to hospital</strong>
-                        <small>15 minutes ago</small>
-                      </div>
-                    </div>
-                    <div class="activity-item">
-                      <div class="activity-icon warning" aria-hidden="true">
-                        <i class="ph-fill ph-user"></i>
-                      </div>
-                      <div class="activity-body">
-                        <strong>Driver Ana logged in</strong>
-                        <small>30 minutes ago</small>
-                      </div>
-                    </div>
-                    <div class="activity-item">
-                      <div class="activity-icon danger" aria-hidden="true">
-                        <i class="ph-fill ph-warning-circle"></i>
-                      </div>
-                      <div class="activity-body">
-                        <strong>Maintenance alert created</strong>
-                        <small>1 hour ago</small>
-                      </div>
-                    </div>
+                  @endforelse
                   </div>
                 </div>
               </div>
@@ -405,7 +609,6 @@
     @push('scripts')
     
     <script src="{{ asset('assets/js/core/pending-action.js') }}"></script>
-    <script src="{{ asset('assets/js/components/navbar.js') }}"></script>
     <script src="{{ asset('assets/js/dashboard/dashboard.js') }}"></script>
 
     @endpush

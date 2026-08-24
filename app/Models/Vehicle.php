@@ -33,6 +33,34 @@ class Vehicle extends Model
         'current_fuel' => 'decimal:2',
         'current_odometer' => 'decimal:2',
     ];
+
+    public function getDisplayLabelAttribute(): string
+    {
+        $brandModel = trim(
+            ($this->brand ?? '') .
+            ' ' .
+            ($this->model ?? '')
+        );
+        $vehicleType = trim(
+            (string) ($this->vehicle_type ?? '')
+        );
+        if (
+            $brandModel !== '' &&
+            $vehicleType !== ''
+        ) {
+            return $brandModel .
+                ' - ' .
+                $vehicleType;
+        }
+        if ($brandModel !== '') {
+            return $brandModel;
+        }
+        if ($vehicleType !== '') {
+            return $vehicleType;
+        }
+        return $this->plate_number
+            ?: 'Vehicle';
+    }
     
      public function drivers()
     {

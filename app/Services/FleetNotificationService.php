@@ -120,9 +120,17 @@ class FleetNotificationService
         if ($existing) {
             $updates = [];
 
+            if ($existing->title !== $title) {
+                $updates['title'] = $title;
+            }
+
+            if ($existing->message !== $message) {
+                $updates['message'] = $message;
+            }
+
             if (
-                (!$existing->link || trim((string) $existing->link) === '') &&
-                $link
+                $link &&
+                $existing->link !== $link
             ) {
                 $updates['link'] = $link;
             }

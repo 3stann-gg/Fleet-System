@@ -55,7 +55,7 @@
 #viewMaintenanceModal .view-maintenance-summary-value {
   font-size: 15px;
   font-weight: 600;
-  color: #1f2937;
+  color: var(--color-text);
   word-break: break-word;
 }
 
@@ -89,7 +89,7 @@
 #viewMaintenanceModal .view-maintenance-detail-item p {
   margin: 0;
   font-size: 14px;
-  color: #1f2937;
+  color: var(--color-text);
   line-height: 1.5;
   word-break: break-word;
 }
@@ -117,7 +117,7 @@
 #viewMaintenanceModal .view-maintenance-notes p {
   margin: 0;
   font-size: 14px;
-  color: #1f2937;
+  color: var(--color-text);
   line-height: 1.6;
   white-space: pre-wrap;
   word-break: break-word;

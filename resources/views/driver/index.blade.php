@@ -232,7 +232,7 @@
                       </th>
 
                       <th class="sortable" data-column="2">
-                        Employee ID
+                        Driver ID
                         <i class="ph ph-caret-up-down sort-icon"></i>
                       </th>
 

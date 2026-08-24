@@ -36,7 +36,9 @@
         : 'Inactive';
 
     $lastLoginLabel = $user->last_login_at
-        ? $user->last_login_at->format('M d, Y h:i A')
+        ? $user->last_login_at
+            ->timezone('Asia/Manila')
+            ->format('M d, Y h:i A')
         : '—';
 @endphp
 

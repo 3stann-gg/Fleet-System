@@ -553,11 +553,27 @@ function initNavbarNotifications() {
             if (notification.status === "Unread") {
                 item.classList.add("is-unread");
             }
+            const itemHeader = document.createElement("div");
+            itemHeader.className = "navbar-notification-item-header";
+
             const itemTitle = document.createElement("strong");
             itemTitle.textContent = notification.title || "Notification";
+
+            const time = document.createElement("span");
+            time.className = "navbar-notification-time";
+            time.textContent = formatNotificationAge(notification.created_at);
+
+            itemHeader.appendChild(itemTitle);
+
+            if (time.textContent) {
+                itemHeader.appendChild(time);
+            }
+
             const message = document.createElement("span");
+            message.className = "navbar-notification-message";
             message.textContent = notification.message || "";
-            item.appendChild(itemTitle);
+
+            item.appendChild(itemHeader);
             item.appendChild(message);
             item.addEventListener("click", async (event) => {
                 event.preventDefault();
@@ -729,17 +745,37 @@ function initNavbarMessages() {
     });
 }
 
+function formatNotificationAge(dateValue) {
+    if (!dateValue) return "";
+    const created = new Date(dateValue);
+    const now = new Date();
+    const diffMs = now.getTime() - created.getTime();
+    if (Number.isNaN(diffMs) || diffMs < 0) {
+        return "now";
+    }
+    const minutes = Math.floor(diffMs / (1000 * 60));
+    const hours = Math.floor(diffMs / (1000 * 60 * 60));
+    const days = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+    if (minutes < 1) {
+        return "now";
+    }
+    if (minutes < 60) {
+        return `${minutes}m`;
+    }
+    if (hours < 24) {
+        return `${hours}h`;
+    }
+    return `${days}d`;
+}
+
 /* ==========================================
    Global Search
 ========================================== */
-
 /*
 |--------------------------------------------------------------------------
-| Current search still supports the old localStorage data.
-| We will replace this with DB-backed Laravel search next.
+| Global DB-backed Fleet Search
 |--------------------------------------------------------------------------
 */
-
 function initNavbarSearch() {
     const box = document.querySelector(".navbar-center .search-box");
     const input = box?.querySelector("input");

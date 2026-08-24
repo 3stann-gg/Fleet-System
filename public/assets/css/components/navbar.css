@@ -422,3 +422,31 @@
 .navbar-panel.is-open:not([hidden]) {
   display: block;
 }
+
+/* Notification Time */
+.navbar-notification-item-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.navbar-notification-item-header strong {
+  min-width: 0;
+  flex: 1;
+}
+
+.navbar-notification-time {
+  flex-shrink: 0;
+  font-size: 0.72rem;
+  font-weight: 500;
+  opacity: 0.65;
+  white-space: nowrap;
+}
+
+.navbar-notification-message {
+  display: block;
+  margin-top: 4px;
+  font-size: 0.82rem;
+  line-height: 1.35;
+}

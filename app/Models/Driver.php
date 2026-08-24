@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class Driver extends Model
 {
     protected $fillable = [
+        //'driver_number',
         'first_name',
         'last_name',
         'license_number',

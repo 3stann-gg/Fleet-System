@@ -121,7 +121,7 @@ class FleetNotificationCheckService
 
             FleetNotificationService::createUniqueWhenEnabled(
                 'licenseExpiring',
-                'Driver License Expiring',
+                "{$driver->driver_number} · Driver License Expiring",
                 $message,
                 $eventKey,
                 true

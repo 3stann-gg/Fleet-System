@@ -134,7 +134,7 @@ class DriverController extends Controller
 
         FleetNotificationService::createUniqueWhenEnabled(
             'licenseExpiring',
-            'Driver License Expiring',
+            "{$driver->driver_number} · Driver License Expiring",
             "{$driverName}'s license ({$driver->license_number}) expires {$dayLabel}.",
             $eventKey,
             true,
@@ -203,6 +203,24 @@ class DriverController extends Controller
         }
 
         $driver = Driver::create($validated);
+        /*
+        |--------------------------------------------------------------------------
+        | Generate Permanent Driver Number
+        |--------------------------------------------------------------------------
+        | Uses the database primary key so numbers stay unique and are not reused.
+        */
+        $driver->forceFill([
+            'driver_number' =>
+                'DRV-' .
+                str_pad(
+                    (string) $driver->id,
+                    3,
+                    '0',
+                    STR_PAD_LEFT
+                ),
+        ])->save();
+
+        $driver->refresh();
 
         $this->createLicenseExpiryNotification(
             $driver,
@@ -410,6 +428,7 @@ class DriverController extends Controller
             ->orderBy('first_name')
             ->get([
                 'id',
+                'driver_number',
                 'first_name',
                 'last_name',
                 'license_number'

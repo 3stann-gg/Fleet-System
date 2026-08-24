@@ -62,6 +62,7 @@ function renderDriverTable(drivers) {
         html += `
         <tr
             data-id="${driver.id}"
+            data-driver-number="${driver.driver_number ?? ""}"
             data-first-name="${driver.first_name ?? ""}"
             data-last-name="${driver.last_name ?? ""}"
             data-license-number="${driver.license_number ?? ""}"
@@ -106,7 +107,7 @@ function renderDriverTable(drivers) {
             </td>
 
             <td>
-                DRV-${String(driver.id).padStart(3, "0")}
+                ${driver.driver_number ?? "—"}
             </td>
 
             <td>
@@ -118,7 +119,9 @@ function renderDriverTable(drivers) {
             </td>
 
             <td>
-                ${driver.vehicle? `
+                ${
+                    driver.vehicle
+                        ? `
                     <span class="fuel-vehicle">
                             <span class="fuel-vehicle-name">
                                 ${driver.vehicle.brand ?? ""}
@@ -128,7 +131,9 @@ function renderDriverTable(drivers) {
                                 ${driver.vehicle.vehicle_type ?? ""}
                             </small>
                     </span>
-                `: "Unassigned"}
+                `
+                        : "Unassigned"
+                }
             </td>
 
             <td>

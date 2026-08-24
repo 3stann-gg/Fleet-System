@@ -13,15 +13,14 @@ use App\Http\Controllers\CostBudgetController;
 use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\FleetNotificationController;
 use App\Http\Controllers\FleetSearchController;
+use App\Http\Controllers\DashboardController;
 
 
 Route::get('/', function () {
     return view('welcome');
 });
 
-Route::get('/dashboard', function () {
-    return view('dashboard.index');
-})
+Route::get('/dashboard', [DashboardController::class, 'index'])
     ->middleware(['auth', 'verified'])
     ->name('dashboard');
 

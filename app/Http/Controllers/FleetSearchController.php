@@ -84,6 +84,11 @@ class FleetSearchController extends Controller
             ->where(function ($q) use ($query) {
                 $q
                     ->where(
+                        'driver_number',
+                        'like',
+                        "%{$query}%"
+                    )
+                    ->orWhere(
                         'first_name',
                         'like',
                         "%{$query}%"
@@ -118,10 +123,17 @@ class FleetSearchController extends Controller
                         : 'Driver',
 
                 'detail' =>
-                    $driver->license_number ?? '',
+                    trim(
+                        ($driver->driver_number ?? '') .
+                        (
+                            $driver->license_number
+                                ? ' · ' . $driver->license_number
+                                : ''
+                        )
+                    ),
 
                 'url' =>
-                    url('/driver'),
+                    route('driver'),
             ]);
         }
 
