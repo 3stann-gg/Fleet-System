@@ -17,10 +17,16 @@
                 </p>
               </div>
 
-              <button type="button" id="addReservationBtn" class="btn-primary">
-                <i class="ph ph-plus"></i>
-                Add Reservation
-              </button>
+              @if($reservationPermissions['canCreate'] ?? false)
+                  <button
+                      type="button"
+                      id="addReservationBtn"
+                      class="btn-primary"
+                  >
+                      <i class="ph ph-plus"></i>
+                      Add Reservation
+                  </button>
+              @endif
             </div>
 
             <!-- Reservation Statistics -->
@@ -123,28 +129,35 @@
             </div>
 
             <!-- Bulk Toolbar -->
-            <div class="bulk-toolbar" id="reservationBulkToolbar">
-              <span id="reservationSelectedCount">0 reservations selected</span>
-
-              <div>
-                <button
-                  type="button"
-                  class="btn-outline"
-                  id="clearReservationSelection"
+            @if($reservationPermissions['canBulkDelete'] ?? false)
+                <div
+                    class="bulk-toolbar"
+                    id="reservationBulkToolbar"
                 >
-                  Clear
-                </button>
+                    <span id="reservationSelectedCount">
+                        0 reservations selected
+                    </span>
 
-                <button
-                  type="button"
-                  id="deleteSelectedReservations"
-                  class="btn-danger"
-                >
-                  <i class="ph ph-trash"></i>
-                  Delete Selected
-                </button>
-              </div>
-            </div>
+                    <div>
+                        <button
+                            type="button"
+                            class="btn-outline"
+                            id="clearReservationSelection"
+                        >
+                            Clear
+                        </button>
+
+                        <button
+                            type="button"
+                            id="deleteSelectedReservations"
+                            class="btn-danger"
+                        >
+                            <i class="ph ph-trash"></i>
+                            Delete Selected
+                        </button>
+                    </div>
+                </div>
+            @endif
 
             <!-- Reservation Table -->
             <div class="card">
@@ -218,11 +231,13 @@
                   <thead>
                     <tr>
                       <th>
-                        <input
-                          type="checkbox"
-                          id="selectAllReservations"
-                          aria-label="Select all visible reservations"
-                        />
+                          @if($reservationPermissions['canBulkDelete'] ?? false)
+                              <input
+                                  type="checkbox"
+                                  id="selectAllReservations"
+                                  aria-label="Select all visible reservations"
+                              />
+                          @endif
                       </th>
 
                       <th class="sortable" data-column="1">
@@ -295,10 +310,29 @@
           </div>
         </section>
 
-    @include('components.reservation.add-reservation-modal')
+    @if($reservationPermissions['canCreate'] ?? false)
+        @include('components.reservation.add-reservation-modal')
+    @endif
+
     @include('components.reservation.view-reservation-modal')
-    @include('components.reservation.edit-reservation-modal')
-    @include('components.reservation.delete-reservation-modal')
+
+    @if($reservationPermissions['canUpdate'] ?? false)
+        @include('components.reservation.edit-reservation-modal')
+    @endif
+
+    @if($reservationPermissions['canDelete'] ?? false)
+        @include('components.reservation.delete-reservation-modal')
+    @endif
+
+    <script>
+      window.FLEET_RBAC = window.FLEET_RBAC || {};
+      window.FLEET_RBAC.role =
+          @json(auth()->user()?->role);
+      window.FLEET_RBAC.reservations =
+          @json($reservationPermissions ?? []);
+  </script>
+
+  <script src="{{ asset('assets/js/helpers/rbac.js') }}"></script>
 
     <!-- Export dependencies -->
     <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>

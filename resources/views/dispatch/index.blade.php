@@ -17,10 +17,16 @@
                 </p>
               </div>
 
-              <button type="button" id="createDispatchBtn" class="btn-primary">
-                <i class="ph ph-plus"></i>
-                Create Dispatch
-              </button>
+              @if($dispatchPermissions['canCreate'] ?? false)
+                  <button
+                      type="button"
+                      id="createDispatchBtn"
+                      class="btn-primary"
+                  >
+                      <i class="ph ph-plus"></i>
+                      Create Dispatch
+                  </button>
+              @endif
             </div>
 
             <!-- Dispatch Statistics -->
@@ -135,28 +141,35 @@
             </div>
 
             <!-- Bulk Toolbar -->
-            <div class="bulk-toolbar" id="dispatchBulkToolbar">
-              <span id="dispatchSelectedCount">0 dispatches selected</span>
-
-              <div>
-                <button
-                  type="button"
-                  class="btn-outline"
-                  id="clearDispatchSelection"
+            @if($dispatchPermissions['canBulkDelete'] ?? false)
+                <div
+                    class="bulk-toolbar"
+                    id="dispatchBulkToolbar"
                 >
-                  Clear
-                </button>
+                    <span id="dispatchSelectedCount">
+                        0 dispatches selected
+                    </span>
 
-                <button
-                  type="button"
-                  id="deleteSelectedDispatches"
-                  class="btn-danger"
-                >
-                  <i class="ph ph-trash"></i>
-                  Delete Selected
-                </button>
-              </div>
-            </div>
+                    <div>
+                        <button
+                            type="button"
+                            class="btn-outline"
+                            id="clearDispatchSelection"
+                        >
+                            Clear
+                        </button>
+
+                        <button
+                            type="button"
+                            id="deleteSelectedDispatches"
+                            class="btn-danger"
+                        >
+                            <i class="ph ph-trash"></i>
+                            Delete Selected
+                        </button>
+                    </div>
+                </div>
+            @endif
 
             <!-- Dispatch Table -->
             <div class="card">
@@ -230,11 +243,13 @@
                   <thead>
                     <tr>
                       <th>
-                        <input
-                          type="checkbox"
-                          id="selectAllDispatches"
-                          aria-label="Select all visible dispatches"
-                        />
+                          @if($dispatchPermissions['canBulkDelete'] ?? false)
+                              <input
+                                  type="checkbox"
+                                  id="selectAllDispatches"
+                                  aria-label="Select all visible dispatches"
+                              />
+                          @endif
                       </th>
 
                       <th class="sortable" data-column="1">
@@ -309,10 +324,29 @@
           </div>
         </section>
       
-    @include('components.dispatch.add-dispatch-modal')
+    @if($dispatchPermissions['canCreate'] ?? false)
+        @include('components.dispatch.add-dispatch-modal')
+    @endif
+
     @include('components.dispatch.view-dispatch-modal')
-    @include('components.dispatch.edit-dispatch-modal')
-    @include('components.dispatch.delete-dispatch-modal')
+
+    @if($dispatchPermissions['canUpdate'] ?? false)
+        @include('components.dispatch.edit-dispatch-modal')
+    @endif
+
+    @if($dispatchPermissions['canDelete'] ?? false)
+        @include('components.dispatch.delete-dispatch-modal')
+    @endif
+
+    <script>
+        window.FLEET_RBAC = window.FLEET_RBAC || {};
+        window.FLEET_RBAC.role =
+            @json(auth()->user()?->role);
+        window.FLEET_RBAC.dispatch =
+            @json($dispatchPermissions ?? []);
+    </script>
+
+    <script src="{{ asset('assets/js/helpers/rbac.js') }}"></script>
 
     <!-- Export dependencies -->
     <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>

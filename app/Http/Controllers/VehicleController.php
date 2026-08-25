@@ -8,9 +8,11 @@ use App\Models\Driver;
 use App\Models\FleetSetting;
 use Illuminate\Validation\Rule;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 
 class VehicleController extends Controller
 {   
+    use AuthorizesRequests;
     /**
      * Display a listing of the resource.
      */
@@ -49,7 +51,9 @@ class VehicleController extends Controller
     }
 
     public function index(Request $request)
-    {
+    {   
+        $this->authorize('viewAny', Vehicle::class);
+
         $query = Vehicle::with('drivers');
 
         if ($request->filled('search')) {
@@ -133,7 +137,32 @@ class VehicleController extends Controller
 
         }
 
-        return view('fleet.index',);
+        $vehiclePermissions = [
+            'role' => $request->user()->role,
+            'canCreate' =>
+                $request->user()->can(
+                    'create',
+                    Vehicle::class
+                ),
+            'canUpdate' =>
+                $request->user()->hasRole(
+                    'fleet_manager',
+                    'dispatcher',
+                    'maintenance'
+                ),
+            'canDelete' =>
+                $request->user()->hasRole(
+                    'fleet_manager'
+                ),
+            'canBulkDelete' =>
+                $request->user()->hasRole(
+                    'fleet_manager'
+                ),
+        ];
+        return view(
+            'fleet.index',
+            compact('vehiclePermissions')
+        );
     }
     /**
      * Show the form for creating a new resource.
@@ -148,6 +177,8 @@ class VehicleController extends Controller
      */
     public function store(Request $request)
     {   
+        $this->authorize('create', Vehicle::class);
+
         $vehicleSettings = $this->getVehicleSettings();
         $requirePlateNumber =
             (bool) $vehicleSettings['requirePlateNumber'];
@@ -237,11 +268,14 @@ class VehicleController extends Controller
             'vehicle' => $vehicle->load('drivers'),
         ]);
     }
+
     /**
      * Display the specified resource.
      */
     public function show(Vehicle $vehicle)
     {
+        $this->authorize('view', $vehicle);
+
         $vehicle->load('drivers');
 
         $availableDrivers = Driver::whereNull('assigned_vehicle_id')
@@ -265,112 +299,279 @@ class VehicleController extends Controller
     /**
      * Update the specified resource in storage.
      */
-    public function update(Request $request, Vehicle $vehicle)
-    {   
-        $vehicleSettings =
-            $this->getVehicleSettings();
-        $requirePlateNumber =
-            (bool) $vehicleSettings['requirePlateNumber'];
+    public function update(
+        Request $request,
+        Vehicle $vehicle
+    ) {
+        $this->authorize('update', $vehicle);
 
-        $validator = Validator::make(
-            $request->all(),
-            [
-                'plate_number' => [
-                    $requirePlateNumber
-                        ? 'required'
-                        : 'nullable',
-                    'string',
-                    'max:255',
-                    Rule::unique(
-                        'vehicles',
-                        'plate_number'
-                    )->ignore($vehicle->id),
-                ],
-                'vehicle_type' => [
-                    'required',
-                ],
-                'capacity' => [
-                    'required',
-                    'integer',
-                    'min:0',
-                ],
-                'fuel_type' => [
-                    'required',
-                    'in:Diesel,Gasoline,Premium Gasoline,Electric,Hybrid',
-                ],
-                'tank_capacity' => [
-                    'required',
-                    'numeric',
-                    'min:0.01',
-                ],
-                'status' => [
-                    'required',
-                    'in:Available,On Trip,Maintenance,Out of Service',
-                ],
-                'assigned_driver_id' => [
-                    'nullable',
-                    'exists:drivers,id',
-                ],
-                'notes' => [
-                    'nullable',
-                    'string',
-                ],
-            ]
-        );
+        $user = $request->user();
 
-        if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Please check the vehicle information.',
-                'errors' => $validator->errors(),
-            ], 422);
-        }
         /*
         |--------------------------------------------------------------------------
-        | Prevent Tank Capacity from becoming lower than Current Fuel
+        | Fleet Manager
         |--------------------------------------------------------------------------
         */
-        $validated = $validator->validated();
+        if ($user->hasRole('fleet_manager')) {
 
-        if (
-            $validated['tank_capacity'] <
-            (float) $vehicle->current_fuel
-        ) {
-            return response()->json([
-                'success' => false,
-                'message' =>
-                    'Tank capacity cannot be lower than the vehicle\'s current fuel level.',
-            ], 422);
-        }
+            $vehicleSettings =
+                $this->getVehicleSettings();
 
-        $driverId =
-            $validated['assigned_driver_id'] ?? null;
+            $requirePlateNumber =
+                (bool) $vehicleSettings['requirePlateNumber'];
 
-        unset($validated['assigned_driver_id']);
+            $validator = Validator::make(
+                $request->all(),
+                [
+                    'plate_number' => [
+                        $requirePlateNumber
+                            ? 'required'
+                            : 'nullable',
+                        'string',
+                        'max:255',
+                        Rule::unique(
+                            'vehicles',
+                            'plate_number'
+                        )->ignore($vehicle->id),
+                    ],
+                    'vehicle_type' => [
+                        'required',
+                        'string',
+                        'max:255',
+                    ],
+                    'brand' => [
+                        'required',
+                        'string',
+                        'max:255',
+                    ],
+                    'model' => [
+                        'required',
+                        'string',
+                        'max:255',
+                    ],
+                    'purchase_date' => [
+                        'nullable',
+                        'date',
+                    ],
+                    'insurance_expiry' => [
+                        'nullable',
+                        'date',
+                    ],
+                    'capacity' => [
+                        'required',
+                        'integer',
+                        'min:0',
+                    ],
+                    'fuel_type' => [
+                        'required',
+                        Rule::in([
+                            'Diesel',
+                            'Gasoline',
+                            'Premium Gasoline',
+                            'Electric',
+                            'Hybrid',
+                        ]),
+                    ],
+                    'tank_capacity' => [
+                        'required',
+                        'numeric',
+                        'min:0.01',
+                    ],
+                    'current_fuel' => [
+                        'required',
+                        'numeric',
+                        'min:0',
+                        'lte:tank_capacity',
+                    ],
+                    'current_odometer' => [
+                        'required',
+                        'numeric',
+                        'min:0',
+                    ],
+                    'status' => [
+                        'required',
+                        Rule::in([
+                            'Available',
+                            'On Trip',
+                            'Maintenance',
+                            'Out of Service',
+                        ]),
+                    ],
+                    'assigned_driver_id' => [
+                        'nullable',
+                        'exists:drivers,id',
+                    ],
+                    'notes' => [
+                        'nullable',
+                        'string',
+                    ],
+                ]
+            );
 
-        $vehicle->update($validated);
-        /*
-        |--------------------------------------------------------------------------
-        | Clear Previous Driver Assignment
-        |--------------------------------------------------------------------------
-        */
-        Driver::where(
-            'assigned_vehicle_id',
-            $vehicle->id
-        )->update([
-            'assigned_vehicle_id' => null,
-        ]);
-        /*
-        |--------------------------------------------------------------------------
-        | Assign New Driver
-        |--------------------------------------------------------------------------
-        */
-        if ($driverId) {
-            Driver::where('id', $driverId)
-                ->update([
-                    'assigned_vehicle_id' =>
-                        $vehicle->id,
+            if ($validator->fails()) {
+                return response()->json([
+                    'success' => false,
+                    'message' =>
+                        'Please check the vehicle information.',
+                    'errors' =>
+                        $validator->errors(),
+                ], 422);
+            }
+
+            $validated =
+                $validator->validated();
+
+            if (
+                (float) $validated['tank_capacity'] <
+                (float) $validated['current_fuel']
+            ) {
+                return response()->json([
+                    'success' => false,
+                    'message' =>
+                        'Tank capacity cannot be lower than the vehicle\'s current fuel level.',
+                ], 422);
+            }
+
+            $driverFieldProvided =
+                array_key_exists(
+                    'assigned_driver_id',
+                    $validated
+                );
+
+            $driverId =
+                $validated['assigned_driver_id']
+                ?? null;
+
+            unset(
+                $validated['assigned_driver_id']
+            );
+
+            $vehicle->update($validated);
+
+            /*
+            |--------------------------------------------------------------------------
+            | Driver assignment can only be changed by Fleet Manager here
+            |--------------------------------------------------------------------------
+            */
+
+            if ($driverFieldProvided) {
+
+                Driver::where(
+                    'assigned_vehicle_id',
+                    $vehicle->id
+                )->update([
+                    'assigned_vehicle_id' => null,
                 ]);
+
+                if ($driverId) {
+                    Driver::where(
+                        'id',
+                        $driverId
+                    )->update([
+                        'assigned_vehicle_id' =>
+                            $vehicle->id,
+                    ]);
+                }
+            }
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Dispatcher
+        |--------------------------------------------------------------------------
+        */
+        elseif ($user->hasRole('dispatcher')) {
+
+            $validated =
+                $request->validate([
+                    'status' => [
+                        'sometimes',
+                        Rule::in([
+                            'Available',
+                            'Out of Service',
+                        ]),
+                    ],
+                    'current_fuel' => [
+                        'sometimes',
+                        'numeric',
+                        'min:0',
+                    ],
+                    'current_odometer' => [
+                        'sometimes',
+                        'numeric',
+                        'min:0',
+                    ],
+                    'notes' => [
+                        'sometimes',
+                        'nullable',
+                        'string',
+                    ],
+                ]);
+
+            if (
+                isset($validated['current_fuel']) &&
+                $vehicle->tank_capacity !== null &&
+                (float) $validated['current_fuel'] >
+                    (float) $vehicle->tank_capacity
+            ) {
+                return response()->json([
+                    'success' => false,
+                    'message' =>
+                        'Current fuel cannot exceed tank capacity.',
+                ], 422);
+            }
+
+            if (empty($validated)) {
+                abort(
+                    403,
+                    'You do not have permission to modify these vehicle fields.'
+                );
+            }
+
+            $vehicle->update($validated);
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Maintenance
+        |--------------------------------------------------------------------------
+        */
+        elseif ($user->hasRole('maintenance')) {
+
+            $validated =
+                $request->validate([
+                    'status' => [
+                        'sometimes',
+                        Rule::in([
+                            'Available',
+                            'Maintenance',
+                            'Out of Service',
+                        ]),
+                    ],
+                    'current_odometer' => [
+                        'sometimes',
+                        'numeric',
+                        'min:0',
+                    ],
+                    'notes' => [
+                        'sometimes',
+                        'nullable',
+                        'string',
+                    ],
+                ]);
+
+            if (empty($validated)) {
+                abort(
+                    403,
+                    'You do not have permission to modify these vehicle fields.'
+                );
+            }
+
+            $vehicle->update($validated);
+        }
+
+        else {
+            abort(403);
         }
 
         return response()->json([
@@ -387,6 +588,8 @@ class VehicleController extends Controller
      */
     public function destroy(Vehicle $vehicle)
     {
+        $this->authorize('delete', $vehicle);
+
         $vehicle->delete();
 
         return response()->json([
@@ -398,6 +601,8 @@ class VehicleController extends Controller
     // Bulk Delete
     public function bulkDelete(Request $request)
     {   
+        $this->authorize('deleteAny', Vehicle::class);
+
         $request->validate([
             'ids' => 'required|array',
             'ids.*' => 'exists:vehicles,id',
@@ -413,6 +618,8 @@ class VehicleController extends Controller
 
     public function stats()
     {
+        $this->authorize('viewAny', Vehicle::class);
+
         return response()->json([
             'total' => Vehicle::count(),
 
@@ -428,6 +635,8 @@ class VehicleController extends Controller
 
     public function available()
     {
+        $this->authorize('viewAny', Vehicle::class);
+
         $vehicles = Vehicle::with('drivers')
             ->where('status', 'Available')
             ->orderBy('brand')
@@ -446,5 +655,6 @@ class VehicleController extends Controller
 
         return response()->json($vehicles);
     }
+
 }
 

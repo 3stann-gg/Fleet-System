@@ -102,6 +102,41 @@ function updateFuelHighCostWarning(settings) {
     }
 }
 
+//  RBAC
+function getFuelRole() {
+    return window.FleetRBAC?.getRole?.() || "";
+}
+function canCreateFuelRecord() {
+    return window.FleetRBAC?.hasPermission?.("fuel", "canCreate") === true;
+}
+function isDriverFuelUser() {
+    return getFuelRole() === "driver";
+}
+function setFuelFieldVisibility(fieldId, visible) {
+    const field = document.getElementById(fieldId);
+    if (!field) return;
+    const wrapper = field.closest(".form-group");
+    if (wrapper) {
+        wrapper.hidden = !visible;
+    }
+    field.disabled = !visible;
+}
+function applyFuelAddRbac() {
+    if (!isDriverFuelUser()) {
+        return;
+    }
+    [
+        "fuelVehicle",
+        "fuelDriver",
+        "fuelDriverId",
+        "fuelPlate",
+        "fuelCurrentFuel",
+        "fuelTankCapacity",
+    ].forEach((id) => {
+        setFuelFieldVisibility(id, false);
+    });
+}
+
 let fuelAddInitialized = false;
 let availableFuelVehicles = [];
 
@@ -164,6 +199,9 @@ async function generateFuelRecordNumber() {
 
 
 async function loadFuelVehicles() {
+    if (isDriverFuelUser()) {
+        return;
+    }
     const vehicleSelect = document.getElementById("fuelVehicle");
 
     if (!vehicleSelect) {
@@ -320,6 +358,9 @@ function updateFuelTotalCost() {
 }
 
 async function initFuelAdd() {
+    if (!canCreateFuelRecord()) {
+        return;
+    }
     const form = document.getElementById("fuelForm");
 
     if (!form || form.dataset.fuelAddInitialized === "true") {
@@ -329,6 +370,7 @@ async function initFuelAdd() {
     const fuelSettings = await window.getFuelModuleSettings();
 
     applyFuelAddSettings(fuelSettings);
+    applyFuelAddRbac();
 
     fuelAddInitialized = true;
     form.dataset.fuelAddInitialized = "true";
@@ -387,19 +429,21 @@ async function initFuelAdd() {
             return;
         }
 
-        const vehicleId = vehicleSelect?.value;
-        const driverId = document.getElementById("fuelDriverId")?.value;
-
-        if (!vehicleId) {
-            showToast?.("Please select a vehicle.", "error");
-            return;
-        }
-        if (!driverId) {
-            showToast?.(
-                "The selected vehicle has no assigned driver.",
-                "error",
-            );
-            return;
+        const role = getFuelRole();
+        const vehicleId = vehicleSelect?.value || null;
+        const driverId = document.getElementById("fuelDriverId")?.value || null;
+        if (role !== "driver") {
+            if (!vehicleId) {
+                showToast?.("Please select a vehicle.", "error");
+                return;
+            }
+            if (!driverId) {
+                showToast?.(
+                    "The selected vehicle has no assigned driver.",
+                    "error",
+                );
+                return;
+            }
         }
 
         form.dataset.submitting = "true";
@@ -417,26 +461,14 @@ async function initFuelAdd() {
                 fuel_number: document
                     .getElementById("fuelNumber")
                     ?.value.trim(),
-
-                vehicle_id: vehicleId,
-                driver_id: driverId,
                 fuel_amount: document.getElementById("fuelQuantity")?.value,
                 cost_per_liter:
                     document.getElementById("fuelCostPerLiter")?.value,
-
-                /*
-                    |--------------------------------------------------------------------------
-                    | Backend recalculates total cost.
-                    |--------------------------------------------------------------------------
-                    */
-                // backend are the one who calculate the cost
-                //cost: document.getElementById("fuelTotalCost")?.value,
                 odometer:
                     document.getElementById("fuelOdometer")?.value || null,
                 date: document.getElementById("fuelRefuelDate")?.value,
                 refuel_time:
                     document.getElementById("fuelRefuelTime")?.value || null,
-                fuel_type: document.getElementById("fuelType")?.value,
                 fuel_station:
                     document.getElementById("fuelStation")?.value.trim() ||
                     null,
@@ -448,6 +480,11 @@ async function initFuelAdd() {
                 notes:
                     document.getElementById("fuelNotes")?.value.trim() || null,
             };
+            if (role !== "driver") {
+                payload.vehicle_id = vehicleId;
+                payload.driver_id = driverId;
+                payload.fuel_type = document.getElementById("fuelType")?.value;
+            }
 
             const response = await fetch("/fuel-records", {
                 method: "POST",
@@ -488,6 +525,7 @@ async function initFuelAdd() {
             form.reset();
 
             applyFuelAddSettings(fuelSettings);
+            applyFuelAddRbac();
 
             updateFuelHighCostWarning(fuelSettings);
 

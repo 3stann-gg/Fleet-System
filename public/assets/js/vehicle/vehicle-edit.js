@@ -5,7 +5,6 @@
 /* ==========================================
    Vehicle Module Settings
 ========================================== */
-
 async function getEditVehicleSettings() {
     if (
         typeof window.getVehicleModuleSettings ===
@@ -70,6 +69,105 @@ function applyEditVehicleSettings(
     }
 }
 
+//    RBAC
+function getVehicleEditRole() {
+    return window.FleetRBAC?.getRole?.() || "";
+}
+function canEditVehicle() {
+    return window.FleetRBAC?.hasPermission?.("vehicles", "canUpdate") === true;
+}
+function setEditVehicleFieldAccess(fieldId, visible) {
+    const field = document.getElementById(fieldId);
+    if (!field) {
+        return;
+    }
+    const wrapper = field.closest(".form-group");
+    if (wrapper) {
+        wrapper.hidden = !visible;
+    }
+    /*
+     * Disabled fields:
+     * - are not validated by the browser
+     * - cannot be edited
+     */
+    field.disabled = !visible;
+}
+function applyVehicleEditRbac() {
+    const role = getVehicleEditRole();
+    const managerFields = [
+        "editVehiclePlate",
+        "editVehicleType",
+        "editVehicleCapacity",
+        "editVehicleDriver",
+        "editVehicleFuel",
+        "editVehicleTankCapacity",
+        "editVehicleMileage",
+        "editVehicleStatus",
+        "editVehicleNotes",
+    ];
+    /*
+     * Always reset first because the same modal
+     * can be opened multiple times.
+     */
+    managerFields.forEach((id) => {
+        setEditVehicleFieldAccess(id, role === "fleet_manager");
+    });
+    /*
+     * Limited Vehicle editors
+     */
+    if (role === "dispatcher" || role === "maintenance") {
+        setEditVehicleFieldAccess("editVehicleStatus", true);
+        setEditVehicleFieldAccess("editVehicleNotes", true);
+    }
+}
+function applyVehicleEditStatusOptions(currentStatus) {
+    const select = document.getElementById("editVehicleStatus");
+    if (!select) {
+        return;
+    }
+    const role = getVehicleEditRole();
+    let allowedStatuses = [];
+    if (role === "fleet_manager") {
+        allowedStatuses = [
+            "Available",
+            "On Trip",
+            "Maintenance",
+            "Out of Service",
+        ];
+    } else if (role === "dispatcher") {
+        allowedStatuses = ["Available", "Out of Service"];
+    } else if (role === "maintenance") {
+        allowedStatuses = ["Available", "Maintenance", "Out of Service"];
+    }
+    /*
+     * Preserve current status for display.
+     */
+    if (currentStatus && !allowedStatuses.includes(currentStatus)) {
+        allowedStatuses.unshift(currentStatus);
+    }
+    select.innerHTML = allowedStatuses
+        .map(
+            (status) => `
+                <option
+                    value="${status}"
+                    ${status === currentStatus ? "selected" : ""}
+                >
+                    ${status}
+                </option>
+            `,
+        )
+        .join("");
+    /*
+     * On Trip is lifecycle-controlled.
+     * Limited users can see it but not
+     * manually change it.
+     */
+    if (role !== "fleet_manager" && currentStatus === "On Trip") {
+        select.disabled = true;
+    }
+}
+
+
 function populateEditDriverDropdown(drivers, vehicle) {
     const select = document.getElementById("editVehicleDriver");
 
@@ -83,18 +181,14 @@ function populateEditDriverDropdown(drivers, vehicle) {
 
     (drivers || []).forEach((driver) => {
         const option = document.createElement("option");
-
         option.value = driver.id;
-
         option.textContent = `${driver.first_name} ${driver.last_name}`;
-
         if (
             vehicle?.drivers?.length &&
             String(vehicle.drivers[0].id) === String(driver.id)
         ) {
             option.selected = true;
         }
-
         select.appendChild(option);
     });
 }
@@ -102,7 +196,6 @@ function populateEditDriverDropdown(drivers, vehicle) {
 
 function setEditVehicleFieldValue(id, value) {
     const field = document.getElementById(id);
-
     if (field) {
         field.value = value ?? "";
     }
@@ -110,13 +203,10 @@ function setEditVehicleFieldValue(id, value) {
 
 function setEditVehicleSelectValue(id, value) {
     const select = document.getElementById(id);
-
     if (!select) {
         return;
     }
-
     const normalizedValue = value == null ? "" : String(value);
-
     if (
         normalizedValue &&
         !Array.from(select.options).some(
@@ -124,14 +214,10 @@ function setEditVehicleSelectValue(id, value) {
         )
     ) {
         const option = document.createElement("option");
-
         option.value = normalizedValue;
-
         option.textContent = normalizedValue;
-
         select.appendChild(option);
     }
-
     select.value = normalizedValue;
 }
 
@@ -143,9 +229,7 @@ function openEditVehicleModal(modal) {
     if (!modal.classList.contains("show")) {
         modal.dataset.previousBodyOverflow = document.body.style.overflow;
     }
-
     modal.classList.add("show");
-
     document.body.style.overflow = "hidden";
 }
 
@@ -153,13 +237,9 @@ function closeEditVehicleModal(modal) {
     if (!modal || !modal.classList.contains("show")) {
         return;
     }
-
     modal.classList.remove("show");
-
     document.body.style.overflow = modal.dataset.previousBodyOverflow || "";
-
     delete modal.dataset.previousBodyOverflow;
-
     modal.currentRow = null;
 }
 
@@ -264,6 +344,9 @@ function validateEditVehicleFuelFields() {
 }
 
 async function initEditVehicleModal() {
+    if (!canEditVehicle()) {
+        return;
+    }
     const modal = document.getElementById("editVehicleModal");
     const form = document.getElementById("editVehicleForm");
     const closeButton = document.getElementById("closeEditVehicleModal");
@@ -312,13 +395,13 @@ async function initEditVehicleModal() {
             }
 
             console.log("EDIT VEHICLE RESPONSE:", data);
-
             const row = button.closest("tr");
-
             modal.currentRow = row || null;
 
             populateEditVehicleModal(data.vehicle);
             populateEditDriverDropdown(data.drivers || [], data.vehicle);
+            applyVehicleEditRbac();
+            applyVehicleEditStatusOptions(data.vehicle.status);
             openEditVehicleModal(modal);
         } catch (error) {
             console.error("EDIT VEHICLE LOAD ERROR:", error);
@@ -366,7 +449,10 @@ async function initEditVehicleModal() {
             form.reportValidity();
             return;
         }
-        if (!validateEditVehicleFuelFields()) {
+        if (
+            getVehicleEditRole() === "fleet_manager" &&
+            !validateEditVehicleFuelFields()
+        ) {
             return;
         }
 
@@ -386,23 +472,42 @@ async function initEditVehicleModal() {
             | Fuel Management owns those values.
             |--------------------------------------------------------------------------
             */
-        const formData = {
-            plate_number:
-                document.getElementById("editVehiclePlate")?.value.trim() || "",
-            vehicle_type:
-                document.getElementById("editVehicleType")?.value || "",
-            capacity:
-                document.getElementById("editVehicleCapacity")?.value || "",
-            fuel_type: document.getElementById("editVehicleFuel")?.value || "",
-            tank_capacity:
-                document.getElementById("editVehicleTankCapacity")?.value || "",
-            status: document.getElementById("editVehicleStatus")?.value || "",
-            notes:
-                document.getElementById("editVehicleNotes")?.value.trim() ||
-                null,
-            assigned_driver_id:
-                document.getElementById("editVehicleDriver")?.value || null,
-        };
+        const role = getVehicleEditRole();
+        let formData = {};
+        if (role === "fleet_manager") {
+            formData = {
+                plate_number:
+                    document.getElementById("editVehiclePlate")?.value.trim() ||
+                    "",
+                vehicle_type:
+                    document.getElementById("editVehicleType")?.value || "",
+                capacity:
+                    document.getElementById("editVehicleCapacity")?.value || "",
+                fuel_type:
+                    document.getElementById("editVehicleFuel")?.value || "",
+                tank_capacity:
+                    document.getElementById("editVehicleTankCapacity")?.value ||
+                    "",
+                status:
+                    document.getElementById("editVehicleStatus")?.value || "",
+                notes:
+                    document.getElementById("editVehicleNotes")?.value.trim() ||
+                    null,
+                assigned_driver_id:
+                    document.getElementById("editVehicleDriver")?.value || null,
+            };
+        }
+        if (role === "dispatcher" || role === "maintenance") {
+            formData = {
+                notes:
+                    document.getElementById("editVehicleNotes")?.value.trim() ||
+                    null,
+            };
+            const status = document.getElementById("editVehicleStatus");
+            if (status && !status.disabled) {
+                formData.status = status.value;
+            }
+        }
 
         const updateButton = document.getElementById("updateVehicleBtn");
 

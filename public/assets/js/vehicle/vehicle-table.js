@@ -109,25 +109,24 @@ function renderVehicleTable(vehicles) {
 
     if (!tableBody) return;
 
+    const canUpdate =
+        window.FleetRBAC?.hasPermission("vehicles", "canUpdate") === true;
+    const canDelete =
+        window.FleetRBAC?.hasPermission("vehicles", "canDelete") === true;
+    const canBulkDelete =
+        window.FleetRBAC?.hasPermission("vehicles", "canBulkDelete") === true;
+
     let html = "";
 
     vehicles.forEach((vehicle) => {
         const badgeClass = getVehicleStatusClass(vehicle.status);
-
         const vehicleIcon = getVehicleIcon(vehicle.vehicle_type);
-
         const driverName = vehicle.driver_name ?? "Not Assigned";
-
         const initials = getVehicleDriverInitials(driverName);
-
         const tankCapacity = vehicle.tank_capacity ?? "";
-
         const currentFuel = vehicle.current_fuel ?? "";
-
         const currentOdometer = vehicle.current_odometer ?? "";
-
         const fuelLevel = formatVehicleFuelLevel(currentFuel, tankCapacity);
-
         html += `
             <tr
                 data-id="${vehicle.id ?? ""}"
@@ -147,64 +146,56 @@ function renderVehicleTable(vehicles) {
                 data-last-service="${vehicle.last_service ?? ""}"
                 data-notes="${vehicle.notes ?? ""}"
             >
-
                 <td>
-                    <input
-                        type="checkbox"
-                        class="vehicle-checkbox"
-                        data-id="${vehicle.id ?? ""}"
-                    >
+                    ${
+                        canBulkDelete
+                            ? `
+                                <input
+                                    type="checkbox"
+                                    class="vehicle-checkbox"
+                                    data-id="${vehicle.id ?? ""}"
+                                >
+                            `
+                            : ""
+                    }
                 </td>
-
                 <td>
                     <div class="vehicle-info">
-
                         <div class="vehicle-avatar">
                             <i class="${vehicleIcon}"></i>
                         </div>
-
                         <div>
                             <div class="vehicle-name">
                                 ${vehicle.brand ?? ""}
                                 ${vehicle.model ?? ""}
                             </div>
-
                             <small>
                                 Emergency Response Unit
                             </small>
                         </div>
-
                     </div>
                 </td>
-
                 <td>
                     ${vehicle.plate_number ?? ""}
                 </td>
-
                 <td>
                     ${vehicle.vehicle_type ?? ""}
                 </td>
-
                 <td>
                     <div class="driver-info">
-
                         <div class="driver-avatar">
                             ${initials}
                         </div>
-
                         <span>
                             ${driverName}
                         </span>
-
                     </div>
                 </td>
-
                 <td>
                     <span class="status-badge ${badgeClass}">
                         ${vehicle.status ?? ""}
                     </span>
                 </td>
-
                 <td>
                     <div class="fuel-progress">
                         <div class="fuel-progress-bar">
@@ -213,42 +204,49 @@ function renderVehicleTable(vehicles) {
                                 style="width: ${fuelLevel === "N/A" ? 0 : fuelLevel}"
                             ></div>
                         </div>
-
                         <span>${fuelLevel}</span>
                     </div>
                 </td>
-
                 <td>
                     ${vehicle.last_service ?? "---"}
                 </td>
-
                 <td>
                     <div class="action-buttons">
-
                         <button
+                            type="button"
                             class="action-btn view"
                             data-id="${vehicle.id}"
                             title="View">
                             <i class="ph ph-eye"></i>
                         </button>
-
-                        <button
-                            class="action-btn edit"
-                            data-id="${vehicle.id}"
-                            title="Edit">
-                            <i class="ph ph-pencil-simple"></i>
-                        </button>
-
-                        <button
-                            class="action-btn delete"
-                            data-id="${vehicle.id}"
-                            title="Delete">
-                            <i class="ph ph-trash"></i>
-                        </button>
-
+                        ${
+                            canUpdate
+                                ? `
+                                    <button
+                                        type="button"
+                                        class="action-btn edit"
+                                        data-id="${vehicle.id}"
+                                        title="Edit">
+                                        <i class="ph ph-pencil-simple"></i>
+                                    </button>
+                                `
+                                : ""
+                        }
+                        ${
+                            canDelete
+                                ? `
+                                    <button
+                                        type="button"
+                                        class="action-btn delete"
+                                        data-id="${vehicle.id}"
+                                        title="Delete">
+                                        <i class="ph ph-trash"></i>
+                                    </button>
+                                `
+                                : ""
+                        }
                     </div>
                 </td>
-
             </tr>
         `;
     });

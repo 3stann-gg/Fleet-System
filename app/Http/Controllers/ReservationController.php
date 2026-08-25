@@ -10,9 +10,12 @@ use App\Models\FleetSetting;
 use App\Services\FleetNotificationService;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 
 class ReservationController extends Controller
 {   
+    use AuthorizesRequests;
+
     private function getReservationSettings(): array
     {
         $record = FleetSetting::query()
@@ -130,10 +133,46 @@ class ReservationController extends Controller
      */
     public function index(Request $request)
     {
+        $this->authorize('viewAny', Reservation::class);
+
+        $user = $request->user();
+
         $query = Reservation::with([
             'vehicle',
-            'driver'
+            'driver',
+            'requester',
         ]);
+            /*
+            |--------------------------------------------------------------------------
+            | RBAC Data Scope
+            |--------------------------------------------------------------------------
+            */
+            if ($user->hasRole('driver')) {
+                $driverId =
+                    $user->driverProfile?->id;
+                if ($driverId) {
+                    $query->where(
+                        'driver_id',
+                        $driverId
+                    );
+                } else {
+                    /*
+                    | Driver account not linked to a Driver profile.
+                    | Return no reservation records.
+                    */
+                    $query->whereRaw('1 = 0');
+                }
+            }
+            if ($user->hasRole('department_head')) {
+                if ($user->department) {
+                    $query->where(
+                        'department',
+                        $user->department
+                    );
+                } else {
+                    $query->whereRaw('1 = 0');
+                }
+            }
 
         if ($request->filled('search')) {
             $search = $request->search;
@@ -232,7 +271,40 @@ class ReservationController extends Controller
             ]);
         }
 
-        return view('reservation.index');
+        $reservationPermissions = [
+            'role' =>
+                $user->role,
+            'canCreate' =>
+                $user->can(
+                    'create',
+                    Reservation::class
+                ),
+            'canUpdate' =>
+                $user->hasRole(
+                    'fleet_manager',
+                    'dispatcher',
+                    'department_head'
+                ),
+            'canDelete' =>
+                $user->hasRole(
+                    'fleet_manager',
+                    'dispatcher'
+                ),
+            'canBulkDelete' =>
+                $user->hasRole(
+                    'fleet_manager',
+                    'dispatcher'
+                ),
+            'canApprove' =>
+                $user->hasRole(
+                    'fleet_manager',
+                    'dispatcher'
+                ),
+        ];
+        return view(
+            'reservation.index',
+            compact('reservationPermissions')
+        );
     }
 
     /**
@@ -240,6 +312,8 @@ class ReservationController extends Controller
      */
     public function store(Request $request)
     {
+        $this->authorize('create', Reservation::class);
+
         $reservationSettings =
             $this->getReservationSettings();
         $minimumDate =
@@ -339,6 +413,42 @@ class ReservationController extends Controller
 
         try {
             $validated = $validator->validated();
+
+            $validated['requested_by'] =
+                $request->user()->id;
+            /*
+            |--------------------------------------------------------------------------
+            | Department Head ownership
+            |--------------------------------------------------------------------------
+            */
+            if (
+                $request->user()->hasRole(
+                    'department_head'
+                )
+            ) {
+                if (!$request->user()->department) {
+                    return response()->json([
+                        'success' => false,
+                        'message' =>
+                            'Your account does not have an assigned department.',
+                    ], 422);
+                }
+                $validated['department'] =
+                    $request->user()->department;
+                /*
+                |--------------------------------------------------------------------------
+                | Department Heads do not assign operational resources
+                |--------------------------------------------------------------------------
+                */
+                $validated['vehicle_id'] = null;
+                $validated['driver_id'] = null;
+            }
+
+            $validated['requested_by'] =
+                $request->user()->id;
+
+            $validated['department'] =
+                $request->user()->department;
             
             $validated['status'] =
                 $reservationSettings['requireApproval']
@@ -391,9 +501,12 @@ class ReservationController extends Controller
      */
     public function show(Reservation $reservation)
     {
+        $this->authorize('view', $reservation);
+
         $reservation->load([
             'vehicle',
-            'driver'
+            'driver',
+            'requester',
         ]);
 
         return response()->json([
@@ -408,12 +521,15 @@ class ReservationController extends Controller
         Request $request,
         Reservation $reservation
     ) {
+        $this->authorize('update', $reservation);
+
         $reservation->load([
-                'routePlan',
-                'vehicle',
-                'driver',
-                'dispatch',
+            'routePlan',
+            'vehicle',
+            'driver',
+            'dispatch',
         ]);
+
         if ($reservation->dispatch) {
             return response()->json([
                 'success' => false,
@@ -429,14 +545,14 @@ class ReservationController extends Controller
             ], 422);
         }
 
+        $user = $request->user();
+
         $reservationSettings =
             $this->getReservationSettings();
-
         $minimumDate =
             $reservationSettings['allowSameDay']
                 ? now()->toDateString()
                 : now()->addDay()->toDateString();
-
         $maximumDate =
             now()
                 ->addDays(
@@ -444,103 +560,259 @@ class ReservationController extends Controller
                 )
                 ->toDateString();
 
-        $validator = Validator::make(
-            $request->all(),
-            [
-                'reservation_number' => [
-                    'required',
-                    'string',
-                    'max:50',
-                    'unique:reservations,reservation_number,' . $reservation->id,
+        /*
+        |--------------------------------------------------------------------------
+        | Fleet Manager / Dispatcher
+        |--------------------------------------------------------------------------
+        */
+        if (
+            $user->hasRole(
+                'fleet_manager',
+                'dispatcher'
+            )
+        ) {
+            $validator = Validator::make(
+                $request->all(),
+                [
+                    'reservation_number' => [
+                        'required',
+                        'string',
+                        'max:50',
+                        'unique:reservations,reservation_number,' .
+                            $reservation->id,
+                    ],
+                    'patient_name' => [
+                        'required',
+                        'string',
+                        'max:255',
+                    ],
+                    'request_type' => [
+                        'required',
+                        'in:Patient Transport,Emergency Transfer,Medical Appointment,Laboratory Transport,Staff Transport,Supply Delivery',
+                    ],
+                    'vehicle_id' => [
+                        'nullable',
+                        'exists:vehicles,id',
+                    ],
+                    'driver_id' => [
+                        'nullable',
+                        'exists:drivers,id',
+                    ],
+                    'pickup_location' => [
+                        'required',
+                        'string',
+                        'max:255',
+                    ],
+                    'destination' => [
+                        'required',
+                        'string',
+                        'max:255',
+                    ],
+                    'schedule_date' => [
+                        'required',
+                        'date',
+                        'after_or_equal:' . $minimumDate,
+                        'before_or_equal:' . $maximumDate,
+                    ],
+                    'schedule_time' => [
+                        'required',
+                    ],
+                    'priority' => [
+                        'required',
+                        'in:Low,Normal,High,Emergency',
+                    ],
+                    'status' => [
+                        'required',
+                        'in:Pending,Approved,Scheduled,Completed,Rejected,Cancelled',
+                    ],
+                    'contact_number' => [
+                        'nullable',
+                        'string',
+                        'max:50',
+                    ],
+                    'notes' => [
+                        'nullable',
+                        'string',
+                    ],
                 ],
-                'patient_name' => [
-                    'required',
-                    'string',
-                    'max:255',
-                ],
-                'request_type' => [
-                    'required',
-                    'in:Patient Transport,Emergency Transfer,Medical Appointment,Laboratory Transport,Staff Transport,Supply Delivery',
-                ],
-                'vehicle_id' => [
-                    'nullable',
-                    'exists:vehicles,id',
-                ],
-                'driver_id' => [
-                    'nullable',
-                    'exists:drivers,id',
-                ],
-                'pickup_location' => [
-                    'required',
-                    'string',
-                    'max:255',
-                ],
-                'destination' => [
-                    'required',
-                    'string',
-                    'max:255',
-                ],
-                'schedule_date' => [
-                    'required',
-                    'date',
-                    'after_or_equal:' . $minimumDate,
-                    'before_or_equal:' . $maximumDate,
-                ],
-                'schedule_time' => [
-                    'required',
-                ],
-                'priority' => [
-                    'required',
-                    'in:Low,Normal,High,Emergency',
-                ],
-                'status' => [
-                    'required',
-                    'in:Pending,Approved,Scheduled,Completed,Rejected,Cancelled',
-                ],
-                'contact_number' => [
-                    'nullable',
-                    'string',
-                    'max:50',
-                ],
-                'notes' => [
-                    'nullable',
-                    'string',
-                ],
-            ]
-        );
+                [
+                    'schedule_date.after_or_equal' =>
+                        $reservationSettings['allowSameDay']
+                            ? 'Reservation date cannot be earlier than today.'
+                            : 'Same-day reservations are disabled. Please select a future date.',
 
-        if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Please check the reservation information.',
-                'errors' => $validator->errors(),
-            ], 422);
-        }
-
-        try {
-            $validated = $validator->validated();
-
-            $this->validateVehicleAndDriverAvailability(
-                $validated['vehicle_id'] ?? null,
-                $validated['driver_id'] ?? null
+                    'schedule_date.before_or_equal' =>
+                        'Reservation date cannot be more than ' .
+                        $reservationSettings['maxAdvanceDays'] .
+                        ' days in advance.',
+                ]
             );
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'success' => false,
+                    'message' =>
+                        'Please check the reservation information.',
+                    'errors' =>
+                        $validator->errors(),
+                ], 422);
+            }
+
+            try {
+                $validated =
+                    $validator->validated();
+
+                $this->validateVehicleAndDriverAvailability(
+                    $validated['vehicle_id'] ?? null,
+                    $validated['driver_id'] ?? null
+                );
+
+                /*
+                |--------------------------------------------------------------------------
+                | RBAC-Protected Ownership
+                |--------------------------------------------------------------------------
+                | requested_by and department are not accepted from the request.
+                */
+                $reservation->update($validated);
+                $reservation->load([
+                    'vehicle',
+                    'driver',
+                    'requester',
+                ]);
+
+                return response()->json([
+                    'success' => true,
+                    'message' =>
+                        'Reservation updated successfully.',
+                    'reservation' =>
+                        $reservation,
+                ]);
+            } catch (\Exception $e) {
+                return response()->json([
+                    'success' => false,
+                    'message' =>
+                        $e->getMessage(),
+                ], 422);
+            }
+        }
+        /*
+        |--------------------------------------------------------------------------
+        | Department Head - Limited Edit
+        |--------------------------------------------------------------------------
+        | Policy already ensures:
+        | - same department
+        | - Pending reservation only
+        |
+        | Department Head cannot modify:
+        | - reservation number
+        | - assigned vehicle
+        | - assigned driver
+        | - operational status
+        | - ownership
+        */
+        if ($user->hasRole('department_head')) {
+            if (!$user->department) {
+                return response()->json([
+                    'success' => false,
+                    'message' =>
+                        'Your account does not have an assigned department.',
+                ], 422);
+            }
+
+            $validator = Validator::make(
+                $request->all(),
+                [
+                    'patient_name' => [
+                        'required',
+                        'string',
+                        'max:255',
+                    ],
+                    'request_type' => [
+                        'required',
+                        'in:Patient Transport,Emergency Transfer,Medical Appointment,Laboratory Transport,Staff Transport,Supply Delivery',
+                    ],
+                    'pickup_location' => [
+                        'required',
+                        'string',
+                        'max:255',
+                    ],
+                    'destination' => [
+                        'required',
+                        'string',
+                        'max:255',
+                    ],
+                    'schedule_date' => [
+                        'required',
+                        'date',
+                        'after_or_equal:' . $minimumDate,
+                        'before_or_equal:' . $maximumDate,
+                    ],
+                    'schedule_time' => [
+                        'required',
+                    ],
+                    'priority' => [
+                        'required',
+                        'in:Low,Normal,High,Emergency',
+                    ],
+                    'contact_number' => [
+                        'nullable',
+                        'string',
+                        'max:50',
+                    ],
+                    'notes' => [
+                        'nullable',
+                        'string',
+                    ],
+                ],
+                [
+                    'schedule_date.after_or_equal' =>
+                        $reservationSettings['allowSameDay']
+                            ? 'Reservation date cannot be earlier than today.'
+                            : 'Same-day reservations are disabled. Please select a future date.',
+
+                    'schedule_date.before_or_equal' =>
+                        'Reservation date cannot be more than ' .
+                        $reservationSettings['maxAdvanceDays'] .
+                        ' days in advance.',
+                ]
+            );
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'success' => false,
+                    'message' =>
+                        'Please check the reservation information.',
+                    'errors' =>
+                        $validator->errors(),
+                ], 422);
+            }
+
+            $validated =
+                $validator->validated();
 
             $reservation->update(
                 $validated
             );
-                    
-            return response()->json([
-                'success' => true,
-                'message' => 'Reservation updated successfully.',
-                'reservation' => $reservation,
+
+            $reservation->load([
+                'vehicle',
+                'driver',
+                'requester',
             ]);
 
-        } catch (\Exception $e) {
             return response()->json([
-                'success' => false,
-                'message' => $e->getMessage(),
-            ], 422);
+                'success' => true,
+                'message' =>
+                    'Reservation updated successfully.',
+                'reservation' =>
+                    $reservation,
+            ]);
         }
+
+        abort(
+            403,
+            'You do not have permission to update this reservation.'
+        );
     }
 
     /**
@@ -548,6 +820,8 @@ class ReservationController extends Controller
      */
     public function destroy(Reservation $reservation)
     {
+        $this->authorize('delete', $reservation);
+
         try {
             $reservation->load([
                 'routePlan',
@@ -581,6 +855,8 @@ class ReservationController extends Controller
      */
     public function bulkDelete(Request $request)
     {
+        $this->authorize('deleteAny', Reservation::class);
+
         $validator = Validator::make(
             $request->all(),
             [
@@ -652,30 +928,81 @@ class ReservationController extends Controller
     /**
      * Reservation statistics.
      */
-    public function stats()
+    public function stats(Request $request)
     {
+        $this->authorize('viewAny', Reservation::class);
+
+        $user =
+            $request->user();
+        $query =
+            Reservation::query();
+
+        if ($user->hasRole('driver')) {
+            $driverId =
+                $user->driverProfile?->id;
+            if ($driverId) {
+                $query->where(
+                    'driver_id',
+                    $driverId
+                );
+            } else {
+                $query->whereRaw('1 = 0');
+            }
+        }
+
+        if (
+            $user->hasRole(
+                'department_head'
+            )
+        ) {
+            if ($user->department) {
+                $query->where(
+                    'department',
+                    $user->department
+                );
+            } else {
+                $query->whereRaw('1 = 0');
+            }
+        }
+
         return response()->json([
-            'total' => Reservation::count(),
-            'pending' => Reservation::where(
-                'status',
-                'Pending'
-            )->count(),
-            'approved' => Reservation::where(
-                'status',
-                'Approved'
-            )->count(),
-            'scheduled' => Reservation::where(
-                'status',
-                'Scheduled'
-            )->count(),
-            'completed' => Reservation::where(
-                'status',
-                'Completed'
-            )->count(),
-            'cancelled' => Reservation::where(
-                'status',
-                'Cancelled'
-            )->count(),
+            'total' =>
+                (clone $query)->count(),
+            'pending' =>
+                (clone $query)
+                    ->where(
+                        'status',
+                        'Pending'
+                    )
+                    ->count(),
+            'approved' =>
+                (clone $query)
+                    ->where(
+                        'status',
+                        'Approved'
+                    )
+                    ->count(),
+            'scheduled' =>
+                (clone $query)
+                    ->where(
+                        'status',
+                        'Scheduled'
+                    )
+                    ->count(),
+            'completed' =>
+                (clone $query)
+                    ->where(
+                        'status',
+                        'Completed'
+                    )
+                    ->count(),
+            'cancelled' =>
+                (clone $query)
+                    ->where(
+                        'status',
+                        'Cancelled'
+                    )
+                    ->count(),
         ]);
     }
 
@@ -712,6 +1039,8 @@ class ReservationController extends Controller
 
     public function nextNumber()
     {
+        $this->authorize('create', Reservation::class);
+
         return response()->json([
             'success' => true,
             'reservation_number' =>

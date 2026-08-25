@@ -9,9 +9,12 @@ use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 
 class DriverController extends Controller
 {
+    use AuthorizesRequests;
+    
     private function getDriverSettings(): array
     {
         $record = FleetSetting::query()
@@ -142,13 +145,47 @@ class DriverController extends Controller
         );
     }
 
-    public function index()
+    public function index(Request $request)
     {
-        return view('driver.index');
+        $this->authorize('viewAny', Driver::class);
+
+        $user = $request->user();
+
+        $driverPermissions = [
+            'role' =>
+                $user->role,
+            'canCreate' =>
+                $user->can(
+                    'create',
+                    Driver::class
+                ),
+            'canUpdate' =>
+                $user->hasRole(
+                    'fleet_manager',
+                    'dispatcher'
+                ),
+            'canDelete' =>
+                $user->hasRole(
+                    'fleet_manager',
+                    'dispatcher'
+                ),
+            'canBulkDelete' =>
+                $user->hasRole(
+                    'fleet_manager',
+                    'dispatcher'
+                ),
+        ];
+
+        return view(
+            'driver.index',
+            compact('driverPermissions')
+        );
     }
 
     public function store(Request $request)
     {
+        $this->authorize('create', Driver::class);
+
         $driverSettings =
         $this->getDriverSettings();
         $requireLicenseExpiry =
@@ -236,11 +273,17 @@ class DriverController extends Controller
 
     public function show(Driver $driver)
     {
-        return response()->json($driver);
+        $this->authorize('view', $driver);
+        $driver->load('vehicle');
+        return response()->json(
+            $driver
+        );
     }
 
     public function update(Request $request, Driver $driver)
     {
+        $this->authorize( 'update',$driver);
+
         $driverSettings =
             $this->getDriverSettings();
         $requireLicenseExpiry =
@@ -281,12 +324,17 @@ class DriverController extends Controller
             'assigned_vehicle_id'=> 'nullable|exists:vehicles,id',
             'status' => [
                 'required',
-                Rule::in([
-                    'Available',
-                    'On Duty',
-                    'On Leave',
-                    'Inactive',
-                ]),
+                Rule::in(
+                    $driver->status === 'On Duty'
+                        ? [
+                            'On Duty',
+                        ]
+                        : [
+                            'Available',
+                            'On Leave',
+                            'Inactive',
+                        ]
+                ),
             ],
         ]);
 
@@ -348,6 +396,8 @@ class DriverController extends Controller
 
     public function destroy(Driver $driver)
     {
+        $this->authorize('delete', $driver);
+
         $driver->delete();
 
         return response()->json([
@@ -357,7 +407,9 @@ class DriverController extends Controller
     }
 
     public function bulkDelete(Request $request)
-    {
+    {   
+        $this->authorize('deleteAny', Driver::class);
+
         $request->validate([
             'ids' => 'required|array',
             'ids.*' => 'exists:drivers,id',
@@ -373,12 +425,28 @@ class DriverController extends Controller
 
     public function getDrivers()
     {
+        $this->authorize('viewAny', Driver::class);
+
+        $user = $request->user();
+
         $driverSettings =
             $this->getDriverSettings();
         $warningDays =
             $driverSettings['warnLicenseDays'];
-        $drivers = Driver::with('vehicle')
-            ->latest()
+        $query = Driver::with('vehicle')
+            ->latest();
+        /*
+        |--------------------------------------------------------------------------
+        | Driver self-scope
+        |--------------------------------------------------------------------------
+        */
+        if ($user->hasRole('driver')) {
+            $query->where(
+                'user_id',
+                $user->id
+            );
+        }
+        $drivers = $query
             ->get()
             ->map(function ($driver) use ($warningDays) {
                 $daysUntilExpiry = null;
@@ -424,6 +492,8 @@ class DriverController extends Controller
 
     public function available()
     {
+        $this->authorize('create', Driver::class);
+        
         $drivers = Driver::whereNull('assigned_vehicle_id')
             ->orderBy('first_name')
             ->get([

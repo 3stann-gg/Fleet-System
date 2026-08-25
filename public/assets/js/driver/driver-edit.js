@@ -106,6 +106,11 @@ function applyEditDriverSettings(
   }
 }
 
+//   RBAC
+function canEditDriverRecords() {
+    return window.FleetRBAC?.hasPermission?.("drivers", "canUpdate") === true;
+}
+
 function setEditDriverFieldValue(id, value) {
   const field = document.getElementById(id);
 
@@ -296,7 +301,7 @@ function populateEditDriverModal(modal, row) {
   );
   setEditDriverFieldValue(
       "editDriverEmployeeId",
-      "DRV-" + String(driverId).padStart(3, "0")
+      row.dataset.driverNumber || "",
   );
   setEditDriverFieldValue(
       "editDriverLicenseNumber",
@@ -371,6 +376,9 @@ function populateEditDriverModal(modal, row) {
 }
 
 async function initEditDriverModal() {
+  if (!canEditDriverRecords()) {
+      return;
+  }
   const modal = document.getElementById("editDriverModal");
   const form = document.getElementById("editDriverForm");
   const closeButton = document.getElementById("closeEditDriverModal");

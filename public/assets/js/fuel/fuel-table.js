@@ -131,6 +131,9 @@ function renderFuelTable(fuelLogs) {
         return;
     }
 
+    const canUpdate =
+        window.FleetRBAC?.hasPermission?.("fuel", "canUpdate") === true;
+
     let html = "";
 
     fuelLogs.forEach((fuel) => {
@@ -182,13 +185,7 @@ function renderFuelTable(fuelLogs) {
 
                     <!-- Checkbox -->
                     <td>
-                        <input
-                            type="checkbox"
-                            class="fuel-checkbox"
-                            data-fuel-id="${fuelId}"
-                            data-id="${fuelId}"
-                            aria-label="Select ${fuelNumber}"
-                        />
+                        
                     </td>
 
                     <!-- Fuel Record Number -->
@@ -272,7 +269,6 @@ function renderFuelTable(fuelLogs) {
                     <!-- Actions -->
                     <td>
                         <div class="action-buttons">
-
                             <button
                                 type="button"
                                 class="action-btn view-fuel"
@@ -283,26 +279,21 @@ function renderFuelTable(fuelLogs) {
                                 <i class="ph ph-eye"></i>
                             </button>
 
-                            <button
-                                type="button"
-                                class="action-btn edit-fuel"
-                                data-id="${fuelId}"
-                                data-fuel-id="${fuelId}"
-                                aria-label="Edit ${fuelNumber}"
-                            >
-                                <i class="ph ph-pencil-simple"></i>
-                            </button>
-
-                            <button
-                                type="button"
-                                class="action-btn delete-fuel"
-                                data-id="${fuelId}"
-                                data-fuel-id="${fuelId}"
-                                aria-label="Delete ${fuelNumber}"
-                            >
-                                <i class="ph ph-trash"></i>
-                            </button>
-
+                            ${
+                                canUpdate
+                                    ? `
+                                        <button
+                                            type="button"
+                                            class="action-btn edit-fuel"
+                                            data-id="${fuelId}"
+                                            data-fuel-id="${fuelId}"
+                                            aria-label="Edit ${fuelNumber}"
+                                        >
+                                            <i class="ph ph-pencil-simple"></i>
+                                        </button>
+                                    `
+                                    : ""
+                            }
                         </div>
                     </td>
 

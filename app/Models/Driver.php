@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use App\Models\Reservation;
+use App\Models\User;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Driver extends Model
@@ -43,5 +44,10 @@ class Driver extends Model
     public function fuelLogs(): HasMany
     {
         return $this->hasMany(FuelLog::class);
+    }
+
+    public function user()
+    {
+        return $this->belongsTo(User::class);
     }
 }

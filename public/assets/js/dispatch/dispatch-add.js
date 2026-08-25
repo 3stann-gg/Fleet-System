@@ -10,12 +10,31 @@
    Schedule comes from RoutePlan
 ========================================== */
 
+//    RBAC
+function canCreateDispatch() {
+    return window.FleetRBAC?.hasPermission?.("dispatch", "canCreate") === true;
+}
+function canUpdateDispatch() {
+    return window.FleetRBAC?.hasPermission?.("dispatch", "canUpdate") === true;
+}
+function canDeleteDispatch() {
+    return window.FleetRBAC?.hasPermission?.("dispatch", "canDelete") === true;
+}
+function canBulkDeleteDispatch() {
+    return (
+        window.FleetRBAC?.hasPermission?.("dispatch", "canBulkDelete") === true
+    );
+}
+
 let availableReservations = [];
 
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", async () => {
+    if (!canCreateDispatch()) {
+        return;
+    }
     initDispatchAdd();
-    loadAvailableReservations();
-    loadNextDispatchNumber();
+    await loadAvailableReservations();
+    await loadNextDispatchNumber();
 });
 
 
@@ -297,6 +316,11 @@ function clearReservationDetails() {
 
 
 function createDispatchRow(dispatch) {
+    //rbac
+    const canUpdate = canUpdateDispatch();
+    const canDeletePermission = canDeleteDispatch();
+    const canBulkDelete = canBulkDeleteDispatch();
+
     const reservation = dispatch.reservation || null;
     const routePlan = getReservationRoutePlan(reservation);
     const vehicle = reservation?.vehicle || null;
@@ -338,12 +362,17 @@ function createDispatchRow(dispatch) {
     tr.dataset.requestType = reservation?.request_type ?? "";
 
     const tdCheckbox = document.createElement("td");
-    const checkbox = document.createElement("input");
-    checkbox.type = "checkbox";
-    checkbox.className = "dispatch-checkbox";
-    checkbox.dataset.id = dispatch.id;
-    checkbox.setAttribute("aria-label", `Select ${dispatch.dispatch_number}`);
-    tdCheckbox.appendChild(checkbox);
+    if (canBulkDelete) {
+        const checkbox = document.createElement("input");
+        checkbox.type = "checkbox";
+        checkbox.className = "dispatch-checkbox";
+        checkbox.dataset.id = dispatch.id;
+        checkbox.setAttribute(
+            "aria-label",
+            `Select ${dispatch.dispatch_number}`,
+        );
+        tdCheckbox.appendChild(checkbox);
+    }
     /*
     |--------------------------------------------------------------------------
     | Dispatch Number
@@ -458,33 +487,34 @@ function createDispatchRow(dispatch) {
     viewBtn.dataset.id = dispatch.id;
     viewBtn.setAttribute("aria-label", `View ${dispatch.dispatch_number}`);
     viewBtn.innerHTML = '<i class="ph ph-eye"></i>';
-    const editBtn = document.createElement("button");
-    editBtn.type = "button";
-    editBtn.className = "action-btn edit-dispatch";
-    editBtn.dataset.id = dispatch.id;
-    editBtn.setAttribute("aria-label", `Edit ${dispatch.dispatch_number}`);
-    editBtn.innerHTML = '<i class="ph ph-pencil-simple"></i>';
-    /*
-    |--------------------------------------------------------------------------
-    | Completed / Cancelled dispatches are history.
-    |--------------------------------------------------------------------------
-    */
-    if (["Completed", "Cancelled"].includes(status)) {
-        editBtn.disabled = true;
+    if (canUpdate) {
+        const editBtn = document.createElement("button");
+        editBtn.type = "button";
+        editBtn.className = "action-btn edit-dispatch";
+        editBtn.dataset.id = dispatch.id;
+        editBtn.setAttribute("aria-label", `Edit ${dispatch.dispatch_number}`);
+        editBtn.innerHTML = '<i class="ph ph-pencil-simple"></i>';
+        if (["Completed", "Cancelled"].includes(status)) {
+            editBtn.disabled = true;
+        }
+        actionsWrap.appendChild(editBtn);
     }
-    const deleteBtn = document.createElement("button");
-    deleteBtn.type = "button";
-    deleteBtn.className = "action-btn delete-dispatch";
-    deleteBtn.dataset.id = dispatch.id;
-    deleteBtn.setAttribute("aria-label", `Delete ${dispatch.dispatch_number}`);
-    deleteBtn.innerHTML = '<i class="ph ph-trash"></i>';
-  
-    if (!["Pending", "Assigned"].includes(status)) {
-        deleteBtn.disabled = true;
+    if (canDeletePermission) {
+        const deleteBtn = document.createElement("button");
+        deleteBtn.type = "button";
+        deleteBtn.className = "action-btn delete-dispatch";
+        deleteBtn.dataset.id = dispatch.id;
+        deleteBtn.setAttribute(
+            "aria-label",
+            `Delete ${dispatch.dispatch_number}`,
+        );
+        deleteBtn.innerHTML = '<i class="ph ph-trash"></i>';
+        if (!["Pending", "Assigned"].includes(status)) {
+            deleteBtn.disabled = true;
+        }
+        actionsWrap.appendChild(deleteBtn);
     }
     actionsWrap.appendChild(viewBtn);
-    actionsWrap.appendChild(editBtn);
-    actionsWrap.appendChild(deleteBtn);
     tdActions.appendChild(actionsWrap);
     
     tr.appendChild(tdCheckbox);
@@ -531,6 +561,9 @@ function formatDispatchSchedule(date, time) {
 
 
 function initDispatchAdd() {
+    if (!canCreateDispatch()) {
+        return;
+    }
     const modal = document.getElementById("addDispatchModal");
     const form = document.getElementById("dispatchForm");
     if (!modal || !form) {

@@ -82,29 +82,40 @@ function renderReservationTable(reservations) {
 
     if (!tableBody) return;
 
+    const role = window.FleetRBAC?.getRole?.() || "";
+    const canDelete =
+        window.FleetRBAC?.hasPermission?.("reservations", "canDelete") === true;
+    const canBulkDelete =
+        window.FleetRBAC?.hasPermission?.("reservations", "canBulkDelete") ===
+        true;
+    const canUpdate =
+        window.FleetRBAC?.hasPermission?.("reservations", "canUpdate") === true;
+
     let html = "";
 
     reservations.forEach(reservation => {
+
+        const canEditThisReservation =
+            canUpdate &&
+            (role === "fleet_manager" ||
+                role === "dispatcher" ||
+                (role === "department_head" &&
+                    reservation.status === "Pending"));
 
         const statusClass =
             getReservationStatusClass(
                 reservation.status
             );
-
         const vehicle = reservation.vehicle;
-
         const driver = reservation.driver;
-
         const vehicleName = vehicle
             ? `${[vehicle.brand, vehicle.model]
                   .filter(Boolean)
                   .join(" ")} - ${vehicle.vehicle_type ?? ""}`
             : "Unassigned";
-
         const driverName = driver
             ? `${driver.first_name} ${driver.last_name}`
             : "Unassigned";
-
         const schedule = formatReservationSchedule(
             reservation.schedule_date,
             reservation.schedule_time
@@ -129,12 +140,18 @@ function renderReservationTable(reservations) {
             >
 
                 <td>
-                    <input
-                        type="checkbox"
-                        class="reservation-checkbox"
-                        data-id="${reservation.id}"
-                        aria-label="Select ${reservation.reservation_number}"
-                    >
+                    ${
+                        canBulkDelete
+                            ? `
+                                <input
+                                    type="checkbox"
+                                    class="reservation-checkbox"
+                                    data-id="${reservation.id}"
+                                    aria-label="Select ${reservation.reservation_number}"
+                                >
+                            `
+                            : ""
+                    }
                 </td>
 
                 <td>
@@ -192,9 +209,7 @@ function renderReservationTable(reservations) {
                 </td>
 
                 <td>
-
                     <div class="action-buttons">
-
                         <button
                             type="button"
                             class="action-btn view-reservation"
@@ -203,27 +218,35 @@ function renderReservationTable(reservations) {
                         >
                             <i class="ph ph-eye"></i>
                         </button>
-
-                        <button
-                            type="button"
-                            class="action-btn edit-reservation"
-                            data-id="${reservation.id}"
-                            aria-label="Edit ${reservation.reservation_number}"
-                        >
-                            <i class="ph ph-pencil-simple"></i>
-                        </button>
-
-                        <button
-                            type="button"
-                            class="action-btn delete-reservation"
-                            data-id="${reservation.id}"
-                            aria-label="Delete ${reservation.reservation_number}"
-                        >
-                            <i class="ph ph-trash"></i>
-                        </button>
-
+                        ${
+                            canEditThisReservation
+                                ? `
+                                    <button
+                                        type="button"
+                                        class="action-btn edit-reservation"
+                                        data-id="${reservation.id}"
+                                        aria-label="Edit ${reservation.reservation_number}"
+                                    >
+                                        <i class="ph ph-pencil-simple"></i>
+                                    </button>
+                                `
+                                : ""
+                        }
+                        ${
+                            canDelete
+                                ? `
+                                    <button
+                                        type="button"
+                                        class="action-btn delete-reservation"
+                                        data-id="${reservation.id}"
+                                        aria-label="Delete ${reservation.reservation_number}"
+                                    >
+                                        <i class="ph ph-trash"></i>
+                                    </button>
+                                `
+                                : ""
+                        }
                     </div>
-
                 </td>
 
             </tr>

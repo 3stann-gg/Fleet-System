@@ -14,10 +14,16 @@
                 <p>Manage hospital fleet drivers, assignments, and availability.</p>
               </div>
 
-              <button type="button" id="addDriverBtn" class="btn-primary">
-                <i class="ph ph-plus"></i>
-                Add Driver
-              </button>
+              @if($driverPermissions['canCreate'] ?? false)
+                  <button
+                      type="button"
+                      id="addDriverBtn"
+                      class="btn-primary"
+                  >
+                      <i class="ph ph-plus"></i>
+                      Add Driver
+                  </button>
+              @endif
             </div>
 
             <!-- Driver Statistics -->
@@ -123,28 +129,35 @@
             </div>
 
             <!-- Bulk Toolbar -->
-            <div class="bulk-toolbar" id="driverBulkToolbar">
-              <span id="driverSelectedCount">0 drivers selected</span>
-
-              <div>
-                <button
-                  type="button"
-                  class="btn-outline"
-                  id="clearDriverSelection"
+            @if($driverPermissions['canBulkDelete'] ?? false)
+                <div
+                    class="bulk-toolbar"
+                    id="driverBulkToolbar"
                 >
-                  Clear
-                </button>
+                    <span id="driverSelectedCount">
+                        0 drivers selected
+                    </span>
 
-                <button
-                  type="button"
-                  id="deleteSelectedDrivers"
-                  class="btn-danger"
-                >
-                  <i class="ph ph-trash"></i>
-                  Delete Selected
-                </button>
-              </div>
-            </div>
+                    <div>
+                        <button
+                            type="button"
+                            class="btn-outline"
+                            id="clearDriverSelection"
+                        >
+                            Clear
+                        </button>
+
+                        <button
+                            type="button"
+                            id="deleteSelectedDrivers"
+                            class="btn-danger"
+                        >
+                            <i class="ph ph-trash"></i>
+                            Delete Selected
+                        </button>
+                    </div>
+                </div>
+            @endif
 
             <!-- Driver Table -->
             <div class="card">
@@ -218,12 +231,13 @@
                   <thead>
                     <tr>
                       <th>
-                        <input
-                          type="checkbox"
-                          id="selectAllDrivers"
-                          data-id="${driver.id}"
-                          aria-label="Select all drivers"
-                        />
+                          @if($driverPermissions['canBulkDelete'] ?? false)
+                              <input
+                                  type="checkbox"
+                                  id="selectAllDrivers"
+                                  aria-label="Select all drivers"
+                              />
+                          @endif
                       </th>
 
                       <th class="sortable" data-column="1">
@@ -295,10 +309,29 @@
           </div>
         </section>
 
-    @include('components.driver.add-driver-modal')
+    @if($driverPermissions['canCreate'] ?? false)
+        @include('components.driver.add-driver-modal')
+    @endif
+
     @include('components.driver.view-driver-modal')
-    @include('components.driver.edit-driver-modal')
-    @include('components.driver.delete-driver-modal')
+
+    @if($driverPermissions['canUpdate'] ?? false)
+        @include('components.driver.edit-driver-modal')
+    @endif
+
+    @if($driverPermissions['canDelete'] ?? false)
+        @include('components.driver.delete-driver-modal')
+    @endif
+
+    <script>
+        window.FLEET_RBAC = window.FLEET_RBAC || {};
+        window.FLEET_RBAC.role =
+            @json(auth()->user()?->role);
+        window.FLEET_RBAC.drivers =
+            @json($driverPermissions ?? []);
+    </script>
+
+    <script src="{{ asset('assets/js/helpers/rbac.js') }}"></script>
 
     <!-- Export dependencies -->
     <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>

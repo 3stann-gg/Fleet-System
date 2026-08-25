@@ -212,6 +212,13 @@ function renderDispatchTable(dispatches) {
         return;
     }
 
+    const canUpdate =
+        window.FleetRBAC?.hasPermission?.("dispatch", "canUpdate") === true;
+    const canDeletePermission =
+        window.FleetRBAC?.hasPermission?.("dispatch", "canDelete") === true;
+    const canBulkDelete =
+        window.FleetRBAC?.hasPermission?.("dispatch", "canBulkDelete") === true;
+
     if (!Array.isArray(dispatches) || dispatches.length === 0) {
         tableBody.innerHTML = "";
 
@@ -263,8 +270,10 @@ function renderDispatchTable(dispatches) {
         const remarks = dispatch.remarks || "";
         const contact = reservation.contact_number || "";
         const statusClass = getDispatchStatusClass(status);
-        const canEdit = !["Completed", "Cancelled"].includes(status);
-        const canDelete = ["Pending", "Assigned"].includes(status);
+        const canEdit =
+            canUpdate && !["Completed", "Cancelled"].includes(status);
+        const canDelete =
+            canDeletePermission && ["Pending", "Assigned"].includes(status);
         const safeDispatchNumber = escapeDispatchHtml(
             dispatch.dispatch_number || "N/A",
         );
@@ -297,17 +306,21 @@ function renderDispatchTable(dispatches) {
                     data-contact="${escapeDispatchHtml(contact)}"
                     data-notes="${escapeDispatchHtml(remarks)}"
                 >
-
                     <!-- Checkbox -->
                     <td>
-                        <input
-                            type="checkbox"
-                            class="dispatch-checkbox"
-                            data-id="${escapeDispatchHtml(dispatch.id)}"
-                            aria-label="Select ${safeDispatchNumber}"
-                        >
+                        ${
+                            canBulkDelete
+                                ? `
+                                    <input
+                                        type="checkbox"
+                                        class="dispatch-checkbox"
+                                        data-id="${escapeDispatchHtml(dispatch.id)}"
+                                        aria-label="Select ${safeDispatchNumber}"
+                                    >
+                                `
+                                : ""
+                        }
                     </td>
-
 
                     <!-- Dispatch Number -->
                     <td>
@@ -316,14 +329,12 @@ function renderDispatchTable(dispatches) {
                         </span>
                     </td>
 
-
                     <!-- Reservation Number -->
                     <td>
                         <span class="dispatch-reservation-number">
                             ${safeReservationNumber}
                         </span>
                     </td>
-
 
                     <!-- Patient -->
                     <td>
@@ -340,7 +351,6 @@ function renderDispatchTable(dispatches) {
                         </div>
                     </td>
 
-
                     <!-- Vehicle -->
                     <td>
                         <div class="vehicle-info">
@@ -352,14 +362,12 @@ function renderDispatchTable(dispatches) {
                         </div>
                     </td>
 
-
                     <!-- Driver -->
                     <td>
                         <span class="dispatch-driver">
                             ${safeDriverText}
                         </span>
                     </td>
-
 
                     <!-- Final Planned Route -->
                     <td>
@@ -372,14 +380,12 @@ function renderDispatchTable(dispatches) {
                         </span>
                     </td>
 
-
                     <!-- Dispatch Schedule -->
                     <td>
                         <span class="dispatch-schedule">
                             ${safeSchedule}
                         </span>
                     </td>
-
 
                     <!-- Priority -->
                     <td>
@@ -388,7 +394,6 @@ function renderDispatchTable(dispatches) {
                         </span>
                     </td>
 
-
                     <!-- Status -->
                     <td>
                         <span class="status-badge ${statusClass}">
@@ -396,11 +401,9 @@ function renderDispatchTable(dispatches) {
                         </span>
                     </td>
 
-
                     <!-- Actions -->
                     <td>
                         <div class="action-buttons">
-
                             <button
                                 type="button"
                                 class="action-btn view-dispatch"
@@ -410,37 +413,47 @@ function renderDispatchTable(dispatches) {
                             >
                                 <i class="ph ph-eye"></i>
                             </button>
+                            ${
+                                canUpdate
+                                    ? `
+                                        <button
+                                            type="button"
+                                            class="action-btn edit-dispatch"
+                                            data-id="${escapeDispatchHtml(dispatch.id)}"
+                                            aria-label="Edit ${safeDispatchNumber}"
+                                            title="${
+                                                canEdit
+                                                    ? "Edit Dispatch"
+                                                    : "This dispatch can no longer be edited"
+                                            }"
+                                            ${canEdit ? "" : "disabled"}
+                                        >
+                                            <i class="ph ph-pencil-simple"></i>
+                                        </button>
+                                    `
+                                    : ""
+                            }
 
-                            <button
-                                type="button"
-                                class="action-btn edit-dispatch"
-                                data-id="${escapeDispatchHtml(dispatch.id)}"
-                                aria-label="Edit ${safeDispatchNumber}"
-                                title="${
-                                    canEdit
-                                        ? "Edit Dispatch"
-                                        : "This dispatch can no longer be edited"
-                                }"
-                                ${canEdit ? "" : "disabled"}
-                            >
-                                <i class="ph ph-pencil-simple"></i>
-                            </button>
-
-                            <button
-                                type="button"
-                                class="action-btn delete-dispatch"
-                                data-id="${escapeDispatchHtml(dispatch.id)}"
-                                aria-label="Delete ${safeDispatchNumber}"
-                                title="${
-                                    canDelete
-                                        ? "Delete Dispatch"
-                                        : "Only Pending or Assigned dispatches can be deleted"
-                                }"
-                                ${canDelete ? "" : "disabled"}
-                            >
-                                <i class="ph ph-trash"></i>
-                            </button>
-
+                            ${
+                                canDeletePermission
+                                    ? `
+                                        <button
+                                            type="button"
+                                            class="action-btn delete-dispatch"
+                                            data-id="${escapeDispatchHtml(dispatch.id)}"
+                                            aria-label="Delete ${safeDispatchNumber}"
+                                            title="${
+                                                canDelete
+                                                    ? "Delete Dispatch"
+                                                    : "Only Pending or Assigned dispatches can be deleted"
+                                            }"
+                                            ${canDelete ? "" : "disabled"}
+                                        >
+                                            <i class="ph ph-trash"></i>
+                                        </button>
+                                    `
+                                    : ""
+                            }
                         </div>
                     </td>
 

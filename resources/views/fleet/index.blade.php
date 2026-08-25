@@ -13,10 +13,16 @@
 
                 <p>Manage all hospital fleet vehicles.</p>
               </div>
-              <button type="button" id="addVehicleBtn" class="btn-primary">
-                <i class="ph ph-plus"></i>
-                Add Vehicle
-              </button>
+              @if($vehiclePermissions['canCreate'] ?? false)
+                  <button
+                      type="button"
+                      id="addVehicleBtn"
+                      class="btn-primary"
+                  >
+                      <i class="ph ph-plus"></i>
+                      Add Vehicle
+                  </button>
+              @endif
             </div>
 
             <!-- Fleet Statistics -->
@@ -111,18 +117,30 @@
                   </button>
                 </div>
               </div>
-              <div class="bulk-toolbar" id="bulkToolbar">
-                <span id="selectedCount"> 0 vehicles selected </span>
-
-                <div>
-                  <button type="button" class="btn-outline" id="clearSelection">Clear</button>
-
-                  <button type="button" id="deleteSelected" class="btn-danger">
-                    <i class="ph ph-trash"></i>
-                    Delete Selected
-                  </button>
-                </div>
-              </div>
+              @if($vehiclePermissions['canBulkDelete'] ?? false)
+                  <div class="bulk-toolbar" id="bulkToolbar">
+                      <span id="selectedCount">
+                          0 vehicles selected
+                      </span>
+                      <div>
+                          <button
+                              type="button"
+                              class="btn-outline"
+                              id="clearSelection"
+                          >
+                              Clear
+                          </button>
+                          <button
+                              type="button"
+                              id="deleteSelected"
+                              class="btn-danger"
+                          >
+                              <i class="ph ph-trash"></i>
+                              Delete Selected
+                          </button>
+                      </div>
+                  </div>
+              @endif
 
               <!-- Vehicle Table (Next Sprint) -->
               <!-- Vehicle Table -->
@@ -197,11 +215,13 @@
                   <thead>
                     <tr>
                       <th>
-                        <input
-                          type="checkbox"
-                          id="selectAllVehicles"
-                          aria-label="Select all visible vehicles"
-                        />
+                        @if($vehiclePermissions['canBulkDelete'] ?? false)
+                            <input
+                                type="checkbox"
+                                id="selectAllVehicles"
+                                aria-label="Select all visible vehicles"
+                            />
+                        @endif
                       </th>
 
                       <th class="sortable" data-column="1">
@@ -265,10 +285,29 @@
           </div>
         </section>
         
-    @include('components.vehicle.add-vehicle-modal')
+    @if($vehiclePermissions['canCreate'] ?? false)
+        @include('components.vehicle.add-vehicle-modal')
+    @endif
+
     @include('components.vehicle.view-vehicle-modal')
-    @include('components.vehicle.edit-vehicle-modal')
-    @include('components.vehicle.delete-vehicle-modal')
+
+    @if($vehiclePermissions['canUpdate'] ?? false)
+        @include('components.vehicle.edit-vehicle-modal')
+    @endif
+
+    @if($vehiclePermissions['canDelete'] ?? false)
+        @include('components.vehicle.delete-vehicle-modal')
+    @endif
+
+    <script>
+        window.FLEET_RBAC = window.FLEET_RBAC || {};
+        window.FLEET_RBAC.role =
+            @json(auth()->user()?->role);
+        window.FLEET_RBAC.vehicles =
+            @json($vehiclePermissions ?? []);
+    </script>
+
+    <script src="{{ asset('assets/js/helpers/rbac.js') }}"></script>
 
     <!-- Components -->
     <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>

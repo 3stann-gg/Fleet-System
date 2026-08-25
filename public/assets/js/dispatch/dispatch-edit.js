@@ -24,6 +24,10 @@
    - RoutePlan completion
 ========================================== */
 
+function canEditDispatchRecords() {
+    return window.FleetRBAC?.hasPermission?.("dispatch", "canUpdate") === true;
+}
+
 let editDispatchInitialized = false;
 
 function getEditDispatchCsrfToken() {
@@ -398,7 +402,10 @@ async function submitEditDispatch(form, dispatchId) {
         if (typeof refreshDispatchBulkState === "function") {
             refreshDispatchBulkState();
         }
-        if (typeof loadAvailableReservations === "function") {
+        if (
+            canCreateDispatch() &&
+            typeof loadAvailableReservations === "function"
+        ) {
             await loadAvailableReservations();
         }
         if (typeof showToast === "function") {
@@ -423,6 +430,9 @@ async function submitEditDispatch(form, dispatchId) {
 }
 
 function initEditDispatchModal() {
+    if (!canEditDispatchRecords()) {
+        return;
+    }
     if (editDispatchInitialized) {
         return;
     }

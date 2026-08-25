@@ -167,6 +167,13 @@ function clearAllFuelErrors(form) {
     });
 }
 
+function getFuelModalRole() {
+    return window.FleetRBAC?.getRole?.() || "";
+}
+function isFuelDriverRole() {
+    return getFuelModalRole() === "driver";
+}
+
 function validateFuelForm(form) {
     if (!form) {
         return false;
@@ -197,6 +204,7 @@ function validateFuelForm(form) {
     }
 
     const isEdit = form.id === "editFuelForm";
+    const isDriverAdd = !isEdit && isFuelDriverRole();
     const prefix = isEdit ? "editFuel" : "fuel";
     const fields = {
         number: form.querySelector("#" + prefix + "Number"),
@@ -232,22 +240,23 @@ function validateFuelForm(form) {
         }
     }
 
-    if (!fields.vehicle || !fields.vehicle.value) {
+    if (!isDriverAdd && (!fields.vehicle || !fields.vehicle.value)) {
         fail(fields.vehicle, "Vehicle is required.");
     }
 
-    if (!fields.driver || !fields.driver.value.trim()) {
-        fail(fields.driver, "Assigned driver is required.");
+    if (!isDriverAdd) {
+        if (!fields.driver || !fields.driver.value.trim()) {
+            fail(fields.driver, "Assigned driver is required.");
+        }
+        if (!fields.driverId || !fields.driverId.value) {
+            fail(
+                fields.driver,
+                "The selected vehicle must have an assigned driver.",
+            );
+        }
     }
 
-    if (!fields.driverId || !fields.driverId.value) {
-        fail(
-            fields.driver,
-            "The selected vehicle must have an assigned driver.",
-        );
-    }
-
-    if (!fields.type || !fields.type.value) {
+    if (!isDriverAdd && (!fields.type || !fields.type.value)) {
         fail(fields.type, "Fuel type is required.");
     }
 
@@ -425,6 +434,10 @@ async function openAddFuelModal() {
     document.body.style.overflow = "hidden";
 
     requestAnimationFrame(() => {
+        if (isFuelDriverRole()) {
+            document.getElementById("fuelQuantity")?.focus();
+            return;
+        }
         document.getElementById("fuelVehicle")?.focus();
     });
 
@@ -434,7 +447,7 @@ async function openAddFuelModal() {
     |--------------------------------------------------------------------------
     */
 
-    if (typeof loadFuelVehicles === "function") {
+    if (!isFuelDriverRole() && typeof loadFuelVehicles === "function") {
         loadFuelVehicles().catch((error) => {
             console.error("Fuel vehicle loading failed:", error);
         });

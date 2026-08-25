@@ -48,43 +48,70 @@ function applyEditReservationDateSettings(settings) {
     dateInput.max = reservationFormatDate(maximumDate);
 }
 
+//  RBAC
+function getReservationEditRole() {
+    return window.FleetRBAC?.getRole?.() || "";
+}
+function canEditReservations() {
+    return (
+        window.FleetRBAC?.hasPermission?.("reservations", "canUpdate") === true
+    );
+}
+function setReservationEditFieldAccess(id, visible) {
+    const field = document.getElementById(id);
+    if (!field) return;
+    const wrapper = field.closest(".form-group");
+    if (wrapper) {
+        wrapper.hidden = !visible;
+    }
+    field.disabled = !visible;
+}
+function applyReservationEditRbac() {
+    const role = getReservationEditRole();
+    if (role === "fleet_manager" || role === "dispatcher") {
+        return;
+    }
+    if (role === "department_head") {
+        [
+            "editReservationNumber",
+            "editReservationVehicle",
+            "editReservationDriver",
+            "editReservationStatus",
+        ].forEach((id) => {
+            setReservationEditFieldAccess(id, false);
+        });
+    }
+}
+
+
 async function loadEditReservationOptions(selectedVehicleId = null) {
     const vehicleSelect = document.getElementById("editReservationVehicle");
     const driverSelect = document.getElementById("editReservationDriver");
 
     if (!vehicleSelect || !driverSelect) return;
-
     vehicleSelect.innerHTML =
         '<option value="">Loading vehicles...</option>';
     driverSelect.innerHTML =
         '<option value="">Select Driver</option>';
-
     try {
         const response = await fetch("/fleet/available", {
             headers: {
                 Accept: "application/json",
             },
         });
-
         if (!response.ok) {
             throw new Error("Failed to load vehicles.");
         }
-
         const vehicles = await response.json();
-
         vehicleSelect.innerHTML =
             '<option value="">Select Vehicle</option>';
-
         vehicles.forEach((vehicle) => {
             const option = document.createElement("option");
-
             option.value = vehicle.id;
             option.textContent =
                 `${vehicle.brand} ${vehicle.model} - ${vehicle.vehicle_type}`;
-
             vehicleSelect.appendChild(option);
         });
-
         vehicleSelect.addEventListener("change", () => {
             updateEditReservationDriver(
                 vehicles,
@@ -92,10 +119,8 @@ async function loadEditReservationOptions(selectedVehicleId = null) {
                 driverSelect
             );
         });
-
         if (selectedVehicleId) {
             vehicleSelect.value = String(selectedVehicleId);
-
             updateEditReservationDriver(
                 vehicles,
                 selectedVehicleId,
@@ -147,6 +172,10 @@ function updateEditReservationDriver(vehicles, vehicleId, driverSelect) {
 }
 
 async function initEditReservationModal() {
+  if (!canEditReservations()) {
+      return;
+  }
+
   const modal = document.getElementById("editReservationModal");
   if (!modal || modal.dataset.editReservationModalInitialized === "true") {
     return;
@@ -179,8 +208,10 @@ async function initEditReservationModal() {
     setValue("editReservationPatient", getRowText(row, ".patient-name"));
     setValue("editReservationType", getRowData(row, "requestType"));
 
-    const vehicleId = getRowData(row, "vehicleId");
-    loadEditReservationOptions(vehicleId);
+    if (getReservationEditRole() !== "department_head") {
+        const vehicleId = getRowData(row, "vehicleId");
+        loadEditReservationOptions(vehicleId);
+    }
 
     setValue("editReservationPickup", getRowText(row, ".reservation-pickup"));
     setValue("editReservationDestination", getRowText(row, ".reservation-destination"));
@@ -195,6 +226,7 @@ async function initEditReservationModal() {
   openEditReservationModal = (row) => {
     modal.currentRow = row;
     populateEditReservationForm(row);
+    applyReservationEditRbac();
     modal.classList.add("show");
     document.body.style.overflow = "hidden";
   };
@@ -204,7 +236,6 @@ async function initEditReservationModal() {
     document.body.style.overflow = "";
     modal.currentRow = null;
   };
-
   document.body.addEventListener("click", (event) => {
     const button = event.target.closest(".action-btn.edit-reservation");
     if (button) {
@@ -212,21 +243,17 @@ async function initEditReservationModal() {
       openEditReservationModal(row);
     }
   });
-
   document
     .getElementById("closeEditReservationModal")
     ?.addEventListener("click", closeEditReservationModal);
-
   document
     .getElementById("cancelEditReservation")
     ?.addEventListener("click", closeEditReservationModal);
-
   modal.addEventListener("click", (event) => {
     if (event.target === modal) {
       closeEditReservationModal();
     }
   });
-
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape" && modal.classList.contains("show")) {
       closeEditReservationModal();
@@ -260,17 +287,23 @@ async function initEditReservationModal() {
       let firstInvalid = null;
       let isValid = true;
 
+      const role = getReservationEditRole();
+      const isOperationalEditor =
+          role === "fleet_manager" || role === "dispatcher";
       if (
-        !reservationNumber ||
-        !reservationNumber.value.trim() ||
-        reservationNumber.value.trim().length < 5
+          isOperationalEditor &&
+          (!reservationNumber ||
+              !reservationNumber.value.trim() ||
+              reservationNumber.value.trim().length < 5)
       ) {
-        showReservationFieldError(
-          reservationNumber,
-          "Reservation Number must be at least 5 characters.",
-        );
-        if (!firstInvalid) firstInvalid = reservationNumber;
-        isValid = false;
+          showReservationFieldError(
+              reservationNumber,
+              "Reservation Number must be at least 5 characters.",
+          );
+          if (!firstInvalid) {
+              firstInvalid = reservationNumber;
+          }
+          isValid = false;
       }
 
       if (!reservationPatient || !reservationPatient.value.trim()) {
@@ -284,19 +317,25 @@ async function initEditReservationModal() {
         if (!firstInvalid) firstInvalid = reservationType;
         isValid = false;
       }
-
-      if (!reservationVehicle || !reservationVehicle.value) {
-        showReservationFieldError(reservationVehicle, "Vehicle is required.");
-        if (!firstInvalid) firstInvalid = reservationVehicle;
-        isValid = false;
+      /*
+      if (
+          isOperationalEditor &&
+          (!reservationVehicle || !reservationVehicle.value)
+      ) {
+          showReservationFieldError(reservationVehicle, "Vehicle is required.");
+          if (!firstInvalid) firstInvalid = reservationVehicle;
+          isValid = false;
       }
 
-      if (!reservationDriver || !reservationDriver.value) {
-        showReservationFieldError(reservationDriver, "Driver is required.");
-        if (!firstInvalid) firstInvalid = reservationDriver;
-        isValid = false;
+      if (
+          isOperationalEditor &&
+          (!reservationDriver || !reservationDriver.value)
+      ) {
+          showReservationFieldError(reservationDriver, "Driver is required.");
+          if (!firstInvalid) firstInvalid = reservationDriver;
+          isValid = false;
       }
-
+      */
       if (!reservationPickup || !reservationPickup.value.trim()) {
         showReservationFieldError(
           reservationPickup,
@@ -364,10 +403,15 @@ async function initEditReservationModal() {
         isValid = false;
       }
 
-      if (!reservationStatus || !reservationStatus.value) {
-        showReservationFieldError(reservationStatus, "Status is required.");
-        if (!firstInvalid) firstInvalid = reservationStatus;
-        isValid = false;
+      if (
+          isOperationalEditor &&
+          (!reservationStatus || !reservationStatus.value)
+      ) {
+          showReservationFieldError(reservationStatus, "Status is required.");
+          if (!firstInvalid) {
+              firstInvalid = reservationStatus;
+          }
+          isValid = false;
       }
 
       if (
@@ -391,22 +435,28 @@ async function initEditReservationModal() {
       const row = modal.currentRow;
       const reservationId = row.dataset.id;
 
-      const formData = {
-          reservation_number: reservationNumber.value.trim(),
+      let formData = {
           patient_name: reservationPatient.value.trim(),
           request_type: reservationType.value,
-          vehicle_id: reservationVehicle.value || null,
-          driver_id: reservationDriver.value || null,
           pickup_location: reservationPickup.value.trim(),
           destination: reservationDestination.value.trim(),
           schedule_date: reservationDate.value,
           schedule_time: reservationTime.value,
           priority: reservationPriority.value,
-          status: reservationStatus.value,
-          contact_number: reservationContact.value.trim(),
+          contact_number: reservationContact?.value.trim() || "",
           notes:
-              document.getElementById("editReservationNotes")?.value.trim() || "",
+              document.getElementById("editReservationNotes")?.value.trim() ||
+              "",
       };
+      if (role === "fleet_manager" || role === "dispatcher") {
+          formData = {
+              reservation_number: reservationNumber.value.trim(),
+              ...formData,
+              vehicle_id: reservationVehicle.value || null,
+              driver_id: reservationDriver.value || null,
+              status: reservationStatus.value,
+          };
+      }
 
       try {
           const response = await fetch(`/reservation/${reservationId}`, {

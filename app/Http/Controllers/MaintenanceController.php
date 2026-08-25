@@ -10,9 +10,11 @@ use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 
 class MaintenanceController extends Controller
 {
+    use AuthorizesRequests;
     /**
      * Display a listing of maintenance records.
      */
@@ -160,6 +162,10 @@ class MaintenanceController extends Controller
 
     public function index(Request $request)
     {
+        $this->authorize('viewAny', Maintenance::class);
+
+        $user = $request->user();
+
         $maintenanceSettings =
             $this->getMaintenanceSettings();
 
@@ -227,7 +233,34 @@ class MaintenanceController extends Controller
             ]);
         }
 
-        return view('maintenance.index');
+        $maintenancePermissions = [
+            'role' =>
+                $user->role,
+            'canCreate' =>
+                $user->can(
+                    'create',
+                    Maintenance::class
+                ),
+            'canUpdate' =>
+                $user->hasRole(
+                    'fleet_manager',
+                    'maintenance'
+                ),
+            'canDelete' =>
+                $user->hasRole(
+                    'fleet_manager',
+                    'maintenance'
+                ),
+            'canBulkDelete' =>
+                $user->hasRole(
+                    'fleet_manager',
+                    'maintenance'
+                ),
+        ];
+        return view(
+            'maintenance.index',
+            compact('maintenancePermissions')
+        );
     }
 
     /**
@@ -235,6 +268,8 @@ class MaintenanceController extends Controller
      */
     public function availableVehicles()
     {
+        $this->authorize('create', Maintenance::class);
+
         $vehicles = Vehicle::where('status', 'Available')
             ->orderBy('brand')
             ->orderBy('model')
@@ -250,6 +285,8 @@ class MaintenanceController extends Controller
      */
     public function store(Request $request)
     {
+        $this->authorize('create', Maintenance::class);
+
         $maintenanceSettings =
         $this->getMaintenanceSettings();
         if (!$request->filled('maintenance_type')) {
@@ -446,6 +483,8 @@ class MaintenanceController extends Controller
      */
     public function show(Maintenance $maintenance)
     {
+        $this->authorize('view', $maintenance);
+
         $maintenance->load('vehicle');
 
         return response()->json([
@@ -454,371 +493,375 @@ class MaintenanceController extends Controller
     }
 
     /**
- * Update the specified maintenance record.
- */
-public function update(
-    Request $request,
-    Maintenance $maintenance
-) {
-    $maintenanceSettings =
-        $this->getMaintenanceSettings();
+     * Update the specified maintenance record.
+     */
+    public function update(
+        Request $request,
+        Maintenance $maintenance
+    ) {
+        $this->authorize('update', $maintenance);
+        
+        $maintenanceSettings =
+            $this->getMaintenanceSettings();
 
-    $validator = Validator::make(
-        $request->all(),
-        [
-            'maintenance_number' => [
-                'required',
-                'string',
-                'max:50',
-                'unique:maintenances,maintenance_number,' . $maintenance->id,
-            ],
-            'vehicle_id' => [
-                'required',
-                'exists:vehicles,id',
-            ],
-            'maintenance_type' => [
-                'required',
-                'string',
-                'max:100',
-            ],
-            'description' => [
-                'required',
-                'string',
-            ],
-            'maintenance_date' => [
-                'required',
-                'date',
-            ],
-            'completion_date' => [
-                'nullable',
-                'date',
-                'after_or_equal:maintenance_date',
-            ],
-            'next_schedule' => [
-                'nullable',
-                'date',
-            ],
-            'technician' => [
-                'nullable',
-                'string',
-                'max:255',
-            ],
-            'priority' => [
-                'required',
-                'in:Low,Normal,High,Emergency',
-            ],
-            'odometer' => [
-                'nullable',
-                'integer',
-                'min:0',
-            ],
-            'parts_used' => [
-                'nullable',
-                'string',
-            ],
-            'cost' => [
-                'nullable',
-                'numeric',
-                'min:0',
-            ],
-            'status' => [
-                'required',
-                'in:Scheduled,In Progress,Completed,Cancelled',
-            ],
-            'notes' => [
-                'nullable',
-                'string',
-            ],
-        ]
-    );
-
-    if ($validator->fails()) {
-        return response()->json([
-            'success' => false,
-            'message' => 'Please check the maintenance information.',
-            'errors' => $validator->errors(),
-        ], 422);
-    }
-
-    try {
-        $result = DB::transaction(function () use (
-            $validator,
-            $maintenance,
-            $maintenanceSettings
-        ) {
-            /*
-            |--------------------------------------------------------------------------
-            | Lock Maintenance
-            |--------------------------------------------------------------------------
-            */
-            $maintenance = Maintenance::lockForUpdate()
-                ->findOrFail($maintenance->id);
-
-            $previousNextSchedule =
-                $maintenance->next_schedule
-                    ? Carbon::parse(
-                        $maintenance->next_schedule
-                    )->format('Y-m-d')
-                    : null;
-
-            $previousStatus =
-                $maintenance->status;
-
-            /*
-            |--------------------------------------------------------------------------
-            | Get Current + Requested Vehicle
-            |--------------------------------------------------------------------------
-            */
-            $currentVehicle = Vehicle::lockForUpdate()
-                ->findOrFail($maintenance->vehicle_id);
-
-            $validated = $validator->validated();
-
-            $newVehicleId = (int) $validated['vehicle_id'];
-            $currentVehicleId = (int) $maintenance->vehicle_id;
-
-            $currentStatus = $maintenance->status;
-            $newStatus = $validated['status'];
-
-            if (
-                $maintenanceSettings['requireCost'] &&
-                $newStatus === 'Completed' &&
-                (
-                    !isset($validated['cost']) ||
-                    $validated['cost'] === null ||
-                    $validated['cost'] === ''
-                )
-            ) {
-                throw new \Exception(
-                    'Cost is required before maintenance can be completed.'
-                );
-            }
-            /*
-            |--------------------------------------------------------------------------
-            | Maintenance Status Lifecycle
-            |--------------------------------------------------------------------------
-            */
-            $allowedTransitions = [
-                'Scheduled' => [
-                    'In Progress',
-                    'Cancelled',
+        $validator = Validator::make(
+            $request->all(),
+            [
+                'maintenance_number' => [
+                    'required',
+                    'string',
+                    'max:50',
+                    'unique:maintenances,maintenance_number,' . $maintenance->id,
                 ],
-                'In Progress' => [
-                    'Completed',
-                    'Cancelled',
+                'vehicle_id' => [
+                    'required',
+                    'exists:vehicles,id',
                 ],
-                'Completed' => [],
-                'Cancelled' => [],
-            ];
-            /*
-            |--------------------------------------------------------------------------
-            | Prevent Invalid Status Transition
-            |--------------------------------------------------------------------------
-            */
-            if (
-                $currentStatus !== $newStatus &&
-                !in_array(
-                    $newStatus,
-                    $allowedTransitions[$currentStatus] ?? []
-                )
-            ) {
-                throw new \Exception(
-                    "Cannot change maintenance status from {$currentStatus} to {$newStatus}."
-                );
-            }
-            /*
-            |--------------------------------------------------------------------------
-            | Vehicle Change Rules
-            |--------------------------------------------------------------------------
-            |
-            | Only Scheduled maintenance may change vehicle.
-            |
-            */
-            if ($newVehicleId !== $currentVehicleId) {
+                'maintenance_type' => [
+                    'required',
+                    'string',
+                    'max:100',
+                ],
+                'description' => [
+                    'required',
+                    'string',
+                ],
+                'maintenance_date' => [
+                    'required',
+                    'date',
+                ],
+                'completion_date' => [
+                    'nullable',
+                    'date',
+                    'after_or_equal:maintenance_date',
+                ],
+                'next_schedule' => [
+                    'nullable',
+                    'date',
+                ],
+                'technician' => [
+                    'nullable',
+                    'string',
+                    'max:255',
+                ],
+                'priority' => [
+                    'required',
+                    'in:Low,Normal,High,Emergency',
+                ],
+                'odometer' => [
+                    'nullable',
+                    'integer',
+                    'min:0',
+                ],
+                'parts_used' => [
+                    'nullable',
+                    'string',
+                ],
+                'cost' => [
+                    'nullable',
+                    'numeric',
+                    'min:0',
+                ],
+                'status' => [
+                    'required',
+                    'in:Scheduled,In Progress,Completed,Cancelled',
+                ],
+                'notes' => [
+                    'nullable',
+                    'string',
+                ],
+            ]
+        );
 
-                if ($currentStatus !== 'Scheduled') {
-                    throw new \Exception(
-                        'The vehicle cannot be changed once maintenance has started or has already been completed or cancelled.'
-                    );
-                }
-
-                $newVehicle = Vehicle::lockForUpdate()
-                    ->findOrFail($newVehicleId);
-
-                if ($newVehicle->status !== 'Available') {
-                    throw new \Exception(
-                        "Vehicle {$newVehicle->brand} {$newVehicle->model} is currently {$newVehicle->status} and cannot be assigned."
-                    );
-                }
-                /*
-                | Current vehicle remains Available because Scheduled
-                | maintenance has not started yet.
-                |
-                */
-                $maintenance->vehicle_id = $newVehicleId;
-            }
-            /*
-            |--------------------------------------------------------------------------
-            | Start Maintenance
-            |--------------------------------------------------------------------------
-            |
-            | Scheduled → In Progress
-            | Vehicle: Available → Maintenance
-            |
-            */
-            if (
-                $currentStatus !== 'In Progress' &&
-                $newStatus === 'In Progress'
-            ) {
-                /*
-                | If vehicle was changed above, use the new vehicle.
-                */
-                $activeVehicle = $newVehicleId !== $currentVehicleId
-                    ? Vehicle::lockForUpdate()
-                        ->findOrFail($newVehicleId)
-                    : $currentVehicle;
-
-                if ($activeVehicle->status !== 'Available') {
-                    throw new \Exception(
-                        "Vehicle {$activeVehicle->brand} {$activeVehicle->model} is currently {$activeVehicle->status} and cannot start maintenance."
-                    );
-                }
-
-                $activeVehicle->update([
-                    'status' => 'Maintenance',
-                ]);
-            }
-            /*
-            |--------------------------------------------------------------------------
-            | Complete Maintenance
-            |--------------------------------------------------------------------------
-            |
-            | In Progress → Completed
-            | Vehicle: Maintenance → Available
-            |
-            */
-            if (
-                $currentStatus !== 'Completed' &&
-                $newStatus === 'Completed'
-            ) {
-                /*
-                | The vehicle associated with this maintenance becomes
-                | available again.
-                */
-                $completionVehicle = $newVehicleId !== $currentVehicleId
-                    ? Vehicle::lockForUpdate()
-                        ->findOrFail($newVehicleId)
-                    : $currentVehicle;
-
-                if ($completionVehicle->status === 'Maintenance') {
-                    $completionVehicle->update([
-                        'status' => 'Available',
-                    ]);
-                }
-
-                if (empty($validated['completion_date'])) {
-                    $validated['completion_date'] =
-                        now()->toDateString();
-                }
-            }
-            /*
-            |--------------------------------------------------------------------------
-            | Cancel Maintenance
-            |--------------------------------------------------------------------------
-            |
-            | If maintenance was In Progress:
-            | Vehicle: Maintenance → Available
-            |
-            */
-            if (
-                $currentStatus !== 'Cancelled' &&
-                $newStatus === 'Cancelled'
-            ) {
-                if (
-                    $currentVehicle->status === 'Maintenance'
-                ) {
-                    $currentVehicle->update([
-                        'status' => 'Available',
-                    ]);
-                }
-                /*
-                | If it was never started, its vehicle stays Available.
-                */
-            }
-            /*
-            |--------------------------------------------------------------------------
-            | Update Maintenance
-            |--------------------------------------------------------------------------
-            */
-            $maintenance->fill($validated);
-            $maintenance->save();
-
-            /*
-            |--------------------------------------------------------------------------
-            | Load Updated Vehicle
-            |--------------------------------------------------------------------------
-            */
-            $maintenance->load('vehicle');
-
-            return [
-                'maintenance' =>
-                    $maintenance,
-                'previousNextSchedule' =>
-                    $previousNextSchedule,
-                'previousStatus' =>
-                    $previousStatus,
-            ];
-        });
-
-        $updatedMaintenance =
-            $result['maintenance'];
-        $currentNextSchedule =
-            $updatedMaintenance->next_schedule
-                ? Carbon::parse(
-                    $updatedMaintenance->next_schedule
-                )->format('Y-m-d')
-                : null;
-        $scheduleChanged =
-            $result['previousNextSchedule'] !==
-            $currentNextSchedule;
-        $statusChanged =
-            $result['previousStatus'] !==
-            $updatedMaintenance->status;
-
-        if (
-            $currentNextSchedule &&
-            (
-                $scheduleChanged ||
-                $statusChanged
-            )
-        ) {
-            $this->createMaintenanceDueNotification(
-                $updatedMaintenance,
-                $maintenanceSettings['overdueWarnDays']
-            );
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Please check the maintenance information.',
+                'errors' => $validator->errors(),
+            ], 422);
         }
 
-        return response()->json([
-            'success' => true,
-            'message' =>
-                'Maintenance record updated successfully.',
-            'maintenance' =>
-                $updatedMaintenance,
-        ]);
+        try {
+            $result = DB::transaction(function () use (
+                $validator,
+                $maintenance,
+                $maintenanceSettings
+            ) {
+                /*
+                |--------------------------------------------------------------------------
+                | Lock Maintenance
+                |--------------------------------------------------------------------------
+                */
+                $maintenance = Maintenance::lockForUpdate()
+                    ->findOrFail($maintenance->id);
 
-    } catch (\Exception $e) {
-        return response()->json([
-            'success' => false,
-            'message' => $e->getMessage(),
-        ], 422);
+                $previousNextSchedule =
+                    $maintenance->next_schedule
+                        ? Carbon::parse(
+                            $maintenance->next_schedule
+                        )->format('Y-m-d')
+                        : null;
+
+                $previousStatus =
+                    $maintenance->status;
+
+                /*
+                |--------------------------------------------------------------------------
+                | Get Current + Requested Vehicle
+                |--------------------------------------------------------------------------
+                */
+                $currentVehicle = Vehicle::lockForUpdate()
+                    ->findOrFail($maintenance->vehicle_id);
+
+                $validated = $validator->validated();
+
+                $newVehicleId = (int) $validated['vehicle_id'];
+                $currentVehicleId = (int) $maintenance->vehicle_id;
+
+                $currentStatus = $maintenance->status;
+                $newStatus = $validated['status'];
+
+                if (
+                    $maintenanceSettings['requireCost'] &&
+                    $newStatus === 'Completed' &&
+                    (
+                        !isset($validated['cost']) ||
+                        $validated['cost'] === null ||
+                        $validated['cost'] === ''
+                    )
+                ) {
+                    throw new \Exception(
+                        'Cost is required before maintenance can be completed.'
+                    );
+                }
+                /*
+                |--------------------------------------------------------------------------
+                | Maintenance Status Lifecycle
+                |--------------------------------------------------------------------------
+                */
+                $allowedTransitions = [
+                    'Scheduled' => [
+                        'In Progress',
+                        'Cancelled',
+                    ],
+                    'In Progress' => [
+                        'Completed',
+                        'Cancelled',
+                    ],
+                    'Completed' => [],
+                    'Cancelled' => [],
+                ];
+                /*
+                |--------------------------------------------------------------------------
+                | Prevent Invalid Status Transition
+                |--------------------------------------------------------------------------
+                */
+                if (
+                    $currentStatus !== $newStatus &&
+                    !in_array(
+                        $newStatus,
+                        $allowedTransitions[$currentStatus] ?? []
+                    )
+                ) {
+                    throw new \Exception(
+                        "Cannot change maintenance status from {$currentStatus} to {$newStatus}."
+                    );
+                }
+                /*
+                |--------------------------------------------------------------------------
+                | Vehicle Change Rules
+                |--------------------------------------------------------------------------
+                |
+                | Only Scheduled maintenance may change vehicle.
+                |
+                */
+                if ($newVehicleId !== $currentVehicleId) {
+
+                    if ($currentStatus !== 'Scheduled') {
+                        throw new \Exception(
+                            'The vehicle cannot be changed once maintenance has started or has already been completed or cancelled.'
+                        );
+                    }
+
+                    $newVehicle = Vehicle::lockForUpdate()
+                        ->findOrFail($newVehicleId);
+
+                    if ($newVehicle->status !== 'Available') {
+                        throw new \Exception(
+                            "Vehicle {$newVehicle->brand} {$newVehicle->model} is currently {$newVehicle->status} and cannot be assigned."
+                        );
+                    }
+                    /*
+                    | Current vehicle remains Available because Scheduled
+                    | maintenance has not started yet.
+                    |
+                    */
+                    $maintenance->vehicle_id = $newVehicleId;
+                }
+                /*
+                |--------------------------------------------------------------------------
+                | Start Maintenance
+                |--------------------------------------------------------------------------
+                |
+                | Scheduled → In Progress
+                | Vehicle: Available → Maintenance
+                |
+                */
+                if (
+                    $currentStatus !== 'In Progress' &&
+                    $newStatus === 'In Progress'
+                ) {
+                    /*
+                    | If vehicle was changed above, use the new vehicle.
+                    */
+                    $activeVehicle = $newVehicleId !== $currentVehicleId
+                        ? Vehicle::lockForUpdate()
+                            ->findOrFail($newVehicleId)
+                        : $currentVehicle;
+
+                    if ($activeVehicle->status !== 'Available') {
+                        throw new \Exception(
+                            "Vehicle {$activeVehicle->brand} {$activeVehicle->model} is currently {$activeVehicle->status} and cannot start maintenance."
+                        );
+                    }
+
+                    $activeVehicle->update([
+                        'status' => 'Maintenance',
+                    ]);
+                }
+                /*
+                |--------------------------------------------------------------------------
+                | Complete Maintenance
+                |--------------------------------------------------------------------------
+                |
+                | In Progress → Completed
+                | Vehicle: Maintenance → Available
+                |
+                */
+                if (
+                    $currentStatus !== 'Completed' &&
+                    $newStatus === 'Completed'
+                ) {
+                    /*
+                    | The vehicle associated with this maintenance becomes
+                    | available again.
+                    */
+                    $completionVehicle = $newVehicleId !== $currentVehicleId
+                        ? Vehicle::lockForUpdate()
+                            ->findOrFail($newVehicleId)
+                        : $currentVehicle;
+
+                    if ($completionVehicle->status === 'Maintenance') {
+                        $completionVehicle->update([
+                            'status' => 'Available',
+                        ]);
+                    }
+
+                    if (empty($validated['completion_date'])) {
+                        $validated['completion_date'] =
+                            now()->toDateString();
+                    }
+                }
+                /*
+                |--------------------------------------------------------------------------
+                | Cancel Maintenance
+                |--------------------------------------------------------------------------
+                |
+                | If maintenance was In Progress:
+                | Vehicle: Maintenance → Available
+                |
+                */
+                if (
+                    $currentStatus !== 'Cancelled' &&
+                    $newStatus === 'Cancelled'
+                ) {
+                    if (
+                        $currentVehicle->status === 'Maintenance'
+                    ) {
+                        $currentVehicle->update([
+                            'status' => 'Available',
+                        ]);
+                    }
+                    /*
+                    | If it was never started, its vehicle stays Available.
+                    */
+                }
+                /*
+                |--------------------------------------------------------------------------
+                | Update Maintenance
+                |--------------------------------------------------------------------------
+                */
+                $maintenance->fill($validated);
+                $maintenance->save();
+
+                /*
+                |--------------------------------------------------------------------------
+                | Load Updated Vehicle
+                |--------------------------------------------------------------------------
+                */
+                $maintenance->load('vehicle');
+
+                return [
+                    'maintenance' =>
+                        $maintenance,
+                    'previousNextSchedule' =>
+                        $previousNextSchedule,
+                    'previousStatus' =>
+                        $previousStatus,
+                ];
+            });
+
+            $updatedMaintenance =
+                $result['maintenance'];
+            $currentNextSchedule =
+                $updatedMaintenance->next_schedule
+                    ? Carbon::parse(
+                        $updatedMaintenance->next_schedule
+                    )->format('Y-m-d')
+                    : null;
+            $scheduleChanged =
+                $result['previousNextSchedule'] !==
+                $currentNextSchedule;
+            $statusChanged =
+                $result['previousStatus'] !==
+                $updatedMaintenance->status;
+
+            if (
+                $currentNextSchedule &&
+                (
+                    $scheduleChanged ||
+                    $statusChanged
+                )
+            ) {
+                $this->createMaintenanceDueNotification(
+                    $updatedMaintenance,
+                    $maintenanceSettings['overdueWarnDays']
+                );
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' =>
+                    'Maintenance record updated successfully.',
+                'maintenance' =>
+                    $updatedMaintenance,
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ], 422);
+        }
     }
-}
 
     /**
      * Remove the specified maintenance record.
      */
     public function destroy(Maintenance $maintenance)
     {
+        $this->authorize('delete', $maintenance);
+
         try {
             DB::transaction(function () use ($maintenance) {
                 $maintenance->load('vehicle');
@@ -872,6 +915,8 @@ public function update(
      */
     public function bulkDelete(Request $request)
     {
+        $this->authorize('deleteAny', Maintenance::class);
+        
         $validator = Validator::make(
             $request->all(),
             [

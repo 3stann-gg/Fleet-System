@@ -8,6 +8,7 @@ use App\Models\Vehicle;
 use App\Models\Driver;
 use App\Models\Dispatch;
 use App\Models\RoutePlan;
+use App\Models\User;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Reservation extends Model
@@ -16,6 +17,8 @@ class Reservation extends Model
 
     protected $fillable = [
         'reservation_number',
+        'requested_by',
+        'department',
         'patient_name',
         'request_type',
         'vehicle_id',
@@ -52,5 +55,13 @@ class Reservation extends Model
     public function routePlan(): HasOne
     {
         return $this->hasOne(RoutePlan::class);
+    }
+
+    public function requester()
+    {
+        return $this->belongsTo(
+            User::class,
+            'requested_by'
+        );
     }
 }

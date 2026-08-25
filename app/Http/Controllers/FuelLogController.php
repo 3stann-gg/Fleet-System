@@ -10,13 +10,14 @@ use App\Services\FleetNotificationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 
 class FuelLogController extends Controller
 {
+    use AuthorizesRequests;
     /**
      * Display a listing of fuel records.
      */
-
     private function getFuelSettings(): array
     {
         $record = FleetSetting::query()
@@ -43,16 +44,39 @@ class FuelLogController extends Controller
 
     public function index(Request $request)
     {
+        $this->authorize('viewAny', FuelLog::class);
+
+        $user = $request->user();
+
         $fuelSettings =
             $this->getFuelSettings();
 
         $highCostAlert =
             $fuelSettings['highCostAlert'];
 
-        $fuelLogs = FuelLog::with([
+        $query = FuelLog::with([
             'vehicle',
             'driver',
-        ])
+        ]);
+        /*
+        |--------------------------------------------------------------------------
+        | Driver Scope
+        |--------------------------------------------------------------------------
+        */
+        if ($user->hasRole('driver')) {
+            $driverId =
+                $user->driverProfile?->id;
+
+            if ($driverId) {
+                $query->where(
+                    'driver_id',
+                    $driverId
+                );
+            } else {
+                $query->whereRaw('1 = 0');
+            }
+        }
+        $fuelLogs = $query
             ->orderBy('date', 'desc')
             ->orderBy('refuel_time', 'desc')
             ->orderBy('id', 'desc')
@@ -90,6 +114,12 @@ class FuelLogController extends Controller
      */
     public function store(Request $request)
     {
+        $this->authorize('create', FuelLog::class);
+
+        $user = $request->user();
+
+        $isDriver = $user->hasRole('driver');
+
         $fuelSettings =
         $this->getFuelSettings();
         $requireOdometer =
@@ -100,14 +130,15 @@ class FuelLogController extends Controller
         $validator = Validator::make(
             $request->all(),
             [
-                'vehicle_id' => [
-                    'required',
-                    'exists:vehicles,id',
-                ],
-                'driver_id' => [
-                    'required',
-                    'exists:drivers,id',
-                ],
+                'vehicle_id' =>
+                    $isDriver
+                        ? ['nullable', 'exists:vehicles,id']
+                        : ['required', 'exists:vehicles,id'],
+
+                'driver_id' =>
+                    $isDriver
+                        ? ['nullable', 'exists:drivers,id']
+                        : ['required', 'exists:drivers,id'],
                 'fuel_amount' => [
                     'required',
                     'numeric',
@@ -138,10 +169,16 @@ class FuelLogController extends Controller
                     'nullable',
                     'date_format:H:i',
                 ],
-                'fuel_type' => [
-                    'required',
-                    'in:Diesel,Gasoline,Premium Gasoline',
-                ],
+                'fuel_type' =>
+                    $isDriver
+                        ? [
+                            'nullable',
+                            'in:Diesel,Gasoline,Premium Gasoline',
+                        ]
+                        : [
+                            'required',
+                            'in:Diesel,Gasoline,Premium Gasoline',
+                        ],
                 'fuel_station' => [
                     $requireStation
                         ? 'required'
@@ -176,9 +213,50 @@ class FuelLogController extends Controller
         try {
             $fuelLog = DB::transaction(function () use (
                 $validator,
-                $fuelSettings
+                $fuelSettings,
+                $user
             ) {
                 $validated = $validator->validated();
+                /*
+                |--------------------------------------------------------------------------
+                | Driver Limited Access
+                |--------------------------------------------------------------------------
+                */
+                if ($user->hasRole('driver')) {
+                    $driverProfile =
+                        $user->driverProfile;
+
+                    if (!$driverProfile) {
+                        throw new \Exception(
+                            'Your account is not linked to a driver profile.'
+                        );
+                    }
+                    if (
+                        !$driverProfile->assigned_vehicle_id
+                    ) {
+                        throw new \Exception(
+                            'You do not have an assigned vehicle.'
+                        );
+                    }
+                    $assignedVehicle =
+                        Vehicle::lockForUpdate()
+                            ->findOrFail(
+                                $driverProfile
+                                    ->assigned_vehicle_id
+                            );
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | Never trust Driver-supplied assignment data
+                    |--------------------------------------------------------------------------
+                    */
+                    $validated['driver_id'] =
+                        $driverProfile->id;
+                    $validated['vehicle_id'] =
+                        $assignedVehicle->id;
+                    $validated['fuel_type'] =
+                        $assignedVehicle->fuel_type;
+                }
                 
                 $validated['fuel_number'] =
                     $this->generateFuelNumber();
@@ -396,6 +474,8 @@ class FuelLogController extends Controller
      */
     public function show(FuelLog $fuelLog)
     {
+        $this->authorize('view', $fuelLog);
+
         $fuelLog->load([
             'vehicle',
             'driver',
@@ -414,6 +494,8 @@ class FuelLogController extends Controller
      */
     public function update(Request $request, FuelLog $fuelLog)
     {
+        $this->authorize('update', $fuelLog);
+        
         $fuelSettings =
             $this->getFuelSettings();
         $requireStation =
@@ -538,7 +620,7 @@ class FuelLogController extends Controller
             $threshold =
                 (float) $fuelSettings['highCostAlert'];
             $newCost =
-                (float) $result->cost;
+                (float) $fuelLogResult->cost;
 
             if (
                 $threshold > 0 &&
@@ -546,9 +628,9 @@ class FuelLogController extends Controller
                 $newCost >= $threshold
             ) {
                 $vehicleLabel = trim(
-                    ($result->vehicle?->brand ?? '') .
+                    ($fuelLogResult->vehicle?->brand ?? '') .
                     ' ' .
-                    ($result->vehicle?->model ?? '')
+                    ($fuelLogResult->vehicle?->model ?? '')
                 );
 
                 if ($vehicleLabel === '') {
@@ -558,8 +640,8 @@ class FuelLogController extends Controller
                 FleetNotificationService::createWhenEnabled(
                     'fuelHighCost',
                     'High Fuel Cost',
-                    "Fuel record {$fuelLog->fuel_number} for {$vehicleLabel} reached ₱" .
-                    number_format($fuelCost, 2) .
+                    "Fuel record {$fuelLogResult->fuel_number} for {$vehicleLabel} reached ₱" .
+                    number_format($newCost, 2) .
                     ", exceeding the configured ₱" .
                     number_format($threshold, 2) .
                     ' alert threshold.',
@@ -572,7 +654,8 @@ class FuelLogController extends Controller
                 'success' => true,
                 'message' =>
                     'Fuel record updated successfully.',
-                'fuelLog' => $result,
+                'fuelLog' =>
+                    $fuelLogResult,
             ]);
 
         } catch (\Exception $e) {
@@ -588,6 +671,7 @@ class FuelLogController extends Controller
      */
     public function destroy(FuelLog $fuelLog)
     {
+        $this->authorize('delete', $fuelLog);
         /*
         |--------------------------------------------------------------------------
         | Important:
@@ -612,6 +696,8 @@ class FuelLogController extends Controller
      */
     public function bulkDelete(Request $request)
     {
+        $this->authorize('deleteAny', FuelLog::class);
+
         $validator = Validator::make(
             $request->all(),
             [
@@ -641,6 +727,7 @@ class FuelLogController extends Controller
                 'Fuel records cannot be deleted because they affect vehicle fuel and mileage history.',
         ], 422);
     }
+
 
     private function generateFuelNumber(): string
     {
@@ -678,6 +765,8 @@ class FuelLogController extends Controller
     
     public function nextNumber()
     {
+        $this->authorize('create', FuelLog::class);
+        
         return response()->json([
             'fuel_number' => $this->generateFuelNumber(),
         ]);

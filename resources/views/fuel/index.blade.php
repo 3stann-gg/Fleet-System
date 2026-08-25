@@ -15,10 +15,16 @@
                 </p>
               </div>
 
-              <button type="button" id="addFuelBtn" class="btn-primary">
-                <i class="ph ph-plus"></i>
-                Add Fuel Record
-              </button>
+              @if($fuelPermissions['canCreate'] ?? false)
+                  <button
+                      type="button"
+                      id="addFuelBtn"
+                      class="btn-primary"
+                  >
+                      <i class="ph ph-plus"></i>
+                      Add Fuel Record
+                  </button>
+              @endif
             </div>
 
             <div class="stats-grid">
@@ -110,6 +116,8 @@
               </div>
             </div>
 
+            {{-- Fuel records are intentionally non-deletable --}}
+            <!--
             <div class="bulk-toolbar" id="fuelBulkToolbar">
               <span id="fuelSelectedCount">0 fuel records selected</span>
               <div>
@@ -127,6 +135,7 @@
                 </button>
               </div>
             </div>
+            -->
 
             <div class="card">
               <div class="card-header">
@@ -194,11 +203,13 @@
                   <thead>
                     <tr>
                       <th>
+                        <!--
                         <input
                           type="checkbox"
                           id="selectAllFuel"
                           aria-label="Select all visible fuel records"
                         />
+                        -->
                       </th>
                       <th class="sortable" data-column="1">
                         Fuel Record No.
@@ -260,10 +271,27 @@
           </div>
         </section>
 
-    @include('components.fuel.add-fuel-modal')
+    @if($fuelPermissions['canCreate'] ?? false)
+        @include('components.fuel.add-fuel-modal')
+    @endif
+
     @include('components.fuel.view-fuel-modal')
-    @include('components.fuel.edit-fuel-modal')
-    @include('components.fuel.delete-fuel-modal')
+
+    @if($fuelPermissions['canUpdate'] ?? false)
+        @include('components.fuel.edit-fuel-modal')
+    @endif
+
+    {{-- @include('components.fuel.delete-fuel-modal') --}}
+
+    <script>
+        window.FLEET_RBAC = window.FLEET_RBAC || {};
+        window.FLEET_RBAC.role =
+            @json(auth()->user()?->role);
+        window.FLEET_RBAC.fuel =
+            @json($fuelPermissions ?? []);
+    </script>
+
+  <script src="{{ asset('assets/js/helpers/rbac.js') }}"></script>
 
     <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>

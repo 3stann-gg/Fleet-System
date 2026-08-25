@@ -52,6 +52,12 @@ function applyEditMaintenanceSettings(settings) {
     }
 }
 
+function canEditMaintenanceRecords() {
+    return (
+        window.FleetRBAC?.hasPermission?.("maintenance", "canUpdate") === true
+    );
+}
+
 let editMaintenanceInitialized = false;
 
 function formatEditMaintenanceVehicle(vehicle) {
@@ -135,6 +141,39 @@ async function loadEditMaintenanceVehicles(
     }
 }
 
+function updateEditMaintenanceStatusOptions(currentStatus) {
+    const select = document.getElementById("editMaintenanceStatus");
+
+    if (!select) {
+        return;
+    }
+    const allowedTransitions = {
+        Scheduled: ["In Progress", "Cancelled"],
+        "In Progress": ["Completed", "Cancelled"],
+        Completed: [],
+        Cancelled: [],
+    };
+
+    const allowed = allowedTransitions[currentStatus] || [];
+
+    Array.from(select.options).forEach((option) => {
+        const value = option.value;
+
+        if (!value) {
+            option.disabled = true;
+            return;
+        }
+
+        if (value === currentStatus) {
+            option.disabled = false;
+            return;
+        }
+        option.disabled = !allowed.includes(value);
+    });
+    select.value = currentStatus;
+    select.disabled = ["Completed", "Cancelled"].includes(currentStatus);
+}
+
 async function populateEditMaintenanceForm(row, maintenanceData = null) {
     if (!row) {
         return null;
@@ -213,6 +252,8 @@ async function populateEditMaintenanceForm(row, maintenanceData = null) {
         );
         setValue("editMaintenanceCost", maintenance.cost);
         setValue("editMaintenancePriority", maintenance.priority);
+        setValue("editMaintenanceStatus", maintenance.status);
+        updateEditMaintenanceStatusOptions(maintenance.status);
         document
             .getElementById("editMaintenanceStatus")
             ?.dispatchEvent(new Event("change"));
@@ -348,6 +389,9 @@ async function updateMaintenanceRecord(form, maintenanceId) {
 }
 
 async function initMaintenanceEdit() {
+    if (!canEditMaintenanceRecords()) {
+        return;
+    }
     if (editMaintenanceInitialized) {
         return;
     }

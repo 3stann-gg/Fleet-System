@@ -59,6 +59,11 @@ function updateEditFuelHighCostWarning(settings) {
     }
 }
 
+//  RBAC
+function canEditFuelRecords() {
+    return window.FleetRBAC?.hasPermission?.("fuel", "canUpdate") === true;
+}
+
 let editFuelInitialized = false;
 
 
@@ -300,6 +305,9 @@ async function updateFuelRecord(form, fuelId) {
 }
 
 async function initEditFuelModal() {
+    if (!canEditFuelRecords()) {
+        return;
+    }
     if (editFuelInitialized) {
         return;
     }
@@ -361,6 +369,9 @@ async function initEditFuelModal() {
 }
 
 function initFuelEdit() {
+    if (!canEditFuelRecords()) {
+        return;
+    }
     const form = document.getElementById("editFuelForm");
 
     const modal = document.getElementById("editFuelModal");

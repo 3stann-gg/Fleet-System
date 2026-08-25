@@ -122,6 +122,11 @@ function applyDriverAddSettings(settings) {
   }
 }
 
+//   RBAC
+function canCreateDriver() {
+    return window.FleetRBAC?.hasPermission?.("drivers", "canCreate") === true;
+}
+
 function setDriverFieldValidationMessage(field) {
   field.setCustomValidity("Please complete this required field.");
 
@@ -136,6 +141,9 @@ function setDriverFieldValidationMessage(field) {
 }
 
 async function initDriverAdd() {
+  if (!canCreateDriver()) {
+      return;
+  }
   const form = document.getElementById("driverForm");
 
   if (!form || form.dataset.driverAddInitialized === "true") return;

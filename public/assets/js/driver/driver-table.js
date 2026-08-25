@@ -43,12 +43,12 @@ function getDriverInitials(firstName, lastName) {
 }
 
 function renderDriverTable(drivers) {
-    if (typeof applyDriverFilters === "function") {
-        applyDriverFilters();
-    }
-    if (typeof refreshDriverPagination === "function") {
-        refreshDriverPagination();
-    }
+    const canUpdate =
+        window.FleetRBAC?.hasPermission?.("drivers", "canUpdate") === true;
+    const canDelete =
+        window.FleetRBAC?.hasPermission?.("drivers", "canDelete") === true;
+    const canBulkDelete =
+        window.FleetRBAC?.hasPermission?.("drivers", "canBulkDelete") === true;
 
     const tableBody = document.getElementById("driverTableBody");
 
@@ -80,10 +80,17 @@ function renderDriverTable(drivers) {
             data-photo="${driver.photo ?? ""}"
         >
             <td>
-                <input
-                    type="checkbox"
-                    class="driver-checkbox"
-                    data-id="${driver.id}">
+                ${
+                    canBulkDelete
+                        ? `
+                            <input
+                                type="checkbox"
+                                class="driver-checkbox"
+                                data-id="${driver.id}"
+                            >
+                        `
+                        : ""
+                }
             </td>
 
             <td>
@@ -149,22 +156,42 @@ function renderDriverTable(drivers) {
             <td>
                 <div class="action-buttons">
                     <button
+                        type="button"
                         class="action-btn view"
-                        data-id="${driver.id}">
+                        data-id="${driver.id}"
+                        title="View Driver"
+                    >
                         <i class="ph ph-eye"></i>
                     </button>
+                    ${
+                        canUpdate
+                            ? `
+                                <button
+                                    type="button"
+                                    class="action-btn edit"
+                                    data-id="${driver.id}"
+                                    title="Edit Driver"
+                                >
+                                    <i class="ph ph-pencil-simple"></i>
+                                </button>
+                            `
+                            : ""
+                    }
 
-                    <button
-                        class="action-btn edit"
-                        data-id="${driver.id}">
-                        <i class="ph ph-pencil-simple"></i>
-                    </button>
-
-                    <button
-                        class="action-btn delete"
-                        data-id="${driver.id}">
-                        <i class="ph ph-trash"></i>
-                    </button>
+                    ${
+                        canDelete
+                            ? `
+                                <button
+                                    type="button"
+                                    class="action-btn delete"
+                                    data-id="${driver.id}"
+                                    title="Delete Driver"
+                                >
+                                    <i class="ph ph-trash"></i>
+                                </button>
+                            `
+                            : ""
+                    }
                 </div>
             </td>
         </tr>
@@ -174,6 +201,13 @@ function renderDriverTable(drivers) {
     });
 
     tableBody.innerHTML = html;
+
+    if (typeof applyDriverFilters === "function") {
+        applyDriverFilters();
+    }
+    if (typeof refreshDriverPagination === "function") {
+        refreshDriverPagination();
+    }
 
     if (typeof refreshDriverBulkState === "function") {
         refreshDriverBulkState();

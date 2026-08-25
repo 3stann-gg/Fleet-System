@@ -135,10 +135,20 @@ function applyMaintenanceAddSettings(
     }
 }
 
+//  RBAC
+function canCreateMaintenance() {
+    return (
+        window.FleetRBAC?.hasPermission?.("maintenance", "canCreate") === true
+    );
+}
+
 let availableMaintenanceVehicles = [];
 let maintenanceAddInitialized = false;
 
 async function loadAvailableMaintenanceVehicles() {
+    if (!canCreateMaintenance()) {
+        return;
+    }
     const select = document.getElementById("maintenanceVehicle");
 
     if (!select) {
@@ -205,6 +215,15 @@ function populateMaintenanceVehicleSelect(vehicles) {
 }
 
 function createMaintenanceRow(form, savedMaintenance = null) {
+    // rbac
+    const canUpdate =
+        window.FleetRBAC?.hasPermission?.("maintenance", "canUpdate") === true;
+    const canDelete =
+        window.FleetRBAC?.hasPermission?.("maintenance", "canDelete") === true;
+    const canBulkDelete =
+        window.FleetRBAC?.hasPermission?.("maintenance", "canBulkDelete") ===
+        true;
+
     const get = (id) => {
         const el = form.querySelector("#" + id);
         return el ? el.value : "";
@@ -332,15 +351,16 @@ function createMaintenanceRow(form, savedMaintenance = null) {
     /* 1. Checkbox */
     const checkboxTd = makeCell();
 
-    const checkbox = document.createElement("input");
-
-    checkbox.type = "checkbox";
-    checkbox.className = "maintenance-checkbox";
-    checkbox.dataset.maintenanceId = savedMaintenance?.id ?? "";
-    checkbox.dataset.id = savedMaintenance?.id ?? "";
-    checkbox.setAttribute("aria-label", "Select " + number);
-    checkbox.checked = false;
-    checkboxTd.appendChild(checkbox);
+    if (canBulkDelete) {
+        const checkbox = document.createElement("input");
+        checkbox.type = "checkbox";
+        checkbox.className = "maintenance-checkbox";
+        checkbox.dataset.maintenanceId = savedMaintenance?.id ?? "";
+        checkbox.dataset.id = savedMaintenance?.id ?? "";
+        checkbox.setAttribute("aria-label", "Select " + number);
+        checkbox.checked = false;
+        checkboxTd.appendChild(checkbox);
+    }
 
     /* 2. Maintenance Number */
     const numberTd = makeCell();
@@ -412,33 +432,31 @@ function createMaintenanceRow(form, savedMaintenance = null) {
     viewIcon.className = "ph ph-eye";
     viewBtn.appendChild(viewIcon);
 
-    const editBtn = document.createElement("button");
+    if (canUpdate) {
+        const editBtn = document.createElement("button");
+        editBtn.type = "button";
+        editBtn.className = "action-btn edit-maintenance";
+        editBtn.dataset.id = savedMaintenance?.id ?? "";
+        editBtn.setAttribute("aria-label", "Edit " + number);
+        const editIcon = document.createElement("i");
+        editIcon.className = "ph ph-pencil-simple";
+        editBtn.appendChild(editIcon);
+        actionsWrapper.appendChild(editBtn);
+    }
 
-    editBtn.type = "button";
-    editBtn.className = "action-btn edit-maintenance";
-    editBtn.dataset.id = savedMaintenance?.id ?? "";
-    editBtn.setAttribute("aria-label", "Edit " + number);
-
-    const editIcon = document.createElement("i");
-
-    editIcon.className = "ph ph-pencil-simple";
-    editBtn.appendChild(editIcon);
-
-    const deleteBtn = document.createElement("button");
-
-    deleteBtn.type = "button";
-    deleteBtn.className = "action-btn delete-maintenance";
-    deleteBtn.dataset.id = savedMaintenance?.id ?? "";
-    deleteBtn.setAttribute("aria-label", "Delete " + number);
-
-    const deleteIcon = document.createElement("i");
-
-    deleteIcon.className = "ph ph-trash";
-    deleteBtn.appendChild(deleteIcon);
+    if (canDelete) {
+        const deleteBtn = document.createElement("button");
+        deleteBtn.type = "button";
+        deleteBtn.className = "action-btn delete-maintenance";
+        deleteBtn.dataset.id = savedMaintenance?.id ?? "";
+        deleteBtn.setAttribute("aria-label", "Delete " + number);
+        const deleteIcon = document.createElement("i");
+        deleteIcon.className = "ph ph-trash";
+        deleteBtn.appendChild(deleteIcon);
+        actionsWrapper.appendChild(deleteBtn);
+    }
 
     actionsWrapper.appendChild(viewBtn);
-    actionsWrapper.appendChild(editBtn);
-    actionsWrapper.appendChild(deleteBtn);
     actionsTd.appendChild(actionsWrapper);
 
     tr.appendChild(checkboxTd);
@@ -518,6 +536,9 @@ async function saveMaintenance(form) {
 
 
 async function initMaintenanceAdd() {
+    if (!canCreateMaintenance()) {
+        return;
+    }
     if (maintenanceAddInitialized) {
         return;
     }

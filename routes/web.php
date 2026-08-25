@@ -1,7 +1,9 @@
 <?php
 
-use App\Http\Controllers\ProfileController;
 use Illuminate\Support\Facades\Route;
+
+use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\VehicleController;
 use App\Http\Controllers\DriverController;
 use App\Http\Controllers\ReservationController;
@@ -13,17 +15,23 @@ use App\Http\Controllers\CostBudgetController;
 use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\FleetNotificationController;
 use App\Http\Controllers\FleetSearchController;
-use App\Http\Controllers\DashboardController;
 
 
+/*
+|--------------------------------------------------------------------------
+| PUBLIC ROUTES
+|--------------------------------------------------------------------------
+*/
 Route::get('/', function () {
     return view('welcome');
 });
 
-Route::get('/dashboard', [DashboardController::class, 'index'])
-    ->middleware(['auth', 'verified'])
-    ->name('dashboard');
 
+/*
+|--------------------------------------------------------------------------
+| AUTH ROUTES
+|--------------------------------------------------------------------------
+*/
 require __DIR__.'/auth.php';
 
 
@@ -34,31 +42,89 @@ require __DIR__.'/auth.php';
 */
 Route::middleware(['auth', 'verified'])->group(function () {
 
-Route::get('/notifications', [FleetNotificationController::class, 'index'])
-    ->name('notifications.index');
+    /*
+    |--------------------------------------------------------------------------
+    | GLOBAL SERVICES
+    |--------------------------------------------------------------------------
+    |
+    | These are shared across Fleet pages and should not be tied to one
+    | specific module.
+    |
+    */
+    Route::get(
+        '/notifications',
+        [FleetNotificationController::class, 'index']
+    )->name('notifications.index');
 
-Route::patch('/notifications/read-all', [FleetNotificationController::class, 'markAllRead'])
-    ->name('notifications.readAll');
+    Route::patch(
+        '/notifications/read-all',
+        [FleetNotificationController::class, 'markAllRead']
+    )->name('notifications.readAll');
 
-Route::patch('/notifications/{notification}/read', [FleetNotificationController::class, 'markRead'])
-    ->name('notifications.read');
+    Route::patch(
+        '/notifications/{notification}/read',
+        [FleetNotificationController::class, 'markRead']
+    )->name('notifications.read');
 
-Route::get('/fleet-search', [FleetSearchController::class, 'search'])
-    ->name('fleet.search');
+    Route::get(
+        '/fleet-search',
+        [FleetSearchController::class, 'search']
+    )->name('fleet.search');
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | SHARED SETTINGS DATA
+    |--------------------------------------------------------------------------
+    |
+    | Navbar and other Fleet components read these settings.
+    | Do not place this route inside the Settings RBAC group.
+    |
+    */
+    Route::get(
+        '/settings/data',
+        [SettingsController::class, 'show']
+    )->name('settings.data');
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | DASHBOARD
+    |--------------------------------------------------------------------------
+    */
+    Route::middleware('fleet.module:dashboard')->group(function () {
+
+        Route::get(
+            '/dashboard',
+            [DashboardController::class, 'index']
+        )->name('dashboard');
+
+    });
+
 
     /*
     |--------------------------------------------------------------------------
     | PROFILE
     |--------------------------------------------------------------------------
+    |
+    | All approved roles have at least Limited Access to Profile.
+    | Ownership / administrative rules will be enforced by policy.
+    |
     */
-    Route::get('/profile', [ProfileController::class, 'edit'])
-        ->name('profile.edit');
+    Route::get(
+        '/profile',
+        [ProfileController::class, 'edit']
+    )->name('profile.edit');
 
-    Route::patch('/profile', [ProfileController::class, 'update'])
-        ->name('profile.update');
+    Route::patch(
+        '/profile',
+        [ProfileController::class, 'update']
+    )->name('profile.update');
 
-    Route::delete('/profile', [ProfileController::class, 'destroy'])
-        ->name('profile.destroy');
+    Route::delete(
+        '/profile',
+        [ProfileController::class, 'destroy']
+    )->name('profile.destroy');
 
 
     /*
@@ -66,30 +132,54 @@ Route::get('/fleet-search', [FleetSearchController::class, 'search'])
     | VEHICLE MODULE
     |--------------------------------------------------------------------------
     */
-    Route::get('/fleet/search', [VehicleController::class, 'index']);
+    Route::middleware('fleet.module:vehicles')->group(function () {
 
-    Route::get('/fleet/stats', [VehicleController::class, 'stats'])
-        ->name('vehicles.stats');
+        Route::get(
+            '/fleet/search',
+            [VehicleController::class, 'index']
+        );
 
-    Route::delete('/fleet/bulk-delete', [VehicleController::class, 'bulkDelete'])
-        ->name('vehicles.bulkDelete');
+        Route::get(
+            '/fleet/stats',
+            [VehicleController::class, 'stats']
+        )->name('vehicles.stats');
 
-    Route::get('/fleet', [VehicleController::class, 'index'])
-        ->name('fleet');
+        Route::delete(
+            '/fleet/bulk-delete',
+            [VehicleController::class, 'bulkDelete']
+        )->name('vehicles.bulkDelete');
 
-    Route::get('/fleet/available', [VehicleController::class, 'available']);
+        Route::get(
+            '/fleet',
+            [VehicleController::class, 'index']
+        )->name('fleet');
 
-    Route::post('/fleet', [VehicleController::class, 'store'])
-        ->name('vehicles.store');
+        Route::get(
+            '/fleet/available',
+            [VehicleController::class, 'available']
+        );
 
-    Route::get('/fleet/{vehicle}', [VehicleController::class, 'show'])
-        ->name('vehicles.show');
+        Route::post(
+            '/fleet',
+            [VehicleController::class, 'store']
+        )->name('vehicles.store');
 
-    Route::put('/fleet/{vehicle}', [VehicleController::class, 'update'])
-        ->name('vehicles.update');
+        Route::get(
+            '/fleet/{vehicle}',
+            [VehicleController::class, 'show']
+        )->name('vehicles.show');
 
-    Route::delete('/fleet/{vehicle}', [VehicleController::class, 'destroy'])
-        ->name('vehicles.destroy');
+        Route::put(
+            '/fleet/{vehicle}',
+            [VehicleController::class, 'update']
+        )->name('vehicles.update');
+
+        Route::delete(
+            '/fleet/{vehicle}',
+            [VehicleController::class, 'destroy']
+        )->name('vehicles.destroy');
+
+    });
 
 
     /*
@@ -97,16 +187,29 @@ Route::get('/fleet-search', [FleetSearchController::class, 'search'])
     | RESERVATION MODULE
     |--------------------------------------------------------------------------
     */
-    Route::get('/reservation/stats', [ReservationController::class, 'stats'])
-        ->name('reservation.stats');
-    
-    Route::get('/reservation/next-number', [ReservationController::class, 'nextNumber'])
-        ->name('reservation.next-number');
+    Route::middleware('fleet.module:reservations')->group(function () {
 
-    Route::delete('/reservation/bulk-delete', [ReservationController::class, 'bulkDelete'])
-        ->name('reservation.bulkDelete');
+        Route::get(
+            '/reservation/stats',
+            [ReservationController::class, 'stats']
+        )->name('reservation.stats');
 
-    Route::resource('reservation', ReservationController::class);
+        Route::get(
+            '/reservation/next-number',
+            [ReservationController::class, 'nextNumber']
+        )->name('reservation.next-number');
+
+        Route::delete(
+            '/reservation/bulk-delete',
+            [ReservationController::class, 'bulkDelete']
+        )->name('reservation.bulkDelete');
+
+        Route::resource(
+            'reservation',
+            ReservationController::class
+        );
+
+    });
 
 
     /*
@@ -114,29 +217,49 @@ Route::get('/fleet-search', [FleetSearchController::class, 'search'])
     | DISPATCH MODULE
     |--------------------------------------------------------------------------
     */
-    Route::get('/dispatch', [DispatchController::class, 'index'])
-        ->name('dispatch');
+    Route::middleware('fleet.module:dispatch')->group(function () {
 
-    Route::get('/dispatch/available-reservations', [DispatchController::class, 'availableReservations'])
-        ->name('dispatch.availableReservations');
+        Route::get(
+            '/dispatch',
+            [DispatchController::class, 'index']
+        )->name('dispatch');
 
-    Route::get('/dispatch/next-number', [DispatchController::class, 'nextNumber'])
-        ->name('dispatch.next-number');
+        Route::get(
+            '/dispatch/available-reservations',
+            [DispatchController::class, 'availableReservations']
+        )->name('dispatch.availableReservations');
 
-    Route::post('/dispatch', [DispatchController::class, 'store'])
-        ->name('dispatch.store');
+        Route::get(
+            '/dispatch/next-number',
+            [DispatchController::class, 'nextNumber']
+        )->name('dispatch.next-number');
 
-    Route::delete('/dispatch/bulk-delete', [DispatchController::class, 'bulkDelete'])
-        ->name('dispatch.bulkDelete');
+        Route::post(
+            '/dispatch',
+            [DispatchController::class, 'store']
+        )->name('dispatch.store');
 
-    Route::get('/dispatch/{dispatch}', [DispatchController::class, 'show'])
-        ->name('dispatch.show');
+        Route::delete(
+            '/dispatch/bulk-delete',
+            [DispatchController::class, 'bulkDelete']
+        )->name('dispatch.bulkDelete');
 
-    Route::put('/dispatch/{dispatch}', [DispatchController::class, 'update'])
-        ->name('dispatch.update');
+        Route::get(
+            '/dispatch/{dispatch}',
+            [DispatchController::class, 'show']
+        )->name('dispatch.show');
 
-    Route::delete('/dispatch/{dispatch}', [DispatchController::class, 'destroy'])
-        ->name('dispatch.destroy');
+        Route::put(
+            '/dispatch/{dispatch}',
+            [DispatchController::class, 'update']
+        )->name('dispatch.update');
+
+        Route::delete(
+            '/dispatch/{dispatch}',
+            [DispatchController::class, 'destroy']
+        )->name('dispatch.destroy');
+
+    });
 
 
     /*
@@ -144,27 +267,49 @@ Route::get('/fleet-search', [FleetSearchController::class, 'search'])
     | DRIVER MODULE
     |--------------------------------------------------------------------------
     */
-    Route::delete('/drivers/bulk-delete', [DriverController::class, 'bulkDelete'])
-        ->name('drivers.bulkDelete');
+    Route::middleware('fleet.module:drivers')->group(function () {
 
-    Route::get('/driver', [DriverController::class, 'index'])
-        ->name('driver');
+        Route::delete(
+            '/drivers/bulk-delete',
+            [DriverController::class, 'bulkDelete']
+        )->name('drivers.bulkDelete');
 
-    Route::get('/drivers', [DriverController::class, 'getDrivers']);
+        Route::get(
+            '/driver',
+            [DriverController::class, 'index']
+        )->name('driver');
 
-    Route::get('/drivers/available', [DriverController::class, 'available']);
+        Route::get(
+            '/drivers',
+            [DriverController::class, 'getDrivers']
+        );
 
-    Route::post('/drivers', [DriverController::class, 'store'])
-        ->name('drivers.store');
+        Route::get(
+            '/drivers/available',
+            [DriverController::class, 'available']
+        );
 
-    Route::get('/drivers/{driver}', [DriverController::class, 'show'])
-        ->name('drivers.show');
+        Route::post(
+            '/drivers',
+            [DriverController::class, 'store']
+        )->name('drivers.store');
 
-    Route::put('/drivers/{driver}', [DriverController::class, 'update'])
-        ->name('drivers.update');
+        Route::get(
+            '/drivers/{driver}',
+            [DriverController::class, 'show']
+        )->name('drivers.show');
 
-    Route::delete('/drivers/{driver}', [DriverController::class, 'destroy'])
-        ->name('drivers.destroy');
+        Route::put(
+            '/drivers/{driver}',
+            [DriverController::class, 'update']
+        )->name('drivers.update');
+
+        Route::delete(
+            '/drivers/{driver}',
+            [DriverController::class, 'destroy']
+        )->name('drivers.destroy');
+
+    });
 
 
     /*
@@ -172,32 +317,44 @@ Route::get('/fleet-search', [FleetSearchController::class, 'search'])
     | MAINTENANCE MODULE
     |--------------------------------------------------------------------------
     */
-    Route::get('/maintenance', [MaintenanceController::class, 'index'])
-        ->name('maintenance');
+    Route::middleware('fleet.module:maintenance')->group(function () {
 
-    Route::get(
-        '/maintenance/available-vehicles',
-        [MaintenanceController::class, 'availableVehicles']
-    )
-        ->name('maintenance.availableVehicles');
+        Route::get(
+            '/maintenance',
+            [MaintenanceController::class, 'index']
+        )->name('maintenance');
 
-    Route::post('/maintenance', [MaintenanceController::class, 'store'])
-        ->name('maintenance.store');
+        Route::get(
+            '/maintenance/available-vehicles',
+            [MaintenanceController::class, 'availableVehicles']
+        )->name('maintenance.availableVehicles');
 
-    Route::get('/maintenance/{maintenance}', [MaintenanceController::class, 'show'])
-        ->name('maintenance.show');
+        Route::post(
+            '/maintenance',
+            [MaintenanceController::class, 'store']
+        )->name('maintenance.store');
 
-    Route::put('/maintenance/{maintenance}', [MaintenanceController::class, 'update'])
-        ->name('maintenance.update');
+        Route::get(
+            '/maintenance/{maintenance}',
+            [MaintenanceController::class, 'show']
+        )->name('maintenance.show');
 
-    Route::delete(
-        '/maintenance/bulk-delete',
-        [MaintenanceController::class, 'bulkDelete']
-    )
-        ->name('maintenance.bulkDelete');
+        Route::put(
+            '/maintenance/{maintenance}',
+            [MaintenanceController::class, 'update']
+        )->name('maintenance.update');
 
-    Route::delete('/maintenance/{maintenance}', [MaintenanceController::class, 'destroy'])
-        ->name('maintenance.destroy');
+        Route::delete(
+            '/maintenance/bulk-delete',
+            [MaintenanceController::class, 'bulkDelete']
+        )->name('maintenance.bulkDelete');
+
+        Route::delete(
+            '/maintenance/{maintenance}',
+            [MaintenanceController::class, 'destroy']
+        )->name('maintenance.destroy');
+
+    });
 
 
     /*
@@ -205,29 +362,49 @@ Route::get('/fleet-search', [FleetSearchController::class, 'search'])
     | FUEL MANAGEMENT MODULE
     |--------------------------------------------------------------------------
     */
-    Route::view('/fuel', 'fuel.index')
-        ->name('fuel');
+    Route::middleware('fleet.module:fuel')->group(function () {
 
-    Route::get('/fuel-records', [FuelLogController::class, 'index'])
-        ->name('fuel.index');
+        Route::view(
+            '/fuel',
+            'fuel.index'
+        )->name('fuel');
 
-    Route::get('/fuel-records/next-number', [FuelLogController::class, 'nextNumber'])
-        ->name('fuel.next-number');
+        Route::get(
+            '/fuel-records',
+            [FuelLogController::class, 'index']
+        )->name('fuel.index');
 
-    Route::post('/fuel-records', [FuelLogController::class, 'store'])
-        ->name('fuel.store');
+        Route::get(
+            '/fuel-records/next-number',
+            [FuelLogController::class, 'nextNumber']
+        )->name('fuel.next-number');
 
-    Route::delete('/fuel-records/bulk-delete', [FuelLogController::class, 'bulkDelete'])
-        ->name('fuel.bulk-delete');
+        Route::post(
+            '/fuel-records',
+            [FuelLogController::class, 'store']
+        )->name('fuel.store');
 
-    Route::get('/fuel-records/{fuelLog}', [FuelLogController::class, 'show'])
-        ->name('fuel.show');
+        Route::delete(
+            '/fuel-records/bulk-delete',
+            [FuelLogController::class, 'bulkDelete']
+        )->name('fuel.bulk-delete');
 
-    Route::put('/fuel-records/{fuelLog}', [FuelLogController::class, 'update'])
-        ->name('fuel.update');
+        Route::get(
+            '/fuel-records/{fuelLog}',
+            [FuelLogController::class, 'show']
+        )->name('fuel.show');
 
-    Route::delete('/fuel-records/{fuelLog}', [FuelLogController::class, 'destroy'])
-        ->name('fuel.destroy');
+        Route::put(
+            '/fuel-records/{fuelLog}',
+            [FuelLogController::class, 'update']
+        )->name('fuel.update');
+
+        Route::delete(
+            '/fuel-records/{fuelLog}',
+            [FuelLogController::class, 'destroy']
+        )->name('fuel.destroy');
+
+    });
 
 
     /*
@@ -235,50 +412,64 @@ Route::get('/fleet-search', [FleetSearchController::class, 'search'])
     | ROUTE PLANNING MODULE
     |--------------------------------------------------------------------------
     */
-    Route::get('/route-planning', [RoutePlanController::class, 'index'])
-        ->name('route-planning');
+    Route::middleware('fleet.module:route_planning')->group(function () {
 
-    Route::get(
-        '/route-planning/available-reservations',
-        [RoutePlanController::class, 'availableReservations']
-    )
-        ->name('route-planning.availableReservations');
+        Route::get(
+            '/route-planning',
+            [RoutePlanController::class, 'index']
+        )->name('route-planning');
 
-    Route::get('/route-planning/stats', [RoutePlanController::class, 'stats'])
-        ->name('route-planning.stats');
+        Route::get(
+            '/route-planning/available-reservations',
+            [RoutePlanController::class, 'availableReservations']
+        )->name('route-planning.availableReservations');
 
-    Route::get('/route-planning/next-number', [RoutePlanController::class, 'nextNumber'])
-        ->name('route-planning.nextNumber');
+        Route::get(
+            '/route-planning/stats',
+            [RoutePlanController::class, 'stats']
+        )->name('route-planning.stats');
 
-    Route::get('/route-planning/{routePlan}', [RoutePlanController::class, 'show'])
-        ->name('route-planning.show');
+        Route::get(
+            '/route-planning/next-number',
+            [RoutePlanController::class, 'nextNumber']
+        )->name('route-planning.nextNumber');
 
-    Route::post('/route-planning', [RoutePlanController::class, 'store'])
-        ->name('route-planning.store');
+        Route::get(
+            '/route-planning/{routePlan}',
+            [RoutePlanController::class, 'show']
+        )->name('route-planning.show');
 
-    Route::put('/route-planning/{routePlan}', [RoutePlanController::class, 'update'])
-        ->name('route-planning.update');
+        Route::post(
+            '/route-planning',
+            [RoutePlanController::class, 'store']
+        )->name('route-planning.store');
 
-    Route::delete('/route-planning/{routePlan}', [RoutePlanController::class, 'destroy'])
-        ->name('route-planning.destroy');
+        Route::put(
+            '/route-planning/{routePlan}',
+            [RoutePlanController::class, 'update']
+        )->name('route-planning.update');
 
-    Route::post(
-        '/route-planning/{routePlan}/archive',
-        [RoutePlanController::class, 'archive']
-    )
-        ->name('route-planning.archive');
+        Route::delete(
+            '/route-planning/{routePlan}',
+            [RoutePlanController::class, 'destroy']
+        )->name('route-planning.destroy');
 
-    Route::post(
-        '/route-planning/{routePlan}/restore',
-        [RoutePlanController::class, 'restore']
-    )
-        ->name('route-planning.restore');
+        Route::post(
+            '/route-planning/{routePlan}/archive',
+            [RoutePlanController::class, 'archive']
+        )->name('route-planning.archive');
 
-    Route::post(
-        '/route-planning/{routePlan}/duplicate',
-        [RoutePlanController::class, 'duplicate']
-    )
-        ->name('route-planning.duplicate');
+        Route::post(
+            '/route-planning/{routePlan}/restore',
+            [RoutePlanController::class, 'restore']
+        )->name('route-planning.restore');
+
+        Route::post(
+            '/route-planning/{routePlan}/duplicate',
+            [RoutePlanController::class, 'duplicate']
+        )->name('route-planning.duplicate');
+
+    });
 
 
     /*
@@ -286,23 +477,39 @@ Route::get('/fleet-search', [FleetSearchController::class, 'search'])
     | COST ANALYSIS MODULE
     |--------------------------------------------------------------------------
     */
-    Route::view('/cost-analysis', 'cost-analysis.index')
-        ->name('cost-analysis');
+    Route::middleware('fleet.module:cost_analysis')->group(function () {
 
-    Route::get('/cost-analysis/budget', [CostBudgetController::class, 'show'])
-        ->name('cost-analysis.budget.show');
+        Route::view(
+            '/cost-analysis',
+            'cost-analysis.index'
+        )->name('cost-analysis');
 
-    Route::put('/cost-analysis/budget', [CostBudgetController::class, 'save'])
-        ->name('cost-analysis.budget.save');
+        Route::get(
+            '/cost-analysis/budget',
+            [CostBudgetController::class, 'show']
+        )->name('cost-analysis.budget.show');
 
-    Route::delete('/cost-analysis/budget', [CostBudgetController::class, 'clear'])
-        ->name('cost-analysis.budget.clear');
+        Route::put(
+            '/cost-analysis/budget',
+            [CostBudgetController::class, 'save']
+        )->name('cost-analysis.budget.save');
 
-    Route::get('/cost-analysis/budget/history', [CostBudgetController::class, 'history'])
-        ->name('cost-analysis.budget.history');
+        Route::delete(
+            '/cost-analysis/budget',
+            [CostBudgetController::class, 'clear']
+        )->name('cost-analysis.budget.clear');
 
-    Route::delete('/cost-analysis/budget/history', [CostBudgetController::class, 'clearHistory'])
-        ->name('cost-analysis.budget.history.clear');
+        Route::get(
+            '/cost-analysis/budget/history',
+            [CostBudgetController::class, 'history']
+        )->name('cost-analysis.budget.history');
+
+        Route::delete(
+            '/cost-analysis/budget/history',
+            [CostBudgetController::class, 'clearHistory']
+        )->name('cost-analysis.budget.history.clear');
+
+    });
 
 
     /*
@@ -310,8 +517,14 @@ Route::get('/fleet-search', [FleetSearchController::class, 'search'])
     | REPORTS
     |--------------------------------------------------------------------------
     */
-    Route::view('/reports', 'reports.index')
-        ->name('reports');
+    Route::middleware('fleet.module:reports')->group(function () {
+
+        Route::view(
+            '/reports',
+            'reports.index'
+        )->name('reports');
+
+    });
 
 
     /*
@@ -319,15 +532,23 @@ Route::get('/fleet-search', [FleetSearchController::class, 'search'])
     | SETTINGS
     |--------------------------------------------------------------------------
     */
-    Route::get('/settings', [SettingsController::class, 'index'])
-        ->name('settings');
+    Route::middleware('fleet.module:settings')->group(function () {
 
-    Route::get('/settings/data', [SettingsController::class, 'show'])
-        ->name('settings.data');
+        Route::get(
+            '/settings',
+            [SettingsController::class, 'index']
+        )->name('settings');
 
-    Route::put('/settings', [SettingsController::class, 'update'])
-        ->name('settings.update');
+        Route::put(
+            '/settings',
+            [SettingsController::class, 'update']
+        )->name('settings.update');
 
-    Route::post('/settings/reset', [SettingsController::class, 'reset'])
-        ->name('settings.reset');
+        Route::post(
+            '/settings/reset',
+            [SettingsController::class, 'reset']
+        )->name('settings.reset');
+
+    });
+
 });

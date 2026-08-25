@@ -17,10 +17,16 @@
                 </p>
               </div>
 
-              <button type="button" id="addMaintenanceBtn" class="btn-primary">
-                <i class="ph ph-plus"></i>
-                Add Maintenance
-              </button>
+              @if($maintenancePermissions['canCreate'] ?? false)
+                  <button
+                      type="button"
+                      id="addMaintenanceBtn"
+                      class="btn-primary"
+                  >
+                      <i class="ph ph-plus"></i>
+                      Add Maintenance
+                  </button>
+              @endif
             </div>
 
             <!-- Maintenance Statistics -->
@@ -140,29 +146,34 @@
             </div>
 
             <!-- Bulk Toolbar -->
-            <div class="bulk-toolbar" id="maintenanceBulkToolbar">
-              <span id="maintenanceSelectedCount">0 maintenance selected</span>
-
-              <div>
-                <button
-                  type="button"
-                  class="btn-outline"
-                  id="clearMaintenanceSelection"
+            @if($maintenancePermissions['canBulkDelete'] ?? false)
+                <div
+                    class="bulk-toolbar"
+                    id="maintenanceBulkToolbar"
                 >
-                  Clear
-                </button>
-
-                <button
-                  type="button"
-                  id="deleteSelectedMaintenance"
-                  class="btn-danger"
-                  aria-label="Delete selected maintenance records"
-                >
-                  <i class="ph ph-trash"></i>
-                  Delete Selected
-                </button>
-              </div>
-            </div>
+                    <span id="maintenanceSelectedCount">
+                        0 maintenance selected
+                    </span>
+                    <div>
+                        <button
+                            type="button"
+                            class="btn-outline"
+                            id="clearMaintenanceSelection"
+                        >
+                            Clear
+                        </button>
+                        <button
+                            type="button"
+                            id="deleteSelectedMaintenance"
+                            class="btn-danger"
+                            aria-label="Delete selected maintenance records"
+                        >
+                            <i class="ph ph-trash"></i>
+                            Delete Selected
+                        </button>
+                    </div>
+                </div>
+            @endif
 
             <!-- Maintenance Table -->
             <div class="card">
@@ -236,11 +247,13 @@
                   <thead>
                     <tr>
                       <th>
-                        <input
-                          type="checkbox"
-                          id="selectAllMaintenance"
-                          aria-label="Select all visible maintenance records"
-                        />
+                          @if($maintenancePermissions['canBulkDelete'] ?? false)
+                              <input
+                                  type="checkbox"
+                                  id="selectAllMaintenance"
+                                  aria-label="Select all visible maintenance records"
+                              />
+                          @endif
                       </th>
 
                       <th class="sortable" data-column="1">
@@ -319,10 +332,29 @@
           </div>
         </section>
 
-    @include('components.maintenance.add-maintenance-modal')
+    @if($maintenancePermissions['canCreate'] ?? false)
+        @include('components.maintenance.add-maintenance-modal')
+    @endif
+
     @include('components.maintenance.view-maintenance-modal')
-    @include('components.maintenance.edit-maintenance-modal')
-    @include('components.maintenance.delete-maintenance-modal')
+
+    @if($maintenancePermissions['canUpdate'] ?? false)
+        @include('components.maintenance.edit-maintenance-modal')
+    @endif
+
+    @if($maintenancePermissions['canDelete'] ?? false)
+        @include('components.maintenance.delete-maintenance-modal')
+    @endif
+
+    <script>
+      window.FLEET_RBAC = window.FLEET_RBAC || {};
+      window.FLEET_RBAC.role =
+          @json(auth()->user()?->role);
+      window.FLEET_RBAC.maintenance =
+          @json($maintenancePermissions ?? []);
+  </script>
+
+  <script src="{{ asset('assets/js/helpers/rbac.js') }}"></script>
 
     <!-- Export dependencies -->
     <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>

@@ -125,6 +125,14 @@ function renderMaintenanceTable(maintenances) {
         return;
     }
 
+    const canUpdate =
+        window.FleetRBAC?.hasPermission?.("maintenance", "canUpdate") === true;
+    const canDelete =
+        window.FleetRBAC?.hasPermission?.("maintenance", "canDelete") === true;
+    const canBulkDelete =
+        window.FleetRBAC?.hasPermission?.("maintenance", "canBulkDelete") ===
+        true;
+
     let html = "";
 
     maintenances.forEach((maintenance) => {
@@ -154,12 +162,18 @@ function renderMaintenanceTable(maintenances) {
 
                     <!-- Checkbox -->
                     <td>
-                        <input
-                            type="checkbox"
-                            class="maintenance-checkbox"
-                            data-id="${maintenance.id ?? ""}"
-                            aria-label="Select ${maintenance.maintenance_number ?? ""}"
-                        />
+                        ${
+                            canBulkDelete
+                                ? `
+                                    <input
+                                        type="checkbox"
+                                        class="maintenance-checkbox"
+                                        data-id="${maintenance.id ?? ""}"
+                                        aria-label="Select ${maintenance.maintenance_number ?? ""}"
+                                    />
+                                `
+                                : ""
+                        }
                     </td>
 
                     <!-- Maintenance Number -->
@@ -232,7 +246,6 @@ function renderMaintenanceTable(maintenances) {
                     <!-- Actions -->
                     <td>
                         <div class="action-buttons">
-
                             <button
                                 type="button"
                                 class="action-btn view-maintenance"
@@ -241,25 +254,35 @@ function renderMaintenanceTable(maintenances) {
                             >
                                 <i class="ph ph-eye"></i>
                             </button>
+                            ${
+                                canUpdate
+                                    ? `
+                                        <button
+                                            type="button"
+                                            class="action-btn edit-maintenance"
+                                            data-id="${maintenance.id ?? ""}"
+                                            aria-label="Edit ${maintenance.maintenance_number ?? ""}"
+                                        >
+                                            <i class="ph ph-pencil-simple"></i>
+                                        </button>
+                                    `
+                                    : ""
+                            }
 
-                            <button
-                                type="button"
-                                class="action-btn edit-maintenance"
-                                data-id="${maintenance.id ?? ""}"
-                                aria-label="Edit ${maintenance.maintenance_number ?? ""}"
-                            >
-                                <i class="ph ph-pencil-simple"></i>
-                            </button>
-
-                            <button
-                                type="button"
-                                class="action-btn delete-maintenance"
-                                data-id="${maintenance.id ?? ""}"
-                                aria-label="Delete ${maintenance.maintenance_number ?? ""}"
-                            >
-                                <i class="ph ph-trash"></i>
-                            </button>
-
+                            ${
+                                canDelete
+                                    ? `
+                                        <button
+                                            type="button"
+                                            class="action-btn delete-maintenance"
+                                            data-id="${maintenance.id ?? ""}"
+                                            aria-label="Delete ${maintenance.maintenance_number ?? ""}"
+                                        >
+                                            <i class="ph ph-trash"></i>
+                                        </button>
+                                    `
+                                    : ""
+                            }
                         </div>
                     </td>
 

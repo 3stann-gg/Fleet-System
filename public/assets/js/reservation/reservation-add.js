@@ -137,6 +137,41 @@ function applyReservationAddSettings(settings) {
     }
 }
 
+//   RBAC
+function getReservationRole() {
+    return window.FleetRBAC?.getRole?.() || "";
+}
+function canCreateReservation() {
+    return (
+        window.FleetRBAC?.hasPermission?.("reservations", "canCreate") === true
+    );
+}
+function isDepartmentHeadReservationUser() {
+    return getReservationRole() === "department_head";
+}
+function applyReservationAddRbac() {
+    if (
+        !isDepartmentHeadReservationUser()
+    ) {
+        return;
+    }
+    [
+        "reservationVehicle",
+        "reservationDriver",
+    ].forEach((id) => {
+        const field =
+            document.getElementById(id);
+        if (!field) return;
+        const wrapper =
+            field.closest(".form-group");
+        if (wrapper) {
+            wrapper.hidden = true;
+        }
+        field.disabled = true;
+    });
+}
+
+
 async function loadNextReservationNumber() {
     const numberInput = document.getElementById("reservationNumber");
     if (!numberInput) {
@@ -250,6 +285,9 @@ async function loadReservationOptions() {
 }
 
 async function initReservationAdd() {
+    if (!canCreateReservation()) {
+        return;
+    }
     const modal = document.getElementById("addReservationModal");
     const form = document.getElementById("reservationForm");
 
@@ -259,6 +297,7 @@ async function initReservationAdd() {
     const reservationSettings = await window.getReservationModuleSettings();
 
     applyReservationAddSettings(reservationSettings);
+    applyReservationAddRbac();
 
     form.dataset.reservationAddInitialized = "true";
 
@@ -269,33 +308,36 @@ async function initReservationAdd() {
             return;
         }
 
+        const role = getReservationRole();
         const formData = {
-            reservation_number:
-                document.getElementById("reservationNumber").value.trim(),
-            patient_name:
-                document.getElementById("reservationPatient").value.trim(),
-            request_type:
-                document.getElementById("reservationType").value,
-            vehicle_id:
-                document.getElementById("reservationVehicle").value || null,
-            driver_id:
-                document.getElementById("reservationDriver").value || null,
-            pickup_location:
-                document.getElementById("reservationPickup").value.trim(),
-            destination:
-                document.getElementById("reservationDestination").value.trim(),
-            schedule_date:
-                document.getElementById("reservationDate").value,
-            schedule_time:
-                document.getElementById("reservationTime").value,
-            priority:
-                document.getElementById("reservationPriority").value,
-            // no need status, source of truth is backend
-            contact_number:
-                document.getElementById("reservationContact").value.trim(),
-            notes:
-                document.getElementById("reservationNotes").value.trim(),
+            reservation_number: document
+                .getElementById("reservationNumber")
+                .value.trim(),
+            patient_name: document
+                .getElementById("reservationPatient")
+                .value.trim(),
+            request_type: document.getElementById("reservationType").value,
+            pickup_location: document
+                .getElementById("reservationPickup")
+                .value.trim(),
+            destination: document
+                .getElementById("reservationDestination")
+                .value.trim(),
+            schedule_date: document.getElementById("reservationDate").value,
+            schedule_time: document.getElementById("reservationTime").value,
+            priority: document.getElementById("reservationPriority").value,
+            contact_number: document
+                .getElementById("reservationContact")
+                .value.trim(),
+            notes: document.getElementById("reservationNotes").value.trim(),
         };
+
+        if (role !== "department_head") {
+            formData.vehicle_id =
+                document.getElementById("reservationVehicle")?.value || null;
+            formData.driver_id =
+                document.getElementById("reservationDriver")?.value || null;
+        }
 
         try {
             const response = await fetch("/reservation", {
@@ -350,8 +392,11 @@ async function initReservationAdd() {
                 form.reset();
 
                 applyReservationAddSettings(reservationSettings);
+                applyReservationAddRbac();
                 await loadNextReservationNumber();
-                await loadReservationOptions();
+                if (!isDepartmentHeadReservationUser()) {
+                    await loadReservationOptions();
+                }
 
 
                 if (typeof clearAllReservationErrors === "function") {
@@ -390,5 +435,7 @@ async function initReservationAdd() {
 document.addEventListener("DOMContentLoaded", async () => {
     await initReservationAdd();
     await loadNextReservationNumber();
-    await loadReservationOptions();
+    if (!isDepartmentHeadReservationUser()) {
+        await loadReservationOptions();
+    }
 });

@@ -1,7 +1,0 @@
-createVehicle()
-updateVehicle()
-deleteVehicle()
-bulkDeleteVehicle()
-getVehicle()
-getVehicles()
-getVehicleStats()

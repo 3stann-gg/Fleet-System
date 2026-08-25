@@ -9,9 +9,12 @@ use App\Services\FleetNotificationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 
 class DispatchController extends Controller
 {   
+    use AuthorizesRequests;
+
     private function getDispatchSettings(): array
     {
         $record = FleetSetting::query()
@@ -131,6 +134,10 @@ class DispatchController extends Controller
      */
     public function index(Request $request)
     {
+        $this->authorize('viewAny', Dispatch::class);
+
+        $user = $request->user();
+
         $dispatchSettings =
             $this->getDispatchSettings();
         $completedCutoff =
@@ -142,6 +149,44 @@ class DispatchController extends Controller
             'reservation.driver',
             'reservation.routePlan.stops',
         ]);
+
+        /*
+        |--------------------------------------------------------------------------
+        | RBAC Data Scope
+        |--------------------------------------------------------------------------
+        */
+        if ($user->hasRole('driver')) {
+            $driverId =
+                $user->driverProfile?->id;
+            if ($driverId) {
+                $query->whereHas(
+                    'reservation',
+                    function ($reservation) use ($driverId) {
+                        $reservation->where(
+                            'driver_id',
+                            $driverId
+                        );
+                    }
+                );
+            } else {
+                $query->whereRaw('1 = 0');
+            }
+        }
+        if ($user->hasRole('department_head')) {
+            if ($user->department) {
+                $query->whereHas(
+                    'reservation',
+                    function ($reservation) use ($user) {
+                        $reservation->where(
+                            'department',
+                            $user->department
+                        );
+                    }
+                );
+            } else {
+                $query->whereRaw('1 = 0');
+            }
+        }
         /*
         |--------------------------------------------------------------------------
         | Completed Trip Visibility
@@ -185,7 +230,34 @@ class DispatchController extends Controller
             ]);
         }
 
-        return view('dispatch.index');
+        $dispatchPermissions = [
+            'role' =>
+                $user->role,
+            'canCreate' =>
+                $user->can(
+                    'create',
+                    Dispatch::class
+                ),
+            'canUpdate' =>
+                $user->hasRole(
+                    'fleet_manager',
+                    'dispatcher'
+                ),
+            'canDelete' =>
+                $user->hasRole(
+                    'fleet_manager',
+                    'dispatcher'
+                ),
+            'canBulkDelete' =>
+                $user->hasRole(
+                    'fleet_manager',
+                    'dispatcher'
+                ),
+        ];
+        return view(
+            'dispatch.index',
+            compact('dispatchPermissions')
+        );
     }
 
     /**
@@ -199,6 +271,8 @@ class DispatchController extends Controller
      */
     public function availableReservations()
     {
+        $this->authorize('create', Dispatch::class);
+
         $reservations = Reservation::with([
             'vehicle',
             'driver',
@@ -226,6 +300,8 @@ class DispatchController extends Controller
      */
     public function store(Request $request)
     {
+        $this->authorize('create', Dispatch::class);
+
         $validator = Validator::make(
             $request->all(),
             [
@@ -421,6 +497,8 @@ class DispatchController extends Controller
         Request $request,
         Dispatch $dispatch
     ) {
+        $this->authorize('update', $dispatch);
+
         $validator = Validator::make(
             $request->all(),
             [
@@ -748,6 +826,8 @@ class DispatchController extends Controller
      */
     public function destroy(Dispatch $dispatch)
     {
+        $this->authorize('delete', $dispatch);
+
         try {
             DB::transaction(function () use ($dispatch) {
                 $dispatch = Dispatch::with([
@@ -829,6 +909,8 @@ class DispatchController extends Controller
      */
     public function bulkDelete(Request $request)
     {
+        $this->authorize('deleteAny', Dispatch::class);
+
         $validator = Validator::make(
             $request->all(),
             [
@@ -953,6 +1035,8 @@ class DispatchController extends Controller
             'reservation.routePlan.stops',
         ]);
 
+        $this->authorize('view', $dispatch);
+
         return response()->json([
             'dispatch' => $dispatch,
         ]);
@@ -998,6 +1082,8 @@ class DispatchController extends Controller
      */
     public function nextNumber()
     {
+        $this->authorize('create', Dispatch::class);
+        
         return response()->json([
             'success' => true,
             'dispatch_number' => $this->generateDispatchNumber(),
