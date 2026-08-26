@@ -32,3 +32,43 @@
     </button>
   </div>
 </header>
+
+<script>
+  window.FLEET_NAV_RBAC = {
+      dashboard:
+          @json(auth()->user()?->canViewModule('dashboard') ?? false),
+
+      vehicles:
+          @json(auth()->user()?->canViewModule('vehicles') ?? false),
+
+      reservations:
+          @json(auth()->user()?->canViewModule('reservations') ?? false),
+
+      dispatch:
+          @json(auth()->user()?->canViewModule('dispatch') ?? false),
+
+      drivers:
+          @json(auth()->user()?->canViewModule('drivers') ?? false),
+
+      maintenance:
+          @json(auth()->user()?->canViewModule('maintenance') ?? false),
+
+      fuel:
+          @json(auth()->user()?->canViewModule('fuel') ?? false),
+
+      routes:
+          @json(auth()->user()?->canViewModule('route_planning') ?? false),
+
+      cost:
+          @json(auth()->user()?->canViewModule('cost_analysis') ?? false),
+
+      reports:
+          @json(auth()->user()?->canViewModule('reports') ?? false),
+
+      settings:
+          @json(auth()->user()?->canViewModule('settings') ?? false),
+
+      profile:
+          @json(auth()->user()?->canViewModule('profile') ?? false)
+  };
+</script>

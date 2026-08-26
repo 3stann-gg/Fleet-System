@@ -4,7 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Models\FleetNotification;
 use App\Services\FleetNotificationCheckService;
-use Illuminate\Support\Facades\Auth;
+use App\Services\FleetNotificationService;
+use Illuminate\Http\Request;
 
 class FleetNotificationController extends Controller
 {
@@ -12,19 +13,60 @@ class FleetNotificationController extends Controller
      * Get notifications for the current user.
      */
     public function index(
+        Request $request,
         FleetNotificationCheckService $checker
     ) {
+        $user =
+            $request->user();
+
+        abort_unless(
+            $user !== null,
+            401
+        );
+
+        /*
+        |--------------------------------------------------------------------------
+        | Generate / check notification conditions
+        |--------------------------------------------------------------------------
+        */
         $checker->check();
 
+        /*
+        |--------------------------------------------------------------------------
+        | Own notifications only
+        |--------------------------------------------------------------------------
+        */
         $notifications =
             FleetNotification::query()
                 ->where(
                     'user_id',
-                    Auth::id()
+                    $user->id
                 )
                 ->latest('id')
-                ->limit(30)
-                ->get();
+                ->limit(50)
+                ->get()
+
+                /*
+                |--------------------------------------------------------------------------
+                | RBAC filter
+                |--------------------------------------------------------------------------
+                |
+                | Protects against stale notifications that were created before
+                | RBAC notification filtering was added.
+                |--------------------------------------------------------------------------
+                */
+                ->filter(
+                    function ($notification) use ($user) {
+                        return FleetNotificationService
+                            ::userCanAccessLink(
+                                $user,
+                                $notification->link
+                            );
+                    }
+                )
+
+                ->take(30)
+                ->values();
 
         return response()->json([
             'notifications' =>
@@ -44,46 +86,130 @@ class FleetNotificationController extends Controller
      * Mark one notification as read.
      */
     public function markRead(
+        Request $request,
         FleetNotification $notification
     ) {
-        if (
-            (int) $notification->user_id !==
-            (int) Auth::id()
-        ) {
-            abort(403);
-        }
+        $user =
+            $request->user();
+
+        abort_unless(
+            $user !== null,
+            401
+        );
+
+        /*
+        |--------------------------------------------------------------------------
+        | Ownership Guard
+        |--------------------------------------------------------------------------
+        */
+        abort_unless(
+            (int)
+            $notification->user_id ===
+            (int)
+            $user->id,
+            403
+        );
+
+        /*
+        |--------------------------------------------------------------------------
+        | RBAC Guard
+        |--------------------------------------------------------------------------
+        */
+        abort_unless(
+            FleetNotificationService
+                ::userCanAccessLink(
+                    $user,
+                    $notification->link
+                ),
+            403
+        );
 
         $notification->update([
-            'status' => 'Read',
+            'status' =>
+                'Read',
         ]);
 
         return response()->json([
-            'success' => true,
+            'success' =>
+                true,
+
             'message' =>
                 'Notification marked as read.',
         ]);
     }
 
     /**
-     * Mark all current user's notifications as read.
+     * Mark all accessible notifications
+     * for current user as read.
      */
-    public function markAllRead()
-    {
-        FleetNotification::query()
-            ->where(
-                'user_id',
-                Auth::id()
-            )
-            ->where(
-                'status',
-                'Unread'
-            )
-            ->update([
-                'status' => 'Read',
-            ]);
+    public function markAllRead(
+        Request $request
+    ) {
+        $user =
+            $request->user();
+
+        abort_unless(
+            $user !== null,
+            401
+        );
+
+        /*
+        |--------------------------------------------------------------------------
+        | Fetch own unread notifications
+        |--------------------------------------------------------------------------
+        */
+        $notifications =
+            FleetNotification::query()
+                ->where(
+                    'user_id',
+                    $user->id
+                )
+                ->where(
+                    'status',
+                    'Unread'
+                )
+                ->get();
+
+        /*
+        |--------------------------------------------------------------------------
+        | Only update notifications that remain accessible
+        |--------------------------------------------------------------------------
+        */
+        $accessibleIds =
+            $notifications
+                ->filter(
+                    function ($notification) use ($user) {
+                        return FleetNotificationService
+                            ::userCanAccessLink(
+                                $user,
+                                $notification->link
+                            );
+                    }
+                )
+                ->pluck('id');
+
+        if (
+            $accessibleIds->isNotEmpty()
+        ) {
+            FleetNotification::query()
+                ->where(
+                    'user_id',
+                    $user->id
+                )
+                ->whereIn(
+                    'id',
+                    $accessibleIds
+                )
+                ->update([
+                    'status' =>
+                        'Read',
+                ]);
+        }
 
         return response()->json([
-            'success' => true,
+            'success' =>
+                true,
+
             'message' =>
                 'All notifications marked as read.',
         ]);

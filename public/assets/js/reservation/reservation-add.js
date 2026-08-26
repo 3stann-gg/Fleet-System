@@ -174,14 +174,30 @@ function applyReservationAddRbac() {
 
 async function loadNextReservationNumber() {
     const numberInput = document.getElementById("reservationNumber");
+    const saveButton = document.getElementById("saveReservationBtn");
     if (!numberInput) {
         return;
     }
+    /*
+    |--------------------------------------------------------------------------
+    | Loading State
+    |--------------------------------------------------------------------------
+    */
+    numberInput.value = "Generating...";
+    numberInput.classList.add("is-generating");
+    if (saveButton) {
+        saveButton.disabled = true;
+    }
+
     try {
         const response = await fetch("/reservation/next-number", {
+            method: "GET",
             headers: {
                 Accept: "application/json",
+
+                "X-Requested-With": "XMLHttpRequest",
             },
+            credentials: "same-origin",
         });
         const data = await response.json();
         if (!response.ok) {
@@ -190,9 +206,29 @@ async function loadNextReservationNumber() {
             );
         }
         numberInput.value = data.reservation_number || "";
+        if (!numberInput.value) {
+            throw new Error("Reservation number was not generated.");
+        }
     } catch (error) {
         console.error("Failed to load next reservation number:", error);
-        numberInput.value = "";
+        numberInput.value = "Unable to generate";
+        if (typeof window.showToast === "function") {
+            window.showToast(
+                error.message || "Failed to generate reservation number.",
+                "error",
+            );
+        }
+    } finally {
+        numberInput.classList.remove("is-generating");
+        /*
+         * Only enable Save when a real
+         * reservation number exists.
+         */
+        if (saveButton) {
+            saveButton.disabled =
+                !numberInput.value ||
+                numberInput.value === "Unable to generate";
+        }
     }
 }
 
@@ -434,8 +470,4 @@ async function initReservationAdd() {
 
 document.addEventListener("DOMContentLoaded", async () => {
     await initReservationAdd();
-    await loadNextReservationNumber();
-    if (!isDepartmentHeadReservationUser()) {
-        await loadReservationOptions();
-    }
 });

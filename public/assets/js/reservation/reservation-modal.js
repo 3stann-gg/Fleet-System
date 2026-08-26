@@ -1,3 +1,4 @@
+
 function openReservationModal(modal) {
   if (!modal) return;
 
@@ -72,17 +73,21 @@ function validateReservationForm(form) {
   let firstInvalid = null;
   let isValid = true;
 
+  const reservationNumberValue = reservationNumber?.value?.trim() || "";
   if (
-    !reservationNumber ||
-    !reservationNumber.value.trim() ||
-    reservationNumber.value.trim().length < 5
+      !reservationNumber ||
+      !reservationNumberValue ||
+      reservationNumberValue === "Generating..." ||
+      reservationNumberValue === "Unable to generate"
   ) {
-    showReservationFieldError(
-      reservationNumber,
-      "Reservation Number must be at least 5 characters.",
-    );
-    if (!firstInvalid) firstInvalid = reservationNumber;
-    isValid = false;
+      showReservationFieldError(
+          reservationNumber,
+          "Please wait for the reservation number to be generated.",
+      );
+      if (!firstInvalid) {
+          firstInvalid = reservationNumber;
+      }
+      isValid = false;
   }
 
   if (!reservationPatient || !reservationPatient.value.trim()) {
@@ -128,26 +133,32 @@ function validateReservationForm(form) {
   }
 
   if (!reservationDate || !reservationDate.value) {
-    showReservationFieldError(reservationDate, "Schedule Date is required.");
-    if (!firstInvalid) firstInvalid = reservationDate;
-    isValid = false;
+      showReservationFieldError(reservationDate, "Schedule Date is required.");
+      if (!firstInvalid) {
+          firstInvalid = reservationDate;
+      }
+      isValid = false;
   } else {
-    if (date.value && date.min && date.value < date.min) {
-        showReservationFieldError(
-            date,
-            "Selected date is earlier than the allowed reservation date.",
-        );
-
-        return false;
-    }
-    if (date.value && date.max && date.value > date.max) {
-        showReservationFieldError(
-            date,
-            "Selected date exceeds the maximum advance booking period.",
-        );
-
-        return false;
-    }
+      if (reservationDate.min && reservationDate.value < reservationDate.min) {
+          showReservationFieldError(
+              reservationDate,
+              "Selected date is earlier than the allowed reservation date.",
+          );
+          if (!firstInvalid) {
+              firstInvalid = reservationDate;
+          }
+          isValid = false;
+      }
+      if (reservationDate.max && reservationDate.value > reservationDate.max) {
+          showReservationFieldError(
+              reservationDate,
+              "Selected date exceeds the maximum advance booking period.",
+          );
+          if (!firstInvalid) {
+              firstInvalid = reservationDate;
+          }
+          isValid = false;
+      }
   }
 
   if (!reservationTime || !reservationTime.value) {
@@ -298,5 +309,4 @@ function initReservationModal() {
 
 document.addEventListener("DOMContentLoaded", () => {
     initReservationModal();
-    initReservationAdd();
 });

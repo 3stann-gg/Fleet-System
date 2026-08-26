@@ -15,14 +15,22 @@ function initMaintenanceModal() {
 
     maintenanceModalInitialized = true;
 
-    function openModal() {
+    async function openModal() {
         modal.classList.add("show");
         document.body.style.overflow = "hidden";
+        await Promise.all([
+            loadNextMaintenanceNumber(),
+            loadAvailableMaintenanceVehicles(),
+        ]);
     }
 
     function closeModal() {
         modal.classList.remove("show");
         document.body.style.overflow = "";
+        const numberInput = document.getElementById("maintenanceNumber");
+        if (numberInput) {
+            numberInput.value = "Generating...";
+        }
     }
 
     openBtn.addEventListener("click", openModal);
@@ -168,10 +176,10 @@ function validateMaintenanceForm(form) {
     });
 
     const number = fields.maintenanceNumber;
-    if (!number || !number.value.trim()) {
-        fail(number, "Maintenance number is required.");
-    } else if (number.value.trim().length < 5) {
-        fail(number, "Maintenance number must be at least 5 characters.");
+    if (isEditForm) {
+        if (!number || !number.value.trim()) {
+            fail(number, "Maintenance number is required.");
+        }
     }
 
     const vehicle = fields.maintenanceVehicle;

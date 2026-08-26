@@ -34,7 +34,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
     initDispatchAdd();
     await loadAvailableReservations();
-    await loadNextDispatchNumber();
 });
 
 
@@ -89,24 +88,47 @@ async function dispatchAddApiRequest(url, options = {}) {
 
 async function loadNextDispatchNumber() {
     const numberInput = document.getElementById("dispatchNumber");
-
+    const saveButton = document.querySelector("#dispatchForm [type='submit']");
     if (!numberInput) {
         return;
     }
-
+    /*
+    |--------------------------------------------------------------------------
+    | Loading State
+    |--------------------------------------------------------------------------
+    */
+    numberInput.value = "Generating...";
+    numberInput.classList.add("is-generating");
+    if (saveButton) {
+        saveButton.disabled = true;
+    }
     try {
         const data = await dispatchAddApiRequest("/dispatch/next-number", {
             method: "GET",
         });
-
         numberInput.value = data.dispatch_number || "";
+        if (!numberInput.value) {
+            throw new Error("Dispatch number was not generated.");
+        }
     } catch (error) {
         console.error("Unable to load next dispatch number:", error);
+        numberInput.value = "Unable to generate";
+        if (typeof showToast === "function") {
+            showToast(
+                error.message || "Unable to generate dispatch number.",
+                "error",
+            );
+        }
+    } finally {
+        numberInput.classList.remove("is-generating");
 
-        numberInput.value = "";
+        if (saveButton) {
+            saveButton.disabled =
+                !numberInput.value ||
+                numberInput.value === "Unable to generate";
+        }
     }
 }
-
 function getReservationRoutePlan(reservation) {
     return reservation?.route_plan || reservation?.routePlan || null;
 }

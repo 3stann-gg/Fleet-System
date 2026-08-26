@@ -12,66 +12,159 @@ class FleetSearchController extends Controller
 {
     public function search(Request $request)
     {
-        $query = trim(
-            (string) $request->get('q', '')
+        $user = $request->user();
+
+        abort_unless(
+            $user !== null,
+            401
         );
 
-        if ($query === '') {
+        $search = trim(
+            (string) $request->get(
+                'q',
+                ''
+            )
+        );
+
+        if ($search === '') {
             return response()->json([
                 'results' => [],
             ]);
         }
 
+        /*
+        |--------------------------------------------------------------------------
+        | Protect search input size
+        |--------------------------------------------------------------------------
+        */
+        $search = mb_substr(
+            $search,
+            0,
+            100
+        );
+
         $results = collect();
+
+        $department =
+            $user->department;
+
+        $driverProfile =
+            $user->driverProfile;
 
         /*
         |--------------------------------------------------------------------------
         | Vehicles
         |--------------------------------------------------------------------------
         */
+        if (
+            $user->canViewModule(
+                'vehicles'
+            )
+        ) {
+            $vehicleQuery =
+                Vehicle::query();
 
-        $vehicles = Vehicle::query()
-            ->where(function ($q) use ($query) {
-                $q
-                    ->where(
-                        'plate_number',
-                        'like',
-                        "%{$query}%"
-                    )
-                    ->orWhere(
-                        'brand',
-                        'like',
-                        "%{$query}%"
-                    )
-                    ->orWhere(
-                        'model',
-                        'like',
-                        "%{$query}%"
+            /*
+            |--------------------------------------------------------------------------
+            | Driver - assigned vehicle only
+            |--------------------------------------------------------------------------
+            */
+            if (
+                $user->hasRole(
+                    'driver'
+                )
+            ) {
+                $vehicleId =
+                    $driverProfile
+                        ?->assigned_vehicle_id;
+
+                if ($vehicleId) {
+                    $vehicleQuery->where(
+                        'id',
+                        $vehicleId
                     );
-            })
-            ->limit(5)
-            ->get();
+                } else {
+                    $vehicleQuery
+                        ->whereRaw('1 = 0');
+                }
+            }
 
-        foreach ($vehicles as $vehicle) {
-            $vehicleName = trim(
-                ($vehicle->brand ?? '') .
-                ' ' .
-                ($vehicle->model ?? '')
-            );
+            /*
+            |--------------------------------------------------------------------------
+            | Department Head - own department only
+            |--------------------------------------------------------------------------
+            */
+            elseif (
+                $user->hasRole(
+                    'department_head'
+                )
+            ) {
+                if ($department) {
+                    $vehicleQuery->where(
+                        'department',
+                        $department
+                    );
+                } else {
+                    $vehicleQuery
+                        ->whereRaw('1 = 0');
+                }
+            }
 
-            $results->push([
-                'type' => 'Vehicle',
-                'label' =>
-                    $vehicleName !== ''
-                        ? $vehicleName
-                        : 'Vehicle',
+            $vehicles =
+                $vehicleQuery
+                    ->where(
+                        function ($query) use ($search) {
+                            $query
+                                ->where(
+                                    'plate_number',
+                                    'like',
+                                    "%{$search}%"
+                                )
+                                ->orWhere(
+                                    'brand',
+                                    'like',
+                                    "%{$search}%"
+                                )
+                                ->orWhere(
+                                    'model',
+                                    'like',
+                                    "%{$search}%"
+                                );
+                        }
+                    )
+                    ->limit(5)
+                    ->get();
 
-                'detail' =>
-                    $vehicle->plate_number ?? '',
+            foreach (
+                $vehicles as $vehicle
+            ) {
+                $vehicleName =
+                    trim(
+                        ($vehicle->brand ?? '') .
+                        ' ' .
+                        ($vehicle->model ?? '')
+                    );
 
-                'url' =>
-                    url('/fleet'),
-            ]);
+                $results->push([
+                    'type' =>
+                        'Vehicle',
+
+                    'module' =>
+                        'vehicles',
+
+                    'label' =>
+                        $vehicleName !== ''
+                            ? $vehicleName
+                            : 'Vehicle',
+
+                    'detail' =>
+                        $vehicle->plate_number
+                        ?? '',
+
+                    'url' =>
+                        route('fleet'),
+                ]);
+            }
         }
 
         /*
@@ -79,62 +172,106 @@ class FleetSearchController extends Controller
         | Drivers
         |--------------------------------------------------------------------------
         */
+        if (
+            $user->canViewModule(
+                'drivers'
+            )
+        ) {
+            $driverQuery =
+                Driver::query();
 
-        $drivers = Driver::query()
-            ->where(function ($q) use ($query) {
-                $q
-                    ->where(
-                        'driver_number',
-                        'like',
-                        "%{$query}%"
-                    )
-                    ->orWhere(
-                        'first_name',
-                        'like',
-                        "%{$query}%"
-                    )
-                    ->orWhere(
-                        'last_name',
-                        'like',
-                        "%{$query}%"
-                    )
-                    ->orWhere(
-                        'license_number',
-                        'like',
-                        "%{$query}%"
+            /*
+            |--------------------------------------------------------------------------
+            | Driver role
+            |--------------------------------------------------------------------------
+            |
+            | Driver can access the Drivers module in View mode,
+            | but Global Search should not expose unrelated personnel records.
+            |--------------------------------------------------------------------------
+            */
+            if (
+                $user->hasRole(
+                    'driver'
+                )
+            ) {
+                if ($driverProfile) {
+                    $driverQuery->where(
+                        'id',
+                        $driverProfile->id
                     );
-            })
-            ->limit(5)
-            ->get();
+                } else {
+                    $driverQuery
+                        ->whereRaw('1 = 0');
+                }
+            }
 
-        foreach ($drivers as $driver) {
-            $driverName = trim(
-                ($driver->first_name ?? '') .
-                ' ' .
-                ($driver->last_name ?? '')
-            );
+            $drivers =
+                $driverQuery
+                    ->where(
+                        function ($query) use ($search) {
+                            $query
+                                ->where(
+                                    'driver_number',
+                                    'like',
+                                    "%{$search}%"
+                                )
+                                ->orWhere(
+                                    'first_name',
+                                    'like',
+                                    "%{$search}%"
+                                )
+                                ->orWhere(
+                                    'last_name',
+                                    'like',
+                                    "%{$search}%"
+                                )
+                                ->orWhere(
+                                    'license_number',
+                                    'like',
+                                    "%{$search}%"
+                                );
+                        }
+                    )
+                    ->limit(5)
+                    ->get();
 
-            $results->push([
-                'type' => 'Driver',
-
-                'label' =>
-                    $driverName !== ''
-                        ? $driverName
-                        : 'Driver',
-
-                'detail' =>
+            foreach (
+                $drivers as $driver
+            ) {
+                $driverName =
                     trim(
-                        ($driver->driver_number ?? '') .
-                        (
-                            $driver->license_number
-                                ? ' · ' . $driver->license_number
-                                : ''
-                        )
-                    ),
+                        ($driver->first_name ?? '') .
+                        ' ' .
+                        ($driver->last_name ?? '')
+                    );
 
-                'url' =>
-                    route('driver'),
-            ]);
+                $results->push([
+                    'type' =>
+                        'Driver',
+
+                    'module' =>
+                        'drivers',
+
+                    'label' =>
+                        $driverName !== ''
+                            ? $driverName
+                            : 'Driver',
+
+                    'detail' =>
+                        trim(
+                            ($driver->driver_number ?? '') .
+                            (
+                                $driver->license_number
+                                    ? ' · ' .
+                                        $driver->license_number
+                                    : ''
+                            )
+                        ),
+
+                    'url' =>
+                        route('driver'),
+                ]);
+            }
         }
 
         /*
@@ -142,50 +279,142 @@ class FleetSearchController extends Controller
         | Reservations
         |--------------------------------------------------------------------------
         */
+        if (
+            $user->canViewModule(
+                'reservations'
+            )
+        ) {
+            $reservationQuery =
+                Reservation::query();
 
-        $reservations = Reservation::query()
-            ->where(function ($q) use ($query) {
-                $q
+            /*
+            |--------------------------------------------------------------------------
+            | Driver - own assignments only
+            |--------------------------------------------------------------------------
+            */
+            if (
+                $user->hasRole(
+                    'driver'
+                )
+            ) {
+                $driverId =
+                    $driverProfile?->id;
+
+                if ($driverId) {
+                    $reservationQuery
+                        ->where(
+                            'driver_id',
+                            $driverId
+                        );
+                } else {
+                    $reservationQuery
+                        ->whereRaw('1 = 0');
+                }
+            }
+
+            /*
+            |--------------------------------------------------------------------------
+            | Department Head - own department only
+            |--------------------------------------------------------------------------
+            */
+            elseif (
+                $user->hasRole(
+                    'department_head'
+                )
+            ) {
+                if (!$department) {
+                    $reservationQuery
+                        ->whereRaw('1 = 0');
+                } else {
+                    $reservationQuery
+                        ->where(
+                            function ($scope) use ($department) {
+                                $scope
+                                    ->where(
+                                        'department',
+                                        $department
+                                    )
+                                    ->orWhereHas(
+                                        'routePlan',
+                                        function ($routeQuery) use ($department) {
+                                            $routeQuery->where(
+                                                'department',
+                                                $department
+                                            );
+                                        }
+                                    )
+                                    ->orWhereHas(
+                                        'vehicle',
+                                        function ($vehicleQuery) use ($department) {
+                                            $vehicleQuery->where(
+                                                'department',
+                                                $department
+                                            );
+                                        }
+                                    );
+                            }
+                        );
+                }
+            }
+
+            $reservations =
+                $reservationQuery
                     ->where(
-                        'reservation_number',
-                        'like',
-                        "%{$query}%"
+                        function ($query) use ($search) {
+                            $query
+                                ->where(
+                                    'reservation_number',
+                                    'like',
+                                    "%{$search}%"
+                                )
+                                ->orWhere(
+                                    'patient_name',
+                                    'like',
+                                    "%{$search}%"
+                                )
+                                ->orWhere(
+                                    'pickup_location',
+                                    'like',
+                                    "%{$search}%"
+                                )
+                                ->orWhere(
+                                    'destination',
+                                    'like',
+                                    "%{$search}%"
+                                );
+                        }
                     )
-                    ->orWhere(
-                        'patient_name',
-                        'like',
-                        "%{$query}%"
-                    )
-                    ->orWhere(
-                        'pickup_location',
-                        'like',
-                        "%{$query}%"
-                    )
-                    ->orWhere(
-                        'destination',
-                        'like',
-                        "%{$query}%"
-                    );
-            })
-            ->limit(5)
-            ->get();
+                    ->limit(5)
+                    ->get();
 
-        foreach ($reservations as $reservation) {
-            $results->push([
-                'type' =>
-                    'Reservation',
+            foreach (
+                $reservations as $reservation
+            ) {
+                $results->push([
+                    'type' =>
+                        'Reservation',
 
-                'label' =>
-                    $reservation->reservation_number,
+                    'module' =>
+                        'reservations',
 
-                'detail' =>
-                    $reservation->patient_name ??
-                    $reservation->status ??
-                    '',
+                    'label' =>
+                        $reservation
+                            ->reservation_number,
 
-                'url' =>
-                    url('/reservation'),
-            ]);
+                    'detail' =>
+                        $reservation
+                            ->patient_name
+                        ??
+                        $reservation->status
+                        ??
+                        '',
+
+                    'url' =>
+                        route(
+                            'reservation.index'
+                        ),
+                ]);
+            }
         }
 
         /*
@@ -193,32 +422,136 @@ class FleetSearchController extends Controller
         | Dispatch
         |--------------------------------------------------------------------------
         */
-
-        $dispatches = Dispatch::query()
-            ->where(
-                'dispatch_number',
-                'like',
-                "%{$query}%"
+        if (
+            $user->canViewModule(
+                'dispatch'
             )
-            ->limit(5)
-            ->get();
+        ) {
+            $dispatchQuery =
+                Dispatch::query();
 
-        foreach ($dispatches as $dispatch) {
-            $results->push([
-                'type' =>
-                    'Dispatch',
+            /*
+            |--------------------------------------------------------------------------
+            | Driver - own dispatch assignments only
+            |--------------------------------------------------------------------------
+            */
+            if (
+                $user->hasRole(
+                    'driver'
+                )
+            ) {
+                $driverId =
+                    $driverProfile?->id;
 
-                'label' =>
-                    $dispatch->dispatch_number,
+                if ($driverId) {
+                    $dispatchQuery
+                        ->whereHas(
+                            'reservation',
+                            function ($reservationQuery) use ($driverId) {
+                                $reservationQuery
+                                    ->where(
+                                        'driver_id',
+                                        $driverId
+                                    );
+                            }
+                        );
+                } else {
+                    $dispatchQuery
+                        ->whereRaw('1 = 0');
+                }
+            }
 
-                'detail' =>
-                    $dispatch->trip_status ?? '',
+            /*
+            |--------------------------------------------------------------------------
+            | Department Head - own department only
+            |--------------------------------------------------------------------------
+            */
+            elseif (
+                $user->hasRole(
+                    'department_head'
+                )
+            ) {
+                if (!$department) {
+                    $dispatchQuery
+                        ->whereRaw('1 = 0');
+                } else {
+                    $dispatchQuery
+                        ->whereHas(
+                            'reservation',
+                            function ($reservationQuery) use ($department) {
+                                $reservationQuery
+                                    ->where(
+                                        function ($scope) use ($department) {
+                                            $scope
+                                                ->where(
+                                                    'department',
+                                                    $department
+                                                )
+                                                ->orWhereHas(
+                                                    'routePlan',
+                                                    function ($routeQuery) use ($department) {
+                                                        $routeQuery->where(
+                                                            'department',
+                                                            $department
+                                                        );
+                                                    }
+                                                )
+                                                ->orWhereHas(
+                                                    'vehicle',
+                                                    function ($vehicleQuery) use ($department) {
+                                                        $vehicleQuery->where(
+                                                            'department',
+                                                            $department
+                                                        );
+                                                    }
+                                                );
+                                        }
+                                    );
+                            }
+                        );
+                }
+            }
 
-                'url' =>
-                    url('/dispatch'),
-            ]);
+            $dispatches =
+                $dispatchQuery
+                    ->where(
+                        'dispatch_number',
+                        'like',
+                        "%{$search}%"
+                    )
+                    ->limit(5)
+                    ->get();
+
+            foreach (
+                $dispatches as $dispatch
+            ) {
+                $results->push([
+                    'type' =>
+                        'Dispatch',
+
+                    'module' =>
+                        'dispatch',
+
+                    'label' =>
+                        $dispatch
+                            ->dispatch_number,
+
+                    'detail' =>
+                        $dispatch
+                            ->trip_status
+                        ?? '',
+
+                    'url' =>
+                        route('dispatch'),
+                ]);
+            }
         }
 
+        /*
+        |--------------------------------------------------------------------------
+        | Final Results
+        |--------------------------------------------------------------------------
+        */
         return response()->json([
             'results' =>
                 $results

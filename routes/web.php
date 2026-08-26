@@ -331,6 +331,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
             [MaintenanceController::class, 'availableVehicles']
         )->name('maintenance.availableVehicles');
 
+        Route::get(
+            '/maintenance/next-number',
+            [MaintenanceController::class, 'nextNumber']
+        )->name('maintenance.next-number');
+
         Route::post(
             '/maintenance',
             [MaintenanceController::class, 'store']

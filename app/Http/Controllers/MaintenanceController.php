@@ -160,6 +160,93 @@ class MaintenanceController extends Controller
         );
     }
 
+    /**
+     * Generate the next maintenance number.
+     *
+     * Format:
+     * MNT-YYYYMM-0001
+     */
+    private function generateMaintenanceNumber(): string
+    {
+        $year =
+            now()->format('Y');
+
+        $month =
+            now()->format('m');
+
+        $prefix =
+            'MNT-' .
+            $year .
+            '-' .
+            $month;
+
+        $latestNumber =
+            Maintenance::query()
+                ->where(
+                    'maintenance_number',
+                    'like',
+                    $prefix . '%'
+                )
+                ->orderByDesc(
+                    'maintenance_number'
+                )
+                ->value(
+                    'maintenance_number'
+                );
+
+        $nextSequence = 1;
+
+        if ($latestNumber) {
+            /*
+            |--------------------------------------------------------------------------
+            | Example:
+            |
+            | MNT-2026-08015
+            |
+            | Prefix:
+            | MNT-2026-08
+            |
+            | Sequence:
+            | 015
+            |--------------------------------------------------------------------------
+            */
+            $lastSequence =
+                (int) substr(
+                    $latestNumber,
+                    strlen($prefix)
+                );
+
+            $nextSequence =
+                $lastSequence + 1;
+        }
+
+        return
+            $prefix .
+            str_pad(
+                (string) $nextSequence,
+                3,
+                '0',
+                STR_PAD_LEFT
+            );
+    }
+
+    /**
+     * Preview next maintenance number
+     * for the Add Maintenance modal.
+     */
+    public function nextNumber()
+    {
+        $this->authorize(
+            'create',
+            Maintenance::class
+        );
+
+        return response()->json([
+            'maintenance_number' =>
+                $this->generateMaintenanceNumber(),
+        ]);
+    }
+
     public function index(Request $request)
     {
         $this->authorize('viewAny', Maintenance::class);
@@ -299,13 +386,6 @@ class MaintenanceController extends Controller
         $validator = Validator::make(
             $request->all(),
             [
-                'maintenance_number' => [
-                    'required',
-                    'string',
-                    'max:50',
-                    'unique:maintenances,maintenance_number',
-                ],
-
                 'vehicle_id' => [
                     'required',
                     'exists:vehicles,id',
@@ -392,6 +472,9 @@ class MaintenanceController extends Controller
                 $maintenanceSettings
             ) {
                 $validated = $validator->validated();
+
+                $validated['maintenance_number'] =
+                    $this->generateMaintenanceNumber();
 
                 if (
                     $maintenanceSettings['requireCost'] &&
@@ -507,12 +590,6 @@ class MaintenanceController extends Controller
         $validator = Validator::make(
             $request->all(),
             [
-                'maintenance_number' => [
-                    'required',
-                    'string',
-                    'max:50',
-                    'unique:maintenances,maintenance_number,' . $maintenance->id,
-                ],
                 'vehicle_id' => [
                     'required',
                     'exists:vehicles,id',
@@ -614,6 +691,8 @@ class MaintenanceController extends Controller
                     ->findOrFail($maintenance->vehicle_id);
 
                 $validated = $validator->validated();
+
+                $maintenance->fill($validated);
 
                 $newVehicleId = (int) $validated['vehicle_id'];
                 $currentVehicleId = (int) $maintenance->vehicle_id;

@@ -4,6 +4,92 @@
    Shared across all Fleet pages
 ========================================== */
 
+//   RBAC
+function fleetNavCanAccess(moduleName) {
+    return window.FLEET_NAV_RBAC?.[moduleName] === true;
+}
+function fleetNavCanOpenSearchResult(item) {
+    if (!item?.module) {
+        return false;
+    }
+
+    return fleetNavCanAccess(item.module);
+}
+function fleetNavModuleFromUrl(url) {
+    if (!url) {
+        return null;
+    }
+
+    let pathname = "";
+
+    try {
+        pathname = new URL(url, window.location.origin).pathname;
+    } catch {
+        return null;
+    }
+
+    if (pathname.startsWith("/fleet")) {
+        return "vehicles";
+    }
+
+    if (pathname.startsWith("/reservation")) {
+        return "reservations";
+    }
+
+    if (pathname.startsWith("/dispatch")) {
+        return "dispatch";
+    }
+
+    if (pathname.startsWith("/driver")) {
+        return "drivers";
+    }
+
+    if (pathname.startsWith("/maintenance")) {
+        return "maintenance";
+    }
+
+    if (pathname.startsWith("/fuel")) {
+        return "fuel";
+    }
+
+    if (pathname.startsWith("/route-planning")) {
+        return "routes";
+    }
+
+    if (pathname.startsWith("/cost-analysis")) {
+        return "cost";
+    }
+
+    if (pathname.startsWith("/reports")) {
+        return "reports";
+    }
+
+    if (pathname.startsWith("/settings")) {
+        return "settings";
+    }
+
+    if (pathname.startsWith("/dashboard")) {
+        return "dashboard";
+    }
+
+    if (pathname.startsWith("/profile")) {
+        return "profile";
+    }
+
+    return null;
+}
+function fleetNavCanOpenUrl(url) {
+    const moduleName = fleetNavModuleFromUrl(url);
+    /*
+     * Unknown internal link:
+     * don't trust it automatically.
+     */
+    if (!moduleName) {
+        return false;
+    }
+    return fleetNavCanAccess(moduleName);
+}
+
 let navbarBrowserNotificationsEnabled = false;
 let navbarGlobalEventsInitialized = false;
 let navbarObserverStarted = false;
@@ -584,6 +670,14 @@ function initNavbarNotifications() {
                     }
                     closeAllNavbarPanels();
                     if (notification.link) {
+                        if (!fleetNavCanOpenUrl(notification.link)) {
+                            fleetNavNotify(
+                                "You do not have access to the related module.",
+                                "warning",
+                            );
+                            await refreshNotifications();
+                            return;
+                        }
                         window.location.href = notification.link;
                         return;
                     }
@@ -670,15 +764,12 @@ function getMessagesButton() {
 
 function initNavbarMessages() {
     const button = getMessagesButton();
-
     if (!button) {
         return;
     }
-
     if (button.dataset.navMessagesInit === "true") {
         return;
     }
-
     button.dataset.navMessagesInit = "true";
     button.setAttribute("aria-haspopup", "menu");
     button.setAttribute("aria-expanded", "false");
@@ -697,48 +788,91 @@ function initNavbarMessages() {
         panel.setAttribute("aria-label", "Messages");
         control.appendChild(panel);
     }
-
     panel.innerHTML = "";
+    /*
+    |--------------------------------------------------------------------------
+    | Header
+    |--------------------------------------------------------------------------
+    */
     const header = document.createElement("div");
     header.className = "navbar-panel-header";
     header.textContent = "Messages";
+    /*
+    |--------------------------------------------------------------------------
+    | Message list
+    |--------------------------------------------------------------------------
+    */
     const list = document.createElement("div");
     list.className = "navbar-panel-list";
+    /*
+    |--------------------------------------------------------------------------
+    | Messaging unavailable
+    |--------------------------------------------------------------------------
+    |
+    | Messaging is not currently an official Fleet module,
+    | so there is no separate messaging RBAC permission.
+    |--------------------------------------------------------------------------
+    */
     const unavailable = document.createElement("button");
     unavailable.type = "button";
     unavailable.className = "navbar-panel-item";
-    unavailable.innerHTML =
-        "<strong>No messaging module</strong>" +
-        "<span>Internal messages are not enabled in this system.</span>";
+    const unavailableTitle = document.createElement("strong");
+    unavailableTitle.textContent = "No messaging module";
+    const unavailableText = document.createElement("span");
+    unavailableText.textContent =
+        "Internal messages are not enabled in this system.";
+    unavailable.appendChild(unavailableTitle);
+    unavailable.appendChild(unavailableText);
     unavailable.addEventListener("click", (event) => {
         event.preventDefault();
         event.stopPropagation();
         fleetNavNotify("Messaging is not available in this system.", "info");
     });
-
-    const settings = document.createElement("button");
-    settings.type = "button";
-    settings.className = "navbar-panel-item";
-    settings.innerHTML =
-        "<strong>Open Settings</strong>" +
-        "<span>Configure fleet preferences</span>";
-    settings.addEventListener("click", () => {
-        window.location.href = FLEET_NAV_ROUTES.settings;
-    });
     list.appendChild(unavailable);
-    list.appendChild(settings);
+    /*
+    |--------------------------------------------------------------------------
+    | Settings shortcut
+    |--------------------------------------------------------------------------
+    |
+    | Only Fleet Manager / IT Admin currently have Settings access.
+    |--------------------------------------------------------------------------
+    */
+    if (fleetNavCanAccess("settings")) {
+        const settings = document.createElement("button");
+        settings.type = "button";
+        settings.className = "navbar-panel-item";
+        const settingsTitle = document.createElement("strong");
+        settingsTitle.textContent = "Open Settings";
+        const settingsText = document.createElement("span");
+        settingsText.textContent = "Configure fleet preferences";
+        settings.appendChild(settingsTitle);
+        settings.appendChild(settingsText);
+        settings.addEventListener("click", (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            if (!fleetNavCanAccess("settings")) {
+                return;
+            }
+            window.location.href = FLEET_NAV_ROUTES.settings;
+        });
+        list.appendChild(settings);
+    }
     panel.appendChild(header);
     panel.appendChild(list);
+
+    /*
+    |--------------------------------------------------------------------------
+    | Toggle panel
+    |--------------------------------------------------------------------------
+    */
     button.addEventListener("click", (event) => {
         event.preventDefault();
         event.stopPropagation();
-
         const wasOpen = panel.classList.contains("is-open");
         closeAllNavbarPanels();
         if (wasOpen) {
             return;
         }
-
         panel.hidden = false;
         panel.classList.add("is-open");
         button.setAttribute("aria-expanded", "true");
@@ -843,6 +977,9 @@ function initNavbarSearch() {
             }
 
             matches.forEach((item) => {
+                if (!fleetNavCanOpenSearchResult(item)) {
+                    return;
+                }
                 const button = document.createElement("button");
                 button.type = "button";
                 button.className = "navbar-search-item";

@@ -31,8 +31,9 @@
             <input
               type="text"
               id="maintenanceNumber"
-              placeholder="MNT-2026-001"
+
               required
+              readonly
             />
           </div>
 

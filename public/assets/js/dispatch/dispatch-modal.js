@@ -11,7 +11,15 @@ function validateDispatchForm(form) {
     const requiredFields = [
         {
             id: "dispatchNumber",
-            validate: (value) => value.trim().length >= 5,
+            validate: (value) => {
+                const number = value.trim();
+                return (
+                    number !== "" &&
+                    number !== "Generating..." &&
+                    number !== "Unable to generate" &&
+                    number.length >= 5
+                );
+            },
         },
         {
             id: "dispatchReservation",
@@ -136,6 +144,10 @@ function initDispatchModal() {
     const closeModal = () => {
         modal.classList.remove("show");
         document.body.style.overflow = "";
+        const numberInput = document.getElementById("dispatchNumber");
+        if (numberInput) {
+            numberInput.value = "Generating...";
+        }
     };
 
     const closeBtn = document.getElementById("closeAddDispatchModal");

@@ -135,11 +135,63 @@ function applyMaintenanceAddSettings(
     }
 }
 
+
 //  RBAC
 function canCreateMaintenance() {
     return (
         window.FleetRBAC?.hasPermission?.("maintenance", "canCreate") === true
     );
+}
+
+let maintenanceNumberRequestController = null;
+
+async function loadNextMaintenanceNumber() {
+    if (!canCreateMaintenance()) {
+        return;
+    }
+    const input = document.getElementById("maintenanceNumber");
+    if (!input) {
+        return;
+    }
+    if (maintenanceNumberRequestController) {
+        maintenanceNumberRequestController.abort();
+    }
+    maintenanceNumberRequestController = new AbortController();
+    input.value = "Generating...";
+    input.classList.add("is-generating");
+    try {
+        const response = await fetch("/maintenance/next-number", {
+            method: "GET",
+            headers: {
+                Accept: "application/json",
+                "X-Requested-With": "XMLHttpRequest",
+            },
+            credentials: "same-origin",
+            signal: maintenanceNumberRequestController.signal,
+        });
+        const data = await response.json();
+        if (!response.ok) {
+            throw new Error(
+                data?.message || "Unable to generate maintenance number.",
+            );
+        }
+
+        input.value = data?.maintenance_number || "";
+    } catch (error) {
+        if (error.name === "AbortError") {
+            return;
+        }
+        console.error("Maintenance number load error:", error);
+        input.value = "Unable to generate";
+        if (typeof showToast === "function") {
+            showToast(
+                error.message || "Unable to generate maintenance number.",
+                "error",
+            );
+        }
+    } finally {
+        input.classList.remove("is-generating");
+    }
 }
 
 let availableMaintenanceVehicles = [];
@@ -476,8 +528,6 @@ function createMaintenanceRow(form, savedMaintenance = null) {
 
 async function saveMaintenance(form) {
     const values = {
-        maintenance_number:
-            document.getElementById("maintenanceNumber")?.value.trim() || "",
         vehicle_id: document.getElementById("maintenanceVehicle")?.value || "",
         maintenance_type:
             document.getElementById("maintenanceServiceType")?.value || "",
