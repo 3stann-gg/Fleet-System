@@ -334,10 +334,15 @@
 
                             <input
                                 type="text"
-                                name="employee_id"
+                                @if($profilePermissions['canEditAdministrative'] ?? false)
+                                    name="employee_id"
+                                @endif
                                 id="profileEmployeeId"
                                 maxlength="40"
                                 value="{{ old('employee_id', $user->employee_id) }}"
+                                @unless($profilePermissions['canEditAdministrative'] ?? false)
+                                    readonly
+                                @endunless
                             >
 
                             @error('employee_id')
@@ -354,11 +359,17 @@
 
                             <input
                                 type="text"
-                                name="department"
+                                @if($profilePermissions['canEditAdministrative'] ?? false)
+                                    name="department"
+                                @endif
                                 id="profileDepartment"
                                 maxlength="120"
-                                required
                                 value="{{ old('department', $user->department) }}"
+                                @if($profilePermissions['canEditAdministrative'] ?? false)
+                                    required
+                                @else
+                                    readonly
+                                @endif
                             >
 
                             @error('department')
@@ -378,11 +389,17 @@
 
                             <input
                                 type="text"
-                                name="job_title"
+                                @if($profilePermissions['canEditAdministrative'] ?? false)
+                                    name="job_title"
+                                @endif
                                 id="profileJobTitle"
                                 maxlength="120"
-                                required
                                 value="{{ old('job_title', $user->job_title) }}"
+                                @if($profilePermissions['canEditAdministrative'] ?? false)
+                                    required
+                                @else
+                                    readonly
+                                @endif
                             >
 
                             @error('job_title')
@@ -529,12 +546,14 @@
                             </p>
                         </div>
 
-                        <a 
-                          href="{{ route('settings') }}" 
-                          class="btn-outline"
-                        >
-                          Account Settings
-                        </a>
+                        @if($profilePermissions['canAccessSettings'] ?? false)
+                            <a
+                                href="{{ route('settings') }}"
+                                class="btn-outline"
+                            >
+                                Account Settings
+                            </a>
+                        @endif
                     </div>
 
                     <div class="profile-readonly-grid">

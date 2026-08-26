@@ -74,6 +74,56 @@ async function loadRouteModuleSettings() {
     }
 }
 
+//   RBAC
+function canCreateRoute() {
+    return (
+        window.FleetRBAC?.hasPermission?.(
+            "route_planning",
+            "canCreate"
+        ) === true
+    );
+}
+function canUpdateRoute() {
+    return (
+        window.FleetRBAC?.hasPermission?.(
+            "route_planning",
+            "canUpdate"
+        ) === true
+    );
+}
+function canDeleteRoute() {
+    return (
+        window.FleetRBAC?.hasPermission?.(
+            "route_planning",
+            "canDelete"
+        ) === true
+    );
+}
+function canArchiveRoute() {
+    return (
+        window.FleetRBAC?.hasPermission?.(
+            "route_planning",
+            "canArchive"
+        ) === true
+    );
+}
+function canRestoreRoute() {
+    return (
+        window.FleetRBAC?.hasPermission?.(
+            "route_planning",
+            "canRestore"
+        ) === true
+    );
+}
+function canDuplicateRoute() {
+    return (
+        window.FleetRBAC?.hasPermission?.(
+            "route_planning",
+            "canDuplicate"
+        ) === true
+    );
+}
+
 let routeLastOptimization = null;
 
 /* ==========================================
@@ -778,6 +828,12 @@ function buildUpdateRoutePayload(data) {
    FORM MODAL
 ========================================== */
 async function openRouteFormModal(mode, record = null) {
+    if (mode === "add" && !canCreateRoute()) {
+        return;
+    }
+    if (mode === "edit" && !canUpdateRoute()) {
+        return;
+    }
     const modal = document.getElementById("routeFormModal");
     const title = document.getElementById("routeFormModalTitle");
     const form = document.getElementById("routeForm");
@@ -1108,16 +1164,27 @@ function openViewRouteModal(record) {
     const archiveButton = document.getElementById("archiveRouteFromViewBtn");
     const restoreButton = document.getElementById("restoreRouteFromViewBtn");
     const editButton = document.getElementById("editRouteFromViewBtn");
-
+    const duplicateButton = document.getElementById(
+        "duplicateRouteFromViewBtn",
+    );
+    if (duplicateButton) {
+        duplicateButton.hidden = !canDuplicateRoute();
+    }
     if (archiveButton) {
         archiveButton.hidden =
-            record.status === "Archived" || record.status === "Completed";
+            !canArchiveRoute() ||
+            record.status === "Archived" ||
+            record.status === "Completed";
     }
     if (restoreButton) {
-        restoreButton.hidden = record.status !== "Archived";
+        restoreButton.hidden =
+            !canRestoreRoute() || record.status !== "Archived";
     }
     if (editButton) {
-        editButton.disabled = ["Completed", "Archived"].includes(record.status);
+        editButton.hidden = !canUpdateRoute();
+        editButton.disabled =
+            !canUpdateRoute() ||
+            ["Completed", "Archived"].includes(record.status);
     }
 
     modal.dataset.routeId = record.id;
@@ -1140,6 +1207,9 @@ function closeViewRouteModal() {
 ========================================== */
 
 function openDeleteRouteModal(record) {
+    if (!canDeleteRoute()) {
+        return;
+    }
     const modal = document.getElementById("deleteRouteModal");
 
     if (!modal || !record) {
@@ -1175,6 +1245,12 @@ function closeDeleteRouteModal() {
 }
 
 async function saveRouteFromForm() {
+    if (routeFormMode === "add" && !canCreateRoute()) {
+        return;
+    }
+    if (routeFormMode === "edit" && !canUpdateRoute()) {
+        return;
+    }
     const form = document.getElementById("routeForm");
     if (!form) {
         return;
@@ -1314,6 +1390,9 @@ async function saveRouteFromForm() {
  * Later we can replace this with a proper modal.
  */
 async function duplicateRouteFromView(routeId) {
+    if (!canDuplicateRoute()) {
+        return;
+    }
     try {
         const reservations = await fetchAvailableRouteReservations();
         if (reservations.length === 0) {
@@ -1440,11 +1519,13 @@ function initRoutePlanningModals() {
   | New Route
   |--------------------------------------------------------------------------
   */
-    document
-        .getElementById("newRouteBtn")
-        ?.addEventListener("click", async () => {
-            await openRouteFormModal("add");
-        });
+    if (canCreateRoute()) {
+        document
+            .getElementById("newRouteBtn")
+            ?.addEventListener("click", async () => {
+                await openRouteFormModal("add");
+            });
+    }
     document
         .getElementById("routeReservation")
         ?.addEventListener("change", () => {
@@ -1557,6 +1638,12 @@ function initRoutePlanningModals() {
         .getElementById("routeForm")
         ?.addEventListener("submit", async (event) => {
             event.preventDefault();
+            if (routeFormMode === "add" && !canCreateRoute()) {
+                return;
+            }
+            if (routeFormMode === "edit" && !canUpdateRoute()) {
+                return;
+            }
             await saveRouteFromForm();
         });
     document
@@ -1579,12 +1666,11 @@ function initRoutePlanningModals() {
                 updateOptimizationSummaryPanel(record);
                 return;
             }
-            if (editButton && !editButton.disabled) {
+            if (editButton && !editButton.disabled && canUpdateRoute()) {
                 await openRouteFormModal("edit", record);
-
                 return;
             }
-            if (deleteButton && !deleteButton.disabled) {
+            if (deleteButton && !deleteButton.disabled && canDeleteRoute()) {
                 openDeleteRouteModal(record);
             }
         });
@@ -1604,6 +1690,9 @@ function initRoutePlanningModals() {
     document
         .getElementById("editRouteFromViewBtn")
         ?.addEventListener("click", async () => {
+            if (!canUpdateRoute()) {
+                return;
+            }
             const viewModal = document.getElementById("viewRouteModal");
             const editModal = document.getElementById("routeFormModal");
             const id = viewModal?.dataset.routeId;
@@ -1653,6 +1742,9 @@ function initRoutePlanningModals() {
     document
         .getElementById("archiveRouteFromViewBtn")
         ?.addEventListener("click", async () => {
+            if (!canArchiveRoute()) {
+                return;
+            }
             const modal = document.getElementById("viewRouteModal");
             const id = modal?.dataset.routeId;
 
@@ -1684,6 +1776,9 @@ function initRoutePlanningModals() {
     document
         .getElementById("restoreRouteFromViewBtn")
         ?.addEventListener("click", async () => {
+            if (!canRestoreRoute()) {
+                return;
+            }
             const modal = document.getElementById("viewRouteModal");
             const id = modal?.dataset.routeId;
             if (!id) {
@@ -1729,6 +1824,9 @@ function initRoutePlanningModals() {
     document
         .getElementById("confirmDeleteRoute")
         ?.addEventListener("click", async () => {
+            if (!canDeleteRoute()) {
+                return;
+            }
             if (!routeDeleteTargetId) {
                 return;
             }

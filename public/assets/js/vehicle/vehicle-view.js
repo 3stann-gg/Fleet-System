@@ -147,6 +147,12 @@ function populateViewVehicleModal(modal, vehicle) {
 
     setViewVehicleText(modal, "viewPlateNumber", vehicle.plate_number);
     setViewVehicleText(modal, "viewVehicleType", vehicle.vehicle_type);
+    setViewVehicleText(
+        modal,
+        "viewVehicleDepartment",
+        vehicle.department,
+        "Unassigned",
+    );
     setViewVehicleText(modal, "viewDriver", driverName, "Not Assigned");
     setViewVehicleText(modal, "viewFuelType", fuelType);
     setViewVehicleText(
@@ -260,6 +266,10 @@ function initViewVehicleModal() {
             }
 
             modal.currentVehicle = data.vehicle;
+
+            modal.availableDrivers = Array.isArray(data.drivers)
+                ? data.drivers
+                : [];
 
             const row = viewButton.closest("tr");
 

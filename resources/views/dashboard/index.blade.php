@@ -194,6 +194,7 @@
                   </div>
                 </div>
 
+                @if($dashboardPermissions['canSeeDispatchQueue'] ?? false)
                 <div class="card dispatch-card analytics-card">
                   <div class="card-header">
                     <div>
@@ -269,6 +270,7 @@
                       @endforelse
                   </div>
                 </div>
+                @endif
               </div>
             </section>
 
@@ -284,15 +286,22 @@
                   </p>
                 </div>
               </div>
-
               <div class="dashboard-grid">
+                @if($dashboardPermissions['canSeeFleetStatus'] ?? false)
                 <div class="card analytics-card">
                   <div class="card-header">
                     <div>
                       <h3>Vehicle Status</h3>
                       <p class="card-subtitle">Selected units currently monitored</p>
                     </div>
-                    <button type="button" class="btn-filter">View All</button>
+                    @if($dashboardPermissions['canOpenVehicles'] ?? false)
+                        <a
+                            href="{{ route('fleet') }}"
+                            class="btn-filter"
+                        >
+                            View All
+                        </a>
+                    @endif
                   </div>
                   <div class="table-responsive">
                     <table class="fleet-table">
@@ -379,12 +388,14 @@
                                         : '—' }}
                                 </td>
                                 <td>
-                                    <button
-                                        type="button"
-                                        class="table-btn"
-                                    >
-                                        View
-                                    </button>
+                                    @if($dashboardPermissions['canOpenVehicles'] ?? false)
+                                        <a
+                                            href="{{ route('fleet') }}"
+                                            class="table-btn"
+                                        >
+                                            View
+                                        </a>
+                                    @endif
                                 </td>
                             </tr>
                         @empty
@@ -398,7 +409,9 @@
                     </table>
                   </div>
                 </div>
+                @endif
 
+                @if($dashboardPermissions['canSeeMaintenance'] ?? false)
                 <div class="card analytics-card">
                   <div class="card-header">
                     <div>
@@ -508,8 +521,10 @@
                       @endforelse
                   </div>
                 </div>
+                @endif
               </div>
             </section>
+            
 
             <!-- Activity -->
             <section class="dashboard-section" aria-labelledby="activitySectionTitle">
@@ -605,6 +620,14 @@
             </section>
           </div>
         </section>
+
+    <script>
+        window.FLEET_RBAC = window.FLEET_RBAC || {};
+        window.FLEET_RBAC.role = @json(auth()->user()?->role);
+        window.FLEET_RBAC.dashboard = @json($dashboardPermissions ?? []);
+    </script>
+
+    <script src="{{ asset('assets/js/helpers/rbac.js') }}"></script>   
 
     @push('scripts')
     

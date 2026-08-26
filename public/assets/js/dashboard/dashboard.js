@@ -3,6 +3,14 @@
    No CRUD duplication, no fabricated analytics
 ========================================== */
 
+//   RBAC
+function getDashboardPermissions() {
+    return window.FLEET_RBAC?.dashboard || {};
+}
+function canDashboardOpen(permission) {
+    return getDashboardPermissions()?.[permission] === true;
+}
+
 let dashboardInitialized = false;
 
 const DASHBOARD_ROUTES = {
@@ -80,28 +88,35 @@ function initDashboardChartControls() {
     periodBtn.addEventListener("click", (e) => {
         e.preventDefault();
         dashboardToast(
-            "Fleet Activity shows this week’s sample view. Open Reports for full analytics.",
+            "Fleet Activity shows this week’s dispatch activity. Open Reports for detailed analytics.",
             "info",
         );
     });
 }
 
 function initDashboardVehicleStatus() {
-    const viewAll = document.querySelector(
-        ".dashboard-section .analytics-card .btn-filter",
-    );
-    /* First "View All" in fleet status vehicle card */
     document.querySelectorAll(".dashboard-page .btn-filter").forEach((btn) => {
-        if (btn.dataset.dashBound === "true") return;
+        if (btn.dataset.dashBound === "true") {
+            return;
+        }
         const label = (btn.textContent || "").replace(/\s+/g, " ").trim();
         if (label === "View All") {
             btn.dataset.dashBound = "true";
+
+            if (!canDashboardOpen("canOpenVehicles")) {
+                btn.hidden = true;
+                return;
+            }
             btn.addEventListener("click", (e) => {
                 e.preventDefault();
                 dashboardGo(DASHBOARD_ROUTES.vehicles);
             });
         } else if (label === "Overview") {
             btn.dataset.dashBound = "true";
+            if (!canDashboardOpen("canOpenDispatch")) {
+                btn.hidden = true;
+                return;
+            }
             btn.addEventListener("click", (e) => {
                 e.preventDefault();
                 dashboardToast(
@@ -112,10 +127,15 @@ function initDashboardVehicleStatus() {
             });
         }
     });
-
     document.querySelectorAll(".dashboard-page .table-btn").forEach((btn) => {
-        if (btn.dataset.dashBound === "true") return;
+        if (btn.dataset.dashBound === "true") {
+            return;
+        }
         btn.dataset.dashBound = "true";
+        if (!canDashboardOpen("canOpenVehicles")) {
+            btn.hidden = true;
+            return;
+        }
         const row = btn.closest("tr");
         const vehicleName = row?.querySelector("td")?.textContent?.trim() || "";
         btn.setAttribute(
@@ -132,6 +152,9 @@ function initDashboardVehicleStatus() {
 }
 
 function initDashboardDispatchQueue() {
+    if (!canDashboardOpen("canOpenDispatch")) {
+        return;
+    }
     document
         .querySelectorAll(".dashboard-page .dispatch-item")
         .forEach((item) => {
@@ -146,7 +169,6 @@ function initDashboardDispatchQueue() {
                 },
             );
         });
-
     const badge = document.querySelector(
         ".dashboard-page .dispatch-card .badge-green",
     );
@@ -168,6 +190,9 @@ function initDashboardDispatchQueue() {
 }
 
 function initDashboardMaintenanceAlerts() {
+    if (!canDashboardOpen("canOpenMaintenance")) {
+        return;
+    }
     document
         .querySelectorAll(".dashboard-page .maintenance-item")
         .forEach((item) => {
@@ -184,6 +209,22 @@ function initDashboardMaintenanceAlerts() {
         });
 }
 
+function canOpenDashboardActivityHref(href) {
+    if (!href) {
+        return false;
+    }
+    if (href.startsWith(DASHBOARD_ROUTES.vehicles)) {
+        return canDashboardOpen("canOpenVehicles");
+    }
+    if (href.startsWith(DASHBOARD_ROUTES.dispatch)) {
+        return canDashboardOpen("canOpenDispatch");
+    }
+    if (href.startsWith(DASHBOARD_ROUTES.maintenance)) {
+        return canDashboardOpen("canOpenMaintenance");
+    }
+    return true;
+}
+
 function initDashboardActivity() {
     document
         .querySelectorAll(".dashboard-page .activity-item")
@@ -191,8 +232,10 @@ function initDashboardActivity() {
             const text =
                 item.querySelector("strong")?.textContent?.trim() || "Activity";
             const href = item.dataset.href || "";
-
             if (!href) {
+                return;
+            }
+            if (!canOpenDashboardActivityHref(href)) {
                 return;
             }
             makeDashboardItemInteractive(

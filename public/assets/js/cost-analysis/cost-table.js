@@ -14,7 +14,7 @@ let costTableState = {
   pageSize: 5,
 };
 let costTableInitialized = false;
-
+/*
 function setCostTableConfig(config, options = {}) {
   costTableConfig = config || {
     columns: [],
@@ -25,7 +25,7 @@ function setCostTableConfig(config, options = {}) {
   if (options.resetPage) costTableState.page = 1;
   renderCostTable();
 }
-
+*/
 function getCostTableWorkingRows() {
   let rows = (costTableConfig?.rows || []).slice();
 

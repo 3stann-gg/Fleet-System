@@ -3,6 +3,10 @@
    Uses getActiveReportOutputModel() — no pipeline re-run
 ========================================== */
 
+function canExportReports() {
+    return window.FleetRBAC?.hasPermission?.("reports", "canExport") === true;
+}
+
 let reportsExportBusy = false;
 
 function showReportsExportToast(message, type) {
@@ -328,6 +332,13 @@ function buildReportsPrintHtml(model) {
 }
 
 function printReports() {
+  if (!canExportReports()) {
+      showReportsExportToast(
+          "You do not have permission to export reports.",
+          "error",
+      );
+      return;
+  }
   if (reportsExportBusy) return;
 
   const model =
@@ -405,6 +416,13 @@ function printReports() {
 }
 
 function exportReportsToExcel() {
+  if (!canExportReports()) {
+      showReportsExportToast(
+          "You do not have permission to export reports.",
+          "error",
+      );
+      return;
+  }
   if (reportsExportBusy) return;
 
   const xlsx = window.XLSX;
@@ -520,6 +538,13 @@ function exportReportsToExcel() {
 }
 
 function exportReportsToPdf() {
+  if (!canExportReports()) {
+      showReportsExportToast(
+          "You do not have permission to export reports.",
+          "error",
+      );
+      return;
+  }
   if (reportsExportBusy) return;
 
   const jsPDF = window.jspdf?.jsPDF;

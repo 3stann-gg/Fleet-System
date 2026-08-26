@@ -42,6 +42,55 @@ class FuelLogController extends Controller
         ];
     }
 
+    public function page(Request $request)
+    {
+        $user = $request->user();
+        $this->authorize(
+            'viewAny',
+            FuelLog::class
+        );
+        $fuelPermissions = [
+            'role' => $user->role,
+            'canView' =>
+                $user->can(
+                    'viewAny',
+                    FuelLog::class
+                ),
+            'canCreate' =>
+                $user->can(
+                    'create',
+                    FuelLog::class
+                ),
+            'canUpdate' =>
+                $user->hasRole(
+                    'fleet_manager',
+                    'maintenance'
+                ),
+            /*
+            |--------------------------------------------------------------------------
+            | Fuel logs are intentionally non-deletable
+            |--------------------------------------------------------------------------
+            */
+            'canDelete' => false,
+            'canBulkDelete' => false,
+            'isDriver' =>
+                $user->hasRole(
+                    'driver'
+                ),
+            'viewOnly' =>
+                $user->hasRole(
+                    'dispatcher',
+                    'finance',
+                    'it_admin'
+                ),
+        ];
+
+        return view(
+            'fuel.index',
+            compact('fuelPermissions')
+        );
+    }
+
     public function index(Request $request)
     {
         $this->authorize('viewAny', FuelLog::class);

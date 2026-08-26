@@ -83,39 +83,33 @@ async function fetchCostJson(url) {
 /* ==========================================
    REAL DATABASE SOURCES
 ========================================== */
-
+/*
 async function getCostVehicleData() {
     const data = await fetchCostJson("/fleet");
-
     if (Array.isArray(data?.vehicles)) {
         return data.vehicles;
     }
-
     if (Array.isArray(data)) {
         return data;
     }
-
     return [];
 }
 
 async function getCostFuelData() {
     const data = await fetchCostJson("/fuel-records");
-
     return Array.isArray(data?.fuelLogs) ? data.fuelLogs : [];
 }
 
 async function getCostMaintenanceData() {
     const data = await fetchCostJson("/maintenance");
-
     return Array.isArray(data?.maintenances) ? data.maintenances : [];
 }
 
 async function getCostTripData() {
     const data = await fetchCostJson("/dispatch");
-
     return Array.isArray(data?.dispatches) ? data.dispatches : [];
 }
-
+*/
 
 function vehicleLookupMap(vehicles) {
     const map = new Map();
@@ -297,21 +291,17 @@ function normalizeCostRecords(sources) {
 }
 
 async function loadCostAnalysisSources() {
-    const [vehicles, fuel, maintenance, dispatches] = await Promise.all([
-        getCostVehicleData(),
-        getCostFuelData(),
-        getCostMaintenanceData(),
-        getCostTripData(),
-    ]);
-
+    const data = await fetchCostJson("/cost-analysis/data");
     return {
-        vehicles,
-        fuel,
-        maintenance,
-        dispatches,
+        vehicles: Array.isArray(data?.vehicles) ? data.vehicles : [],
+        fuel: Array.isArray(data?.fuel) ? data.fuel : [],
+        maintenance: Array.isArray(data?.maintenance) ? data.maintenance : [],
+        dispatches: Array.isArray(data?.dispatches) ? data.dispatches : [],
         /*
-         * Reserved for future cost sources.
-         */
+        |--------------------------------------------------------------------------
+        | Reserved for future dedicated Cost Analysis sources
+        |--------------------------------------------------------------------------
+        */
         reservations: [],
         routes: [],
     };

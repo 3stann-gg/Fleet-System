@@ -149,23 +149,28 @@ function getActiveReportOutputModel() {
 }
 
 function updateReportsOutputMetaStrip() {
-  const el = document.getElementById("reportsOutputMeta");
-  if (!el) return;
-
-  const summary = getReportsFilterSummary();
-  el.innerHTML = summary
-    .map((line) => {
-      const idx = line.indexOf(":");
-      if (idx === -1) return `<span>${line}</span>`;
-      return (
-        "<span><strong>" +
-        line.slice(0, idx + 1) +
-        "</strong> " +
-        line.slice(idx + 1).trim() +
-        "</span>"
-      );
-    })
-    .join("");
+    const el = document.getElementById("reportsOutputMeta");
+    if (!el) {
+        return;
+    }
+    const summary = getReportsFilterSummary();
+    const fragment = document.createDocumentFragment();
+    summary.forEach((line) => {
+        const span = document.createElement("span");
+        const idx = line.indexOf(":");
+        if (idx === -1) {
+            span.textContent = line;
+        } else {
+            const strong = document.createElement("strong");
+            strong.textContent = line.slice(0, idx + 1);
+            span.appendChild(strong);
+            span.appendChild(
+                document.createTextNode(" " + line.slice(idx + 1).trim()),
+            );
+        }
+        fragment.appendChild(span);
+    });
+    el.replaceChildren(fragment);
 }
 
 function startOfLocalDay(date) {
@@ -925,15 +930,24 @@ function driverPerformanceLevel(trips) {
 
 function computeDriversModel(sources, range, filters) {
   /* Drivers themselves are not date-filtered; trip metrics are */
-  const drivers = sources.drivers.filter((d) => {
-    if (filters.vehicle && filters.vehicle !== "all") {
-      return d.assignedVehicle === filters.vehicle;
-    }
-    return true;
+  const drivers = sources.drivers.filter((driver) => {
+      if (
+          filters.vehicle &&
+          filters.vehicle !== "all" &&
+          driver.assignedVehicle !== filters.vehicle
+      ) {
+          return false;
+      }
+      if (
+          filters.department &&
+          filters.department !== "all" &&
+          driver.department !== filters.department
+      ) {
+          return false;
+      }
+      return true;
   });
-  const trips = filterDatedRecords(sources.dispatches, range, filters, {
-    applyDepartment: false,
-  });
+  const trips = filterDatedRecords(sources.dispatches, range, filters);
 
   const rows = drivers.map((d) => {
     const mine = trips.filter((trip) => String(trip.driverId) === String(d.id));

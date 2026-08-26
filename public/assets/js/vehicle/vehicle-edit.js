@@ -33,39 +33,38 @@ async function getEditVehicleSettings() {
             await response.json();
         return {
             requirePlateNumber:
-                data?.settings?.vehicles
-                    ?.requirePlateNumber !==
-                false,
+                data?.settings?.vehicles?.requirePlateNumber !== false,
+            requireDepartment:
+                data?.settings?.vehicles?.requireDepartment === true,
         };
     } catch {
         return {
             requirePlateNumber: true,
+            requireDepartment: false,
         };
     }
 }
 
-function applyEditVehicleSettings(
-    settings
-) {
-    const plate =
-        document.getElementById(
-            "editVehiclePlate"
-        );
-    const mark =
-        document.getElementById(
-            "editVehiclePlateRequiredMark"
-        );
-    const required =
-        settings
-            ?.requirePlateNumber !==
-        false;
+function applyEditVehicleSettings(settings) {
+    const plate = document.getElementById("editVehiclePlate");
+    const plateMark = document.getElementById("editVehiclePlateRequiredMark");
+    const department = document.getElementById("editVehicleDepartment");
+    const departmentMark = document.getElementById(
+        "editVehicleDepartmentRequiredMark",
+    );
+    const requirePlate = settings?.requirePlateNumber !== false;
+    const requireDepartment = settings?.requireDepartment === true;
     if (plate) {
-        plate.required =
-            required;
+        plate.required = requirePlate;
     }
-    if (mark) {
-        mark.hidden =
-            !required;
+    if (plateMark) {
+        plateMark.hidden = !requirePlate;
+    }
+    if (department) {
+        department.required = requireDepartment;
+    }
+    if (departmentMark) {
+        departmentMark.hidden = !requireDepartment;
     }
 }
 
@@ -97,6 +96,7 @@ function applyVehicleEditRbac() {
     const managerFields = [
         "editVehiclePlate",
         "editVehicleType",
+        "editVehicleDepartment",
         "editVehicleCapacity",
         "editVehicleDriver",
         "editVehicleFuel",
@@ -252,6 +252,7 @@ function populateEditVehicleModal(vehicle) {
     setEditVehicleFieldValue("editVehicleId", vehicle.id);
     setEditVehicleFieldValue("editVehiclePlate", vehicle.plate_number);
     setEditVehicleSelectValue("editVehicleType", vehicle.vehicle_type);
+    setEditVehicleSelectValue("editVehicleDepartment", vehicle.department);
     setEditVehicleFieldValue("editVehicleCapacity", vehicle.capacity);
     setEditVehicleSelectValue("editVehicleFuel", vehicle.fuel_type);
     setEditVehicleFieldValue("editVehicleTankCapacity", vehicle.tank_capacity);
@@ -481,6 +482,9 @@ async function initEditVehicleModal() {
                     "",
                 vehicle_type:
                     document.getElementById("editVehicleType")?.value || "",
+                department:
+                    document.getElementById("editVehicleDepartment")?.value ||
+                    null,
                 capacity:
                     document.getElementById("editVehicleCapacity")?.value || "",
                 fuel_type:
@@ -530,7 +534,15 @@ async function initEditVehicleModal() {
                 body: JSON.stringify(formData),
             });
 
-            const data = await response.json();
+            const contentType = response.headers.get("content-type") || "";
+            let data = {};
+            if (contentType.includes("application/json")) {
+                data = await response.json();
+            } else {
+                const text = await response.text();
+                console.error("NON-JSON VEHICLE UPDATE RESPONSE:", text);
+                throw new Error(`Server error (${response.status}).`);
+            }
 
             if (!response.ok) {
                 const firstError = data.errors

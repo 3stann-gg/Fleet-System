@@ -310,18 +310,32 @@
               <div data-cost-view="budget" hidden aria-hidden="true">
                 <div class="cost-budget-panel">
                   <div class="cost-budget-actions">
-                    <button type="button" class="btn-primary" id="openCostBudgetModal">
-                      <i class="ph ph-gear" aria-hidden="true"></i>
-                      Configure Budget
-                    </button>
-                    <button type="button" class="btn-outline" id="editCostBudget">
-                      <i class="ph ph-pencil-simple" aria-hidden="true"></i>
-                      Edit Budget
-                    </button>
-                    <button type="button" class="btn-outline" id="clearCostBudget">
-                      <i class="ph ph-trash" aria-hidden="true"></i>
-                      Clear Budget
-                    </button>
+                      @if($costAnalysisPermissions['canManageBudget'] ?? false)
+                          <button
+                              type="button"
+                              class="btn-primary"
+                              id="openCostBudgetModal"
+                          >
+                              <i class="ph ph-gear" aria-hidden="true"></i>
+                              Configure Budget
+                          </button>
+                          <button
+                              type="button"
+                              class="btn-outline"
+                              id="editCostBudget"
+                          >
+                              <i class="ph ph-pencil-simple" aria-hidden="true"></i>
+                              Edit Budget
+                          </button>
+                          <button
+                              type="button"
+                              class="btn-outline"
+                              id="clearCostBudget"
+                          >
+                              <i class="ph ph-trash" aria-hidden="true"></i>
+                              Clear Budget
+                          </button>
+                      @endif
                   </div>
                   <p
                     class="cost-budget-mismatch"
@@ -384,10 +398,16 @@
                 </div>
                 <div class="cost-budget-table-section">
                   <div class="cost-budget-history-header">
-                    <h4>Budget History</h4>
-                    <button type="button" class="btn-outline" id="clearCostBudgetHistory">
-                      Clear History
-                    </button>
+                      <h4>Budget History</h4>
+                      @if($costAnalysisPermissions['canManageBudget'] ?? false)
+                          <button
+                              type="button"
+                              class="btn-outline"
+                              id="clearCostBudgetHistory"
+                          >
+                              Clear History
+                          </button>
+                      @endif
                   </div>
                   <div class="table-responsive">
                     <table class="fleet-table" id="costBudgetHistoryTable">
@@ -493,102 +513,114 @@
           </div>
         </section>
 
-    <!-- Budget configuration modal -->
-    <div
-      id="costBudgetModal"
-      class="modal-overlay"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="costBudgetModalTitle"
-    >
-      <div class="custom-modal cost-budget-modal">
-        <div class="modal-header">
-          <div>
-            <h2 id="costBudgetModalTitle">Configure Budget</h2>
-            <p>Set overall and category budgets for Cost Analysis.</p>
+    @if($costAnalysisPermissions['canManageBudget'] ?? false)
+      <!-- Budget configuration modal -->
+      <div
+        id="costBudgetModal"
+        class="modal-overlay"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="costBudgetModalTitle"
+      >
+        <div class="custom-modal cost-budget-modal">
+          <div class="modal-header">
+            <div>
+              <h2 id="costBudgetModalTitle">Configure Budget</h2>
+              <p>Set overall and category budgets for Cost Analysis.</p>
+            </div>
+            <button
+              type="button"
+              class="modal-close"
+              id="closeCostBudgetModal"
+              aria-label="Close budget configuration"
+            >
+              <i class="ph ph-x"></i>
+            </button>
           </div>
-          <button
-            type="button"
-            class="modal-close"
-            id="closeCostBudgetModal"
-            aria-label="Close budget configuration"
-          >
-            <i class="ph ph-x"></i>
-          </button>
-        </div>
-        <div class="modal-body">
-          <form id="saveCostBudgetForm">
-            <div class="form-grid">
-              <div class="form-group">
-                <label for="budgetPeriodType">Budget Period Type</label>
-                <select id="budgetPeriodType">
-                  <option value="filter">Current Filter Period</option>
-                  <option value="monthly">Monthly</option>
-                  <option value="quarterly">Quarterly</option>
-                  <option value="yearly">Yearly</option>
-                  <option value="custom">Custom</option>
-                </select>
-              </div>
-              <div class="form-group">
-                <label for="budgetOverallInput">Overall Budget (₱) *</label>
-                <input
-                  type="number"
-                  id="budgetOverallInput"
-                  min="0"
-                  step="0.01"
-                  placeholder="0.00"
-                  required
-                />
-              </div>
-              <div class="form-group full-width" id="budgetCustomPeriodWrap" hidden>
-                <div class="form-grid">
-                  <div class="form-group">
-                    <label for="budgetCustomStart">Start Date *</label>
-                    <input type="date" id="budgetCustomStart" />
-                  </div>
-                  <div class="form-group">
-                    <label for="budgetCustomEnd">End Date *</label>
-                    <input type="date" id="budgetCustomEnd" />
+          <div class="modal-body">
+            <form id="saveCostBudgetForm">
+              <div class="form-grid">
+                <div class="form-group">
+                  <label for="budgetPeriodType">Budget Period Type</label>
+                  <select id="budgetPeriodType">
+                    <option value="filter">Current Filter Period</option>
+                    <option value="monthly">Monthly</option>
+                    <option value="quarterly">Quarterly</option>
+                    <option value="yearly">Yearly</option>
+                    <option value="custom">Custom</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label for="budgetOverallInput">Overall Budget (₱) *</label>
+                  <input
+                    type="number"
+                    id="budgetOverallInput"
+                    min="0"
+                    step="0.01"
+                    placeholder="0.00"
+                    required
+                  />
+                </div>
+                <div class="form-group full-width" id="budgetCustomPeriodWrap" hidden>
+                  <div class="form-grid">
+                    <div class="form-group">
+                      <label for="budgetCustomStart">Start Date *</label>
+                      <input type="date" id="budgetCustomStart" />
+                    </div>
+                    <div class="form-group">
+                      <label for="budgetCustomEnd">End Date *</label>
+                      <input type="date" id="budgetCustomEnd" />
+                    </div>
                   </div>
                 </div>
+                <div class="form-group">
+                  <label for="budgetCatFuel">Fuel Budget (₱)</label>
+                  <input type="number" id="budgetCatFuel" min="0" step="0.01" placeholder="Optional" />
+                </div>
+                <div class="form-group">
+                  <label for="budgetCatMaintenance">Maintenance Budget (₱)</label>
+                  <input type="number" id="budgetCatMaintenance" min="0" step="0.01" placeholder="Optional" />
+                </div>
+                <div class="form-group">
+                  <label for="budgetCatTrip">Trip Operations Budget (₱)</label>
+                  <input type="number" id="budgetCatTrip" min="0" step="0.01" placeholder="Optional" />
+                </div>
+                <div class="form-group">
+                  <label for="budgetCatReservation">Reservation Operations Budget (₱)</label>
+                  <input type="number" id="budgetCatReservation" min="0" step="0.01" placeholder="Optional" />
+                </div>
+                <div class="form-group">
+                  <label for="budgetCatOther">Other Budget (₱)</label>
+                  <input type="number" id="budgetCatOther" min="0" step="0.01" placeholder="Optional" />
+                </div>
+                <div class="form-group full-width">
+                  <label for="budgetNotes">Notes</label>
+                  <textarea id="budgetNotes" maxlength="500" placeholder="Optional notes"></textarea>
+                </div>
               </div>
-              <div class="form-group">
-                <label for="budgetCatFuel">Fuel Budget (₱)</label>
-                <input type="number" id="budgetCatFuel" min="0" step="0.01" placeholder="Optional" />
+              <div class="modal-footer">
+                <button type="button" class="btn-outline" id="cancelCostBudgetModal">
+                  Cancel
+                </button>
+                <button type="submit" class="btn-primary">
+                  Save Budget
+                </button>
               </div>
-              <div class="form-group">
-                <label for="budgetCatMaintenance">Maintenance Budget (₱)</label>
-                <input type="number" id="budgetCatMaintenance" min="0" step="0.01" placeholder="Optional" />
-              </div>
-              <div class="form-group">
-                <label for="budgetCatTrip">Trip Operations Budget (₱)</label>
-                <input type="number" id="budgetCatTrip" min="0" step="0.01" placeholder="Optional" />
-              </div>
-              <div class="form-group">
-                <label for="budgetCatReservation">Reservation Operations Budget (₱)</label>
-                <input type="number" id="budgetCatReservation" min="0" step="0.01" placeholder="Optional" />
-              </div>
-              <div class="form-group">
-                <label for="budgetCatOther">Other Budget (₱)</label>
-                <input type="number" id="budgetCatOther" min="0" step="0.01" placeholder="Optional" />
-              </div>
-              <div class="form-group full-width">
-                <label for="budgetNotes">Notes</label>
-                <textarea id="budgetNotes" maxlength="500" placeholder="Optional notes"></textarea>
-              </div>
-            </div>
-            <div class="modal-footer">
-              <button type="button" class="btn-outline" id="cancelCostBudgetModal">
-                Cancel
-              </button>
-              <button type="submit" class="btn-primary">
-                Save Budget
-              </button>
-            </div>
-          </form>
+            </form>
+          </div>
         </div>
       </div>
-    </div>
+    @endif
+
+    <script>
+        window.FLEET_RBAC = window.FLEET_RBAC || {};
+        window.FLEET_RBAC.role =
+            @json(auth()->user()?->role);
+        window.FLEET_RBAC.cost_analysis =
+            @json($costAnalysisPermissions ?? []);
+    </script>
+
+    <script src="{{ asset('assets/js/helpers/rbac.js') }}"></script>
 
     <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>

@@ -106,6 +106,29 @@
             >
         </div>
 
+        <div class="form-group">
+          <label for="vehicleDepartment">
+              Department
+              <span
+                  id="vehicleDepartmentRequiredMark"
+                  hidden
+              >*</span>
+          </label>
+
+          <select
+              id="vehicleDepartment"
+              name="department"
+          >
+              <option value="">Select Department</option>
+              <option value="Emergency">Emergency</option>
+              <option value="Outpatient">Outpatient</option>
+              <option value="Laboratory">Laboratory</option>
+              <option value="Facilities">Facilities</option>
+              <option value="Admin">Admin</option>
+              <option value="Logistics">Logistics</option>
+          </select>
+      </div>
+
           <div class="form-group">
             <label for="vehicleCapacity">Capacity</label>
             <input

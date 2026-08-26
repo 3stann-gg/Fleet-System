@@ -44,6 +44,9 @@ class VehicleController extends Controller
         return [
             'requirePlateNumber' =>
                 $vehicleSettings['requirePlateNumber'] ?? true,
+            
+            'requireDepartment' =>
+                $vehicleSettings['requireDepartment'] ?? false,
 
             'defaultStatus' =>
                 $defaultStatus,
@@ -54,7 +57,10 @@ class VehicleController extends Controller
     {   
         $this->authorize('viewAny', Vehicle::class);
 
-        $query = Vehicle::with('drivers');
+        $query = Vehicle::with([
+            'drivers',
+            'lastCompletedMaintenance',
+        ]);
 
         if ($request->filled('search')) {
 
@@ -64,7 +70,7 @@ class VehicleController extends Controller
                 $q->where('brand', 'like', "%{$search}%")
                 ->orWhere('model', 'like', "%{$search}%")
                 ->orWhere('plate_number', 'like', "%{$search}%")
-
+                ->orWhere('department', 'like', "%{$search}%")
                     ->orWhereHas('drivers', function ($driver) use ($search) {
                     $driver->where('first_name', 'like', "%{$search}%")
                             ->orWhere('last_name', 'like', "%{$search}%");
@@ -92,6 +98,7 @@ class VehicleController extends Controller
                 'id'                => $vehicle->id,
                 'plate_number'      => $vehicle->plate_number,
                 'vehicle_type'      => $vehicle->vehicle_type,
+                'department'        => $vehicle->department,
                 'brand'             => $vehicle->brand,
                 'model'             => $vehicle->model,
                 'purchase_date'     => $vehicle->purchase_date,
@@ -110,7 +117,6 @@ class VehicleController extends Controller
                 'driver_license' => $driver?->license_number,
 
                 'notes' => $vehicle->notes,
-                //'last_service' => $vehicle->last_service,
                 /*
                 |--------------------------------------------------------------------------
                 | Include assigned drivers for Fuel Management
@@ -125,6 +131,28 @@ class VehicleController extends Controller
                         'status' => $driver->status,
                     ];
                 })->values(),
+                // Last Service from Last Maintenance Complete
+                'last_service' =>
+                    $vehicle->lastCompletedMaintenance?->completion_date
+                        ?->format('Y-m-d'),
+                'last_service_record' =>
+                    $vehicle->lastCompletedMaintenance
+                        ? [
+                            'id' =>
+                                $vehicle->lastCompletedMaintenance->id,
+                            'maintenance_number' =>
+                                $vehicle->lastCompletedMaintenance->maintenance_number,
+                            'maintenance_type' =>
+                                $vehicle->lastCompletedMaintenance->maintenance_type,
+                            'completion_date' =>
+                                optional(
+                                    $vehicle->lastCompletedMaintenance->completion_date
+                                )->format('Y-m-d'),
+                            'cost' =>
+                                $vehicle->lastCompletedMaintenance->cost,
+                        ]
+                        : null,
+            
             ];
         });
         
@@ -182,6 +210,8 @@ class VehicleController extends Controller
         $vehicleSettings = $this->getVehicleSettings();
         $requirePlateNumber =
             (bool) $vehicleSettings['requirePlateNumber'];
+        $requireDepartment =
+            (bool) $vehicleSettings['requireDepartment'];
         if (!$request->filled('status')) {
             $request->merge([
                 'status' => $vehicleSettings['defaultStatus'],
@@ -203,6 +233,20 @@ class VehicleController extends Controller
                     ),
                 ],
                 'vehicle_type'      => 'required',
+                'department' => [
+                    $requireDepartment
+                        ? 'required'
+                        : 'nullable',
+
+                    Rule::in([
+                        'Emergency',
+                        'Outpatient',
+                        'Laboratory',
+                        'Facilities',
+                        'Admin',
+                        'Logistics',
+                    ]),
+                ],
                 'brand'             => 'required',
                 'model'             => 'required',
                 'purchase_date'     => 'nullable|date',
@@ -276,7 +320,10 @@ class VehicleController extends Controller
     {
         $this->authorize('view', $vehicle);
 
-        $vehicle->load('drivers');
+        $vehicle->load([
+            'drivers',
+            'lastCompletedMaintenance',
+        ]);
 
         $availableDrivers = Driver::whereNull('assigned_vehicle_id')
             ->orWhere('assigned_vehicle_id', $vehicle->id)
@@ -314,12 +361,11 @@ class VehicleController extends Controller
         */
         if ($user->hasRole('fleet_manager')) {
 
-            $vehicleSettings =
-                $this->getVehicleSettings();
-
+            $vehicleSettings = $this->getVehicleSettings();
             $requirePlateNumber =
                 (bool) $vehicleSettings['requirePlateNumber'];
-
+            $requireDepartment =
+                (bool) ($vehicleSettings['requireDepartment'] ?? false);
             $validator = Validator::make(
                 $request->all(),
                 [
@@ -339,21 +385,44 @@ class VehicleController extends Controller
                         'string',
                         'max:255',
                     ],
+                    'department' => [
+                        $requireDepartment
+                            ? 'required'
+                            : 'nullable',
+                        Rule::in([
+                            'Emergency',
+                            'Outpatient',
+                            'Laboratory',
+                            'Facilities',
+                            'Admin',
+                            'Logistics',
+                        ]),
+                    ],
+                    /*
+                    |--------------------------------------------------------------------------
+                    | Brand / Model
+                    |--------------------------------------------------------------------------
+                    | Wala sila currently sa Edit Vehicle form,
+                    | kaya hindi sila dapat required sa update.
+                    |--------------------------------------------------------------------------
+                    */
                     'brand' => [
-                        'required',
+                        'sometimes',
                         'string',
                         'max:255',
                     ],
                     'model' => [
-                        'required',
+                        'sometimes',
                         'string',
                         'max:255',
                     ],
                     'purchase_date' => [
+                        'sometimes',
                         'nullable',
                         'date',
                     ],
                     'insurance_expiry' => [
+                        'sometimes',
                         'nullable',
                         'date',
                     ],
@@ -377,14 +446,21 @@ class VehicleController extends Controller
                         'numeric',
                         'min:0.01',
                     ],
+                    /*
+                    |--------------------------------------------------------------------------
+                    | Fuel + Odometer
+                    |--------------------------------------------------------------------------
+                    | Hindi sila galing sa Vehicle Edit form.
+                    | Existing values remain unchanged.
+                    |--------------------------------------------------------------------------
+                    */
                     'current_fuel' => [
-                        'required',
+                        'sometimes',
                         'numeric',
                         'min:0',
-                        'lte:tank_capacity',
                     ],
                     'current_odometer' => [
-                        'required',
+                        'sometimes',
                         'numeric',
                         'min:0',
                     ],
@@ -418,12 +494,20 @@ class VehicleController extends Controller
                 ], 422);
             }
 
-            $validated =
-                $validator->validated();
-
+            $validated = $validator->validated();
+            /*
+            |--------------------------------------------------------------------------
+            | Tank Capacity Safety
+            |--------------------------------------------------------------------------
+            | Vehicle Edit does not submit current_fuel.
+            | Compare against the vehicle's existing fuel value instead.
+            |--------------------------------------------------------------------------
+            */
             if (
+                isset($validated['tank_capacity']) &&
+                $vehicle->current_fuel !== null &&
                 (float) $validated['tank_capacity'] <
-                (float) $validated['current_fuel']
+                    (float) $vehicle->current_fuel
             ) {
                 return response()->json([
                     'success' => false,
@@ -450,10 +534,9 @@ class VehicleController extends Controller
 
             /*
             |--------------------------------------------------------------------------
-            | Driver assignment can only be changed by Fleet Manager here
+            | Driver Assignment
             |--------------------------------------------------------------------------
             */
-
             if ($driverFieldProvided) {
 
                 Driver::where(
@@ -646,6 +729,7 @@ class VehicleController extends Controller
                 'brand',
                 'model',
                 'vehicle_type',
+                'department',
                 'fuel_type',
                 'tank_capacity',
                 'current_fuel',

@@ -487,6 +487,14 @@
           </div>
         </section>
 
+    <script>
+      window.FLEET_RBAC = window.FLEET_RBAC || {};
+      window.FLEET_RBAC.role = @json(auth()->user()?->role);
+      window.FLEET_RBAC.reports = @json($reportPermissions ?? []);
+    </script>
+
+    <script src="{{ asset('assets/js/helpers/rbac.js') }}"></script>
+
     <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>

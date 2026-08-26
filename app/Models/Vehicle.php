@@ -6,12 +6,14 @@ use Illuminate\Database\Eloquent\Model;
 use App\Models\Reservation;
 use App\Models\Maintenance;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Vehicle extends Model
 {
     protected $fillable = [
         'plate_number',
         'vehicle_type',
+        'department',
         'brand',
         'model',
         'purchase_date',
@@ -80,5 +82,19 @@ class Vehicle extends Model
     public function fuelLogs(): HasMany
     {
         return $this->hasMany(FuelLog::class);
+    }
+
+    public function lastCompletedMaintenance(): HasOne
+    {
+        return $this->hasOne(Maintenance::class)
+            ->ofMany(
+                [
+                    'completion_date' => 'max',
+                    'id' => 'max',
+                ],
+                function ($query) {
+                    $query->where('status', 'Completed');
+                }
+            );
     }
 }

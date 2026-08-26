@@ -9,8 +9,9 @@ window.getVehicleModuleSettings =
   window.getVehicleModuleSettings ||
   async function () {
     const defaults = {
-      requirePlateNumber: true,
-      defaultStatus: "Available",
+        requirePlateNumber: true,
+        requireDepartment: false,
+        defaultStatus: "Available",
     };
 
     try {
@@ -47,15 +48,11 @@ window.getVehicleModuleSettings =
         "Out of Service",
       ];
       return {
-        requirePlateNumber:
-          settings.requirePlateNumber !==
-          false,
-        defaultStatus:
-          allowedStatuses.includes(
-            settings.defaultStatus
-          )
-            ? settings.defaultStatus
-            : defaults.defaultStatus,
+          requirePlateNumber: settings.requirePlateNumber !== false,
+          requireDepartment: settings.requireDepartment === true,
+          defaultStatus: allowedStatuses.includes(settings.defaultStatus)
+              ? settings.defaultStatus
+              : defaults.defaultStatus,
       };
     } catch (error) {
       console.error(
@@ -66,44 +63,31 @@ window.getVehicleModuleSettings =
     }
   };
 
-function applyVehicleAddSettings(
-  settings
-) {
-  const plate =
-    document.getElementById(
-      "vehiclePlate"
+function applyVehicleAddSettings(settings) {
+    const plate = document.getElementById("vehiclePlate");
+    const plateMark = document.getElementById("vehiclePlateRequiredMark");
+    const department = document.getElementById("vehicleDepartment");
+    const departmentMark = document.getElementById(
+        "vehicleDepartmentRequiredMark",
     );
-  const plateMark =
-    document.getElementById(
-      "vehiclePlateRequiredMark"
-    );
-  const status =
-    document.getElementById(
-      "vehicleStatus"
-    );
-  const requirePlate =
-    settings?.requirePlateNumber !==
-    false;
-  if (plate) {
-    plate.required =
-      requirePlate;
-  }
-  if (plateMark) {
-    plateMark.hidden =
-      !requirePlate;
-  }
-  /*
-   * Only set default when no status
-   * has been selected yet.
-   */
-  if (
-    status &&
-    !status.value
-  ) {
-    status.value =
-      settings?.defaultStatus ||
-      "Available";
-  }
+    const status = document.getElementById("vehicleStatus");
+    const requirePlate = settings?.requirePlateNumber !== false;
+    const requireDepartment = settings?.requireDepartment === true;
+    if (plate) {
+        plate.required = requirePlate;
+    }
+    if (plateMark) {
+        plateMark.hidden = !requirePlate;
+    }
+    if (department) {
+        department.required = requireDepartment;
+    }
+    if (departmentMark) {
+        departmentMark.hidden = !requireDepartment;
+    }
+    if (status && !status.value) {
+        status.value = settings?.defaultStatus || "Available";
+    }
 }
 
 async function loadAvailableDrivers(selectedId = null) {
@@ -251,8 +235,12 @@ async function initVehicleAdd() {
     function getRequiredVehicleFields() {
         const fields = [...alwaysRequiredFields];
         const plate = document.getElementById("vehiclePlate");
+        const department = document.getElementById("vehicleDepartment");
         if (plate && plate.required) {
             fields.unshift(plate);
+        }
+        if (department && department.required) {
+            fields.push(department);
         }
         return fields;
     }
@@ -327,6 +315,8 @@ async function initVehicleAdd() {
             plate_number:
                 document.getElementById("vehiclePlate")?.value.trim() || "",
             vehicle_type: document.getElementById("vehicleType")?.value || "",
+            department:
+                document.getElementById("vehicleDepartment")?.value || null,
             brand: document.getElementById("vehicleBrand")?.value.trim() || "",
             model: document.getElementById("vehicleModel")?.value.trim() || "",
             purchase_date:

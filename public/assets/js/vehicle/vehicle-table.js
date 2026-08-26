@@ -1,5 +1,5 @@
 /* ==========================================
-   Vehicle Table :)
+   Vehicle Table 
 ========================================== */
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -75,6 +75,21 @@ function getVehicleDriverInitials(driverName) {
         .toUpperCase();
 }
 
+function formatVehicleLastService(date) {
+    if (!date) {
+        return "---";
+    }
+    const parsed = new Date(date);
+    if (Number.isNaN(parsed.getTime())) {
+        return "---";
+    }
+    return parsed.toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+    });
+}
+
 /* ==========================================
    Fuel Level
 ========================================== */
@@ -134,6 +149,7 @@ function renderVehicleTable(vehicles) {
                 data-model="${vehicle.model ?? ""}"
                 data-plate-number="${vehicle.plate_number ?? ""}"
                 data-vehicle-type="${vehicle.vehicle_type ?? ""}"
+                data-department="${vehicle.department ?? ""}"
                 data-driver-name="${driverName}"
                 data-driver-license="${vehicle.driver_license ?? ""}"
                 data-status="${vehicle.status ?? ""}"
@@ -143,7 +159,7 @@ function renderVehicleTable(vehicles) {
                 data-current-fuel="${currentFuel}"
                 data-fuel-level="${fuelLevel}"
                 data-current-odometer="${currentOdometer}"
-                data-last-service="${vehicle.last_service ?? ""}"
+                data-last-service="${formatVehicleLastService(vehicle.last_service)}"
                 data-notes="${vehicle.notes ?? ""}"
             >
                 <td>
@@ -208,7 +224,7 @@ function renderVehicleTable(vehicles) {
                     </div>
                 </td>
                 <td>
-                    ${vehicle.last_service ?? "---"}
+                    ${formatVehicleLastService(vehicle.last_service)}
                 </td>
                 <td>
                     <div class="action-buttons">

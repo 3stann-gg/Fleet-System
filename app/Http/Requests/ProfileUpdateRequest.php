@@ -16,27 +16,31 @@ class ProfileUpdateRequest extends FormRequest
     {
         $user = $this->user();
 
-        return [
+        $rules = [
             'first_name' => [
                 'required',
                 'string',
                 'max:60',
             ],
+
             'middle_name' => [
                 'nullable',
                 'string',
                 'max:60',
             ],
+
             'last_name' => [
                 'required',
                 'string',
                 'max:60',
             ],
+
             'name' => [
                 'required',
                 'string',
                 'max:120',
             ],
+
             'email' => [
                 'required',
                 'string',
@@ -45,49 +49,68 @@ class ProfileUpdateRequest extends FormRequest
                 Rule::unique('users', 'email')
                     ->ignore($user->id),
             ],
-            'employee_id' => [
-                'nullable',
-                'string',
-                'max:40',
-                Rule::unique('users', 'employee_id')
-                    ->ignore($user->id),
-            ],
-            'department' => [
-                'required',
-                'string',
-                'max:120',
-            ],
-            'job_title' => [
-                'required',
-                'string',
-                'max:120',
-            ],
+
             'mobile_number' => [
                 'nullable',
                 'string',
                 'max:40',
             ],
+
             'office_extension' => [
                 'nullable',
                 'string',
                 'max:20',
             ],
+
             'office_location' => [
                 'nullable',
                 'string',
                 'max:200',
             ],
+
             'profile_photo' => [
                 'nullable',
                 'image',
                 'mimes:jpg,jpeg,png,webp',
                 'max:2048',
             ],
+
             'remove_profile_photo' => [
                 'nullable',
                 'boolean',
             ],
         ];
+
+        /*
+        |--------------------------------------------------------------------------
+        | IT Admin - Full Profile Access
+        |--------------------------------------------------------------------------
+        */
+        if ($user->hasRole('it_admin')) {
+            $rules['employee_id'] = [
+                'nullable',
+                'string',
+                'max:40',
+                Rule::unique(
+                    'users',
+                    'employee_id'
+                )->ignore($user->id),
+            ];
+
+            $rules['department'] = [
+                'required',
+                'string',
+                'max:120',
+            ];
+
+            $rules['job_title'] = [
+                'required',
+                'string',
+                'max:120',
+            ];
+        }
+
+        return $rules;
     }
 
     public function messages(): array

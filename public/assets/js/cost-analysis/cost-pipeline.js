@@ -311,7 +311,9 @@ function computeOverviewKpis(filtered, vehicles, trips, budget) {
   );
   const tripCostTotal = sumCost(tripCostRecords);
   const completedTrips = (trips || []).filter(
-    (t) => String(t.status).toLowerCase() === "completed",
+      (trip) =>
+          String(trip.trip_status ?? trip.status ?? "").toLowerCase() ===
+          "completed",
   ).length;
   let avgTrip = null;
   if (tripCostRecords.length > 0 && completedTrips > 0) {

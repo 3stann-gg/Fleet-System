@@ -59,6 +59,10 @@ function normalizeReportDate(value) {
     return String(value).slice(0, 10);
 }
 
+async function getReportsSourceData() {
+    return await fetchReportsJson("/reports/data");
+}
+
 async function fetchReportsJson(url) {
     const response = await fetch(url, {
         headers: {
@@ -80,38 +84,36 @@ async function fetchReportsJson(url) {
 }
 
 /* ==========================================
-   VEHICLES
+   LOAD ALL REPORT SOURCES
 ========================================== */
-async function getVehicleReportData() {
-    const data = await fetchReportsJson("/fleet");
-    const vehicles = Array.isArray(data?.vehicles)
-        ? data.vehicles
-        : Array.isArray(data)
-          ? data
-          : [];
-    return vehicles.map((vehicle) => ({
+
+async function getAllReportsSourceData() {
+    const data = await fetchReportsJson("/reports/data");
+    const vehiclesRaw = Array.isArray(data?.vehicles) ? data.vehicles : [];
+    const driversRaw = Array.isArray(data?.drivers) ? data.drivers : [];
+    const reservationsRaw = Array.isArray(data?.reservations)
+        ? data.reservations
+        : [];
+    const dispatchesRaw = Array.isArray(data?.dispatches)
+        ? data.dispatches
+        : [];
+    const maintenanceRaw = Array.isArray(data?.maintenance)
+        ? data.maintenance
+        : [];
+    const fuelRaw = Array.isArray(data?.fuel) ? data.fuel : [];
+
+    const vehicles = vehiclesRaw.map((vehicle) => ({
         id: String(vehicle.id ?? ""),
         name: getReportVehicleLabel(vehicle),
         plateNumber: vehicle.plate_number || "",
         type: vehicle.vehicle_type || vehicle.type || "",
         status: vehicle.status || "",
-        department: vehicle.department || vehicle.department_name || "",
+        department: vehicle.department || "",
         capacity: Number(vehicle.capacity) || 0,
         raw: vehicle,
     }));
-}
 
-/* ==========================================
-   DRIVERS
-========================================== */
-async function getDriverReportData() {
-    const data = await fetchReportsJson("/drivers");
-    const drivers = Array.isArray(data?.drivers)
-        ? data.drivers
-        : Array.isArray(data)
-          ? data
-          : [];
-    return drivers.map((driver) => {
+    const drivers = driversRaw.map((driver) => {
         const assignedVehicle =
             driver.vehicle || driver.assigned_vehicle || null;
         return {
@@ -121,22 +123,12 @@ async function getDriverReportData() {
             assignedVehicle: assignedVehicle
                 ? getReportVehicleLabel(assignedVehicle)
                 : driver.assigned_vehicle_name || "",
+            department: assignedVehicle?.department || null,
             raw: driver,
         };
     });
-}
 
-/* ==========================================
-   RESERVATIONS
-========================================== */
-async function getReservationReportData() {
-    const data = await fetchReportsJson("/reservation");
-    const reservations = Array.isArray(data?.reservations)
-        ? data.reservations
-        : Array.isArray(data)
-          ? data
-          : [];
-    return reservations.map((reservation) => {
+    const reservations = reservationsRaw.map((reservation) => {
         const vehicle = reservation.vehicle || null;
         const routePlan =
             reservation.route_plan || reservation.routePlan || null;
@@ -150,15 +142,6 @@ async function getReservationReportData() {
                     ? String(reservation.vehicle_id)
                     : "",
             vehicleName: getReportVehicleLabel(vehicle),
-            /*
-        |--------------------------------------------------------------------------
-        | Requester
-        |--------------------------------------------------------------------------
-        |
-        | Current Reservation model may not have a generic requester field.
-        | Use patient/requester-related fields only when actually available.
-        |
-        */
             requester:
                 reservation.requester_name ||
                 reservation.patient_name ||
@@ -174,19 +157,8 @@ async function getReservationReportData() {
             raw: reservation,
         };
     });
-}
 
-/* ==========================================
-   DISPATCH
-========================================== */
-async function getDispatchReportData() {
-    const data = await fetchReportsJson("/dispatch");
-    const dispatches = Array.isArray(data?.dispatches)
-        ? data.dispatches
-        : Array.isArray(data)
-          ? data
-          : [];
-    return dispatches.map((dispatch) => {
+    const dispatches = dispatchesRaw.map((dispatch) => {
         const reservation = dispatch.reservation || null;
         const vehicle = reservation?.vehicle || dispatch.vehicle || null;
         const driver = reservation?.driver || dispatch.driver || null;
@@ -221,97 +193,48 @@ async function getDispatchReportData() {
             raw: dispatch,
         };
     });
-}
 
-/* ==========================================
-   MAINTENANCE
-========================================== */
+    const maintenance = maintenanceRaw.map((record) => ({
+        id: String(record.id ?? ""),
+        maintenanceNumber: record.maintenance_number || String(record.id || ""),
+        date: normalizeReportDate(record.maintenance_date),
+        completionDate: normalizeReportDate(record.completion_date),
+        vehicleId: record.vehicle_id != null ? String(record.vehicle_id) : "",
+        vehicleName: getReportVehicleLabel(record.vehicle),
+        type: record.maintenance_type || "",
+        status: record.status || "",
+        cost: record.cost != null ? Number(record.cost) : null,
+        serviceProvider: record.technician || "",
+        department: record.vehicle?.department || null,
+        raw: record,
+    }));
 
-async function getMaintenanceReportData() {
-    const data = await fetchReportsJson("/maintenance");
-    const maintenances = Array.isArray(data?.maintenances)
-        ? data.maintenances
-        : [];
-    return maintenances.map((maintenance) => {
-        const vehicle = maintenance.vehicle || null;
-        return {
-            id: String(maintenance.id ?? ""),
-
-            maintenanceNumber:
-                maintenance.maintenance_number || String(maintenance.id || ""),
-            date: normalizeReportDate(maintenance.maintenance_date),
-            completionDate: normalizeReportDate(maintenance.completion_date),
-            vehicleId:
-                maintenance.vehicle_id != null
-                    ? String(maintenance.vehicle_id)
-                    : "",
-            vehicleName: getReportVehicleLabel(vehicle),
-            type: maintenance.maintenance_type || "",
-            status: maintenance.status || "",
-            cost: maintenance.cost != null ? Number(maintenance.cost) : null,
-            /*
-        |--------------------------------------------------------------------------
-        | Current Maintenance schema has technician, not service_provider.
-        |--------------------------------------------------------------------------
-        */
-            serviceProvider: maintenance.technician || "",
-            department: vehicle?.department || null,
-            raw: maintenance,
-        };
-    });
-}
-
-/* ==========================================
-   FUEL
-========================================== */
-
-async function getFuelReportData() {
-    const data = await fetchReportsJson("/fuel-records");
-    const fuelLogs = Array.isArray(data?.fuelLogs) ? data.fuelLogs : [];
-    return fuelLogs.map((fuel) => {
-        const vehicle = fuel.vehicle || null;
-        const driver = fuel.driver || null;
-        return {
-            id: String(fuel.id ?? ""),
-            fuelRecordNumber: fuel.fuel_number || String(fuel.id || ""),
-            date: normalizeReportDate(fuel.date),
-            vehicleId: fuel.vehicle_id != null ? String(fuel.vehicle_id) : "",
-            vehicleName: getReportVehicleLabel(vehicle),
-            driverId: fuel.driver_id != null ? String(fuel.driver_id) : "",
-            driverName: getReportDriverLabel(driver),
-            fuelType: fuel.fuel_type || "",
-            quantity: Number(fuel.fuel_amount) || 0,
-            costPerLiter: Number(fuel.cost_per_liter) || 0,
-            totalCost: Number(fuel.cost) || 0,
-            odometer: Number(fuel.odometer) || 0,
-            station: fuel.fuel_station || "",
-            department: vehicle?.department || null,
-            raw: fuel,
-        };
-    });
-}
-
-/* ==========================================
-   LOAD ALL REPORT SOURCES
-========================================== */
-
-async function getAllReportsSourceData() {
-    const [vehicles, reservations, dispatches, drivers, maintenance, fuel] =
-        await Promise.all([
-            getVehicleReportData(),
-            getReservationReportData(),
-            getDispatchReportData(),
-            getDriverReportData(),
-            getMaintenanceReportData(),
-            getFuelReportData(),
-        ]);
+    const fuel = fuelRaw.map((record) => ({
+        id: String(record.id ?? ""),
+        fuelRecordNumber: record.fuel_number || String(record.id || ""),
+        date: normalizeReportDate(record.date),
+        vehicleId: record.vehicle_id != null ? String(record.vehicle_id) : "",
+        vehicleName: getReportVehicleLabel(record.vehicle),
+        driverId: record.driver_id != null ? String(record.driver_id) : "",
+        driverName: getReportDriverLabel(record.driver),
+        fuelType: record.fuel_type || "",
+        quantity: Number(record.fuel_amount) || 0,
+        costPerLiter: Number(record.cost_per_liter) || 0,
+        totalCost: Number(record.cost) || 0,
+        odometer: Number(record.odometer) || 0,
+        station: record.fuel_station || "",
+        department: record.vehicle?.department || null,
+        raw: record,
+    }));
 
     return {
         vehicles,
+        drivers,
         reservations,
         dispatches,
-        drivers,
         maintenance,
         fuel,
+
+        scope: data?.scope || {},
     };
 }

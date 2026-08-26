@@ -131,6 +131,9 @@ async function applyReportPreset(preset) {
     if (typeof syncCustomDateInputs === "function") {
         syncCustomDateInputs();
     }
+    if (typeof applyReportsScopeUi === "function") {
+        applyReportsScopeUi();
+    }
     if (typeof refreshReportsDashboard === "function") {
         await refreshReportsDashboard({
             resetTablePage: true,

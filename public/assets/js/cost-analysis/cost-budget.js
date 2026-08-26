@@ -32,6 +32,16 @@ function emptyCostBudgetConfig() {
     };
 }
 
+//   RBAC
+function canManageCostBudget() {
+    return (
+        window.FleetRBAC?.hasPermission?.(
+            "cost_analysis",
+            "canManageBudget",
+        ) === true
+    );
+}
+
 function parseBudgetNumber(value) {
     if (value == null || value === "") return null;
     const n = Number(value);
@@ -453,6 +463,9 @@ function renderCategoryBudgetTable(rows) {
    MODAL
 ========================================== */
 function openCostBudgetModal() {
+    if (!canManageCostBudget()) {
+        return;
+    }
     const modal = document.getElementById("costBudgetModal");
     if (!modal) {
         return;
@@ -522,6 +535,9 @@ function syncBudgetModalPeriodFields() {
    SAVE BUDGET
 ========================================== */
 async function saveCostBudgetFromModal() {
+    if (!canManageCostBudget()) {
+        return;
+    }
     const overall = parseBudgetNumber(
         document.getElementById("budgetOverallInput")?.value,
     );
@@ -646,6 +662,9 @@ async function saveCostBudgetFromModal() {
    CLEAR ACTIVE BUDGET
 ========================================== */
 async function clearActiveCostBudget() {
+    if (!canManageCostBudget()) {
+        return;
+    }
     const ok = window.confirm(
         "Clear the active budget configuration?\n\nBudget history will be kept.",
     );
@@ -679,6 +698,9 @@ async function clearActiveCostBudget() {
    CLEAR HISTORY
 ========================================== */
 async function clearCostBudgetHistory() {
+    if (!canManageCostBudget()) {
+        return;
+    }
     const ok = window.confirm("Clear all budget history entries?");
     if (!ok) {
         return;
@@ -721,41 +743,42 @@ async function initCostBudgetControls() {
   | Modal Controls
   |--------------------------------------------------------------------------
   */
-    document
-        .getElementById("openCostBudgetModal")
-        ?.addEventListener("click", openCostBudgetModal);
-    document
-        .getElementById("editCostBudget")
-        ?.addEventListener("click", openCostBudgetModal);
-    document
-        .getElementById("closeCostBudgetModal")
-        ?.addEventListener("click", closeCostBudgetModal);
-    document
-        .getElementById("cancelCostBudgetModal")
-        ?.addEventListener("click", closeCostBudgetModal);
-    document
-        .getElementById("costBudgetModal")
-        ?.addEventListener("click", (event) => {
-            if (event.target.id === "costBudgetModal") {
-                closeCostBudgetModal();
-            }
-        });
-    document
-        .getElementById("budgetPeriodType")
-        ?.addEventListener("change", syncBudgetModalPeriodFields);
-    document
-        .getElementById("saveCostBudgetForm")
-        ?.addEventListener("submit", async (event) => {
-            event.preventDefault();
-
-            await saveCostBudgetFromModal();
-        });
-    document
-        .getElementById("clearCostBudget")
-        ?.addEventListener("click", clearActiveCostBudget);
-    document
-        .getElementById("clearCostBudgetHistory")
-        ?.addEventListener("click", clearCostBudgetHistory);
+    if (canManageCostBudget()) {
+        document
+            .getElementById("openCostBudgetModal")
+            ?.addEventListener("click", openCostBudgetModal);
+        document
+            .getElementById("editCostBudget")
+            ?.addEventListener("click", openCostBudgetModal);
+        document
+            .getElementById("closeCostBudgetModal")
+            ?.addEventListener("click", closeCostBudgetModal);
+        document
+            .getElementById("cancelCostBudgetModal")
+            ?.addEventListener("click", closeCostBudgetModal);
+        document
+            .getElementById("costBudgetModal")
+            ?.addEventListener("click", (event) => {
+                if (event.target.id === "costBudgetModal") {
+                    closeCostBudgetModal();
+                }
+            });
+        document
+            .getElementById("budgetPeriodType")
+            ?.addEventListener("change", syncBudgetModalPeriodFields);
+        document
+            .getElementById("saveCostBudgetForm")
+            ?.addEventListener("submit", async (event) => {
+                event.preventDefault();
+                await saveCostBudgetFromModal();
+            });
+        document
+            .getElementById("clearCostBudget")
+            ?.addEventListener("click", clearActiveCostBudget);
+        document
+            .getElementById("clearCostBudgetHistory")
+            ?.addEventListener("click", clearCostBudgetHistory);
+    }
     /*
   |--------------------------------------------------------------------------
   | Escape Key

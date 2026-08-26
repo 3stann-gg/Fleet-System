@@ -61,9 +61,15 @@
       </div>
 
       <div class="view-vehicle-details">
+        <!--
         <div class="view-vehicle-detail-item">
           <label>Model / Subtitle</label>
-          <p id="viewVehicleSubtitle"></p>
+          <p id=""viewVehicleModelSubtitle""></p>
+        </div>
+        -->
+        <div class="view-vehicle-detail-item">
+          <label>Department</label>
+          <p id="viewVehicleDepartment"></p>
         </div>
 
         <div class="view-vehicle-detail-item">

@@ -14,10 +14,16 @@
                   vehicles.
                 </p>
               </div>
-              <button type="button" class="btn-primary" id="newRouteBtn">
-                <i class="ph ph-plus"></i>
-                New Route
-              </button>
+              @if($routePermissions['canCreate'] ?? false)
+                  <button
+                      type="button"
+                      class="btn-primary"
+                      id="newRouteBtn"
+                  >
+                      <i class="ph ph-plus"></i>
+                      New Route
+                  </button>
+              @endif
             </div>
 
             <div class="stats-grid">
@@ -132,23 +138,53 @@
               </div>
             </div>
 
-            <div class="route-templates-bar" aria-label="Route templates">
-              <select class="filter-select" id="routeTemplateSelect" aria-label="Route templates">
-                <option value="">Route templates…</option>
-              </select>
-              <button type="button" class="btn-outline" id="applyRouteTemplate" disabled>
-                Apply Template
-              </button>
-              <button type="button" class="btn-outline" id="saveRouteTemplate">
-                Save as Template
-              </button>
-              <button type="button" class="btn-outline" id="renameRouteTemplate" disabled>
-                Rename
-              </button>
-              <button type="button" class="btn-outline" id="deleteRouteTemplate" disabled>
-                Delete
-              </button>
-            </div>
+            @if($routePermissions['canCreate'] ?? false)
+                <div
+                    class="route-templates-bar"
+                    aria-label="Route templates"
+                >
+                    <select
+                        class="filter-select"
+                        id="routeTemplateSelect"
+                        aria-label="Route templates"
+                    >
+                        <option value="">
+                            Route templates…
+                        </option>
+                    </select>
+                    <button
+                        type="button"
+                        class="btn-outline"
+                        id="applyRouteTemplate"
+                        disabled
+                    >
+                        Apply Template
+                    </button>
+                    <button
+                        type="button"
+                        class="btn-outline"
+                        id="saveRouteTemplate"
+                    >
+                        Save as Template
+                    </button>
+                    <button
+                        type="button"
+                        class="btn-outline"
+                        id="renameRouteTemplate"
+                        disabled
+                    >
+                        Rename
+                    </button>
+                    <button
+                        type="button"
+                        class="btn-outline"
+                        id="deleteRouteTemplate"
+                        disabled
+                    >
+                        Delete
+                    </button>
+                </div>
+            @endif
 
             <div class="route-planning-layout">
               <div class="card route-map-card">
@@ -280,211 +316,251 @@
           </div>
         </section>
 
-    <!-- New / Edit Route Modal -->
-    <div id="routeFormModal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="routeFormModalTitle">
-      <div class="custom-modal">
-        <div class="modal-header">
-          <div>
-            <h2 id="routeFormModalTitle">New Route</h2>
-            <p>Plan a transportation route before dispatch.</p>
+
+    @if(
+        ($routePermissions['canCreate'] ?? false) ||
+        ($routePermissions['canUpdate'] ?? false)
+    )
+        <!-- New / Edit Route Modal -->
+      <div id="routeFormModal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="routeFormModalTitle">
+        <div class="custom-modal">
+          <div class="modal-header">
+            <div>
+              <h2 id="routeFormModalTitle">New Route</h2>
+              <p>Plan a transportation route before dispatch.</p>
+            </div>
+            <button type="button" class="modal-close" id="closeRouteFormModal" aria-label="Close route form">
+              <i class="ph ph-x"></i>
+            </button>
           </div>
-          <button type="button" class="modal-close" id="closeRouteFormModal" aria-label="Close route form">
-            <i class="ph ph-x"></i>
-          </button>
-        </div>
-        <div class="modal-body">
-          <form id="routeForm">
-            <div class="form-grid">
-              <div class="form-group">
-                <label for="routeNumber">Route Number</label>
-                <input type="text" id="routeNumber" readonly />
-              </div>
-              <div class="form-group">
-                  <label for="routeReservation">Reservation Number *</label>
-                  <select id="routeReservation" required>
-                      <option value="">Select approved reservation</option>
+          <div class="modal-body">
+            <form id="routeForm">
+              <div class="form-grid">
+                <div class="form-group">
+                  <label for="routeNumber">Route Number</label>
+                  <input type="text" id="routeNumber" readonly />
+                </div>
+                <div class="form-group">
+                    <label for="routeReservation">Reservation Number *</label>
+                    <select id="routeReservation" required>
+                        <option value="">Select approved reservation</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                  <label for="routePriority">Priority *</label>
+                  <select id="routePriority" required>
+                    <option value="Low">Low</option>
+                    <option value="Normal" selected>Normal</option>
+                    <option value="High">High</option>
+                    <option value="Emergency">Emergency</option>
                   </select>
+                </div>
+                <div class="form-group">
+                  <label for="routeOrigin">Origin *</label>
+                  <input type="text" id="routeOrigin" placeholder="Pickup location" required />
+                </div>
+                <div class="form-group">
+                  <label for="routeDestination">Destination *</label>
+                  <input type="text" id="routeDestination" placeholder="Drop-off location" required />
+                </div>
+                <div class="form-group full-width">
+                  <label>Stops</label>
+                  <div id="routeStopsList"></div>
+                  <button type="button" class="btn-outline" id="addRouteStopBtn">
+                    <i class="ph ph-plus"></i>
+                    Add Stop
+                  </button>
+                </div>
+                <div class="form-group">
+                  <label for="routeVehicle">Vehicle *</label>
+                  <select id="routeVehicle" disabled>
+                      <option value="">Select reservation first</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label for="routeDriver">Driver *</label>
+                  <select id="routeDriver" disabled>
+                      <option value="">Select reservation first</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label for="routeDepartment">Department *</label>
+                  <select id="routeDepartment" required></select>
+                </div>
+                <div class="form-group">
+                  <label for="routeStatus">Status *</label>
+                  <select id="routeStatus" required>
+                    <option value="Draft">Draft</option>
+                    <option value="Planned">Planned</option>
+                    <option value="Ready For Dispatch">Ready For Dispatch</option>
+                    <option value="Completed">Completed</option>
+                    <option value="Archived">Archived</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label for="routeDepartureDate">Departure Date *</label>
+                  <input type="date" id="routeDepartureDate" required />
+                </div>
+                <div class="form-group">
+                  <label for="routeDepartureTime">Departure Time *</label>
+                  <input type="time" id="routeDepartureTime" required />
+                </div>
+                <div class="form-group">
+                  <label for="routeEstimatedDistance">Estimated Distance</label>
+                  <input type="text" id="routeEstimatedDistance" readonly placeholder="Run optimization" />
+                </div>
+                <div class="form-group">
+                  <label for="routeEstimatedTime">Estimated Travel Time</label>
+                  <input type="text" id="routeEstimatedTime" readonly placeholder="Run optimization" />
+                </div>
+                <div class="form-group">
+                  <label for="routeOptStrategy">Optimization Strategy</label>
+                  <input type="text" id="routeOptStrategy" readonly />
+                </div>
+                <div class="form-group">
+                  <label for="routeOptScore">Optimization Score</label>
+                  <input type="text" id="routeOptScore" readonly />
+                </div>
+                <div class="form-group full-width">
+                  <label for="routePurpose">Purpose</label>
+                  <input type="text" id="routePurpose" placeholder="Trip purpose" />
+                </div>
+                <div class="form-group full-width">
+                  <label for="routeNotes">Notes</label>
+                  <textarea id="routeNotes" rows="3" placeholder="Optional notes"></textarea>
+                </div>
               </div>
-              <div class="form-group">
-                <label for="routePriority">Priority *</label>
-                <select id="routePriority" required>
-                  <option value="Low">Low</option>
-                  <option value="Normal" selected>Normal</option>
-                  <option value="High">High</option>
-                  <option value="Emergency">Emergency</option>
-                </select>
+              <div id="routeOptimizeSummary" class="route-optimize-summary" hidden></div>
+              <div class="modal-footer">
+                <button type="button" class="btn-outline" id="cancelRouteForm">Cancel</button>
+                <button type="button" class="btn-outline" id="saveRouteTemplateFromForm">
+                  Save as Template
+                </button>
+                <button type="button" class="btn-outline" id="optimizeRouteBtn">
+                  <i class="ph ph-path"></i>
+                  Optimize Route
+                </button>
+                <button type="submit" class="btn-primary" id="saveRouteBtn">Save Route</button>
               </div>
-              <div class="form-group">
-                <label for="routeOrigin">Origin *</label>
-                <input type="text" id="routeOrigin" placeholder="Pickup location" required />
+            </form>
+          </div>
+        </div>
+      </div>
+    @endif
+
+      <!-- View Route Modal -->
+      <div id="viewRouteModal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="viewRouteModalTitle">
+        <div class="custom-modal">
+          <div class="modal-header">
+            <div>
+              <h2 id="viewRouteModalTitle">Route Details</h2>
+              <p>Read-only planned route information.</p>
+            </div>
+            <button type="button" class="modal-close" id="closeViewRouteModal" aria-label="Close route details">
+              <i class="ph ph-x"></i>
+            </button>
+          </div>
+          <div class="modal-body">
+            <div class="view-route-grid">
+              <div><label>Route Number</label><p id="viewRouteNumber"></p></div>
+              <div><label>Status</label><p id="viewRouteStatus"></p></div>
+              <div><label>Priority</label><p id="viewRoutePriority"></p></div>
+              <div><label>Departure</label><p id="viewRouteDeparture"></p></div>
+              <div><label>Origin</label><p id="viewRouteOrigin"></p></div>
+              <div><label>Destination</label><p id="viewRouteDestination"></p></div>
+              <div><label>Stops</label><p id="viewRouteStops"></p></div>
+              <div><label>Department</label><p id="viewRouteDepartment"></p></div>
+              <div><label>Vehicle</label><p id="viewRouteVehicle"></p></div>
+              <div><label>Driver</label><p id="viewRouteDriver"></p></div>
+              <div><label>Distance</label><p id="viewRouteDistance"></p></div>
+              <div><label>Travel Time</label><p id="viewRouteTime"></p></div>
+              <div><label>Strategy</label><p id="viewRouteStrategy"></p></div>
+              <div><label>Score</label><p id="viewRouteScore"></p></div>
+              <div><label>Purpose</label><p id="viewRoutePurpose"></p></div>
+              <div><label>Created</label><p id="viewRouteCreated"></p></div>
+              <div><label>Updated</label><p id="viewRouteUpdated"></p></div>
+              <div style="grid-column: 1 / -1"><label>Notes</label><p id="viewRouteNotes"></p></div>
+              <div style="grid-column: 1 / -1">
+                <label>Status History / Timeline</label>
+                <ul class="route-timeline" id="viewRouteTimeline"></ul>
               </div>
-              <div class="form-group">
-                <label for="routeDestination">Destination *</label>
-                <input type="text" id="routeDestination" placeholder="Drop-off location" required />
-              </div>
-              <div class="form-group full-width">
-                <label>Stops</label>
-                <div id="routeStopsList"></div>
-                <button type="button" class="btn-outline" id="addRouteStopBtn">
-                  <i class="ph ph-plus"></i>
-                  Add Stop
+            </div>
+          </div>
+          <div class="modal-footer">
+              <button
+                  type="button"
+                  class="btn-outline"
+                  id="closeViewRouteBtn"
+              >
+                  Close
+              </button>
+              @if($routePermissions['canDuplicate'] ?? false)
+                  <button
+                      type="button"
+                      class="btn-outline"
+                      id="duplicateRouteFromViewBtn"
+                  >
+                      <i class="ph ph-copy"></i>
+                      Duplicate
+                  </button>
+              @endif
+              @if($routePermissions['canArchive'] ?? false)
+                  <button
+                      type="button"
+                      class="btn-outline"
+                      id="archiveRouteFromViewBtn"
+                  >
+                      <i class="ph ph-archive"></i>
+                      Archive
+                  </button>
+              @endif
+              @if($routePermissions['canRestore'] ?? false)
+                  <button
+                      type="button"
+                      class="btn-outline"
+                      id="restoreRouteFromViewBtn"
+                      hidden
+                  >
+                      <i class="ph ph-arrow-counter-clockwise"></i>
+                      Restore
+                  </button>
+              @endif
+              @if($routePermissions['canUpdate'] ?? false)
+                  <button
+                      type="button"
+                      class="btn-primary"
+                      id="editRouteFromViewBtn"
+                  >
+                      <i class="ph ph-pencil-simple"></i>
+                      Edit Route
+                  </button>
+              @endif
+          </div>
+        </div>
+      </div>
+
+      @if($routePermissions['canDelete'] ?? false)
+          <!-- Delete Route Modal -->
+          <div id="deleteRouteModal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="deleteRouteModalTitle">
+            <div class="custom-modal delete-modal">
+              <button type="button" class="modal-close" id="closeDeleteRouteModal" aria-label="Close delete route modal">
+                <i class="ph ph-x"></i>
+              </button>
+              <div class="delete-icon"><i class="ph-fill ph-warning-circle"></i></div>
+              <h2 id="deleteRouteModalTitle">Delete Route</h2>
+              <p id="deleteRouteModalDescription">Are you sure you want to delete this route?</p>
+              <p class="delete-note">This action cannot be undone.</p>
+              <div class="modal-footer">
+                <button type="button" class="btn-outline" id="cancelDeleteRoute">Cancel</button>
+                <button type="button" class="btn-danger" id="confirmDeleteRoute">
+                  <i class="ph ph-trash"></i>
+                  Delete Route
                 </button>
               </div>
-              <div class="form-group">
-                <label for="routeVehicle">Vehicle *</label>
-                <select id="routeVehicle" disabled>
-                    <option value="">Select reservation first</option>
-                </select>
-              </div>
-              <div class="form-group">
-                <label for="routeDriver">Driver *</label>
-                <select id="routeDriver" disabled>
-                    <option value="">Select reservation first</option>
-                </select>
-              </div>
-              <div class="form-group">
-                <label for="routeDepartment">Department *</label>
-                <select id="routeDepartment" required></select>
-              </div>
-              <div class="form-group">
-                <label for="routeStatus">Status *</label>
-                <select id="routeStatus" required>
-                  <option value="Draft">Draft</option>
-                  <option value="Planned">Planned</option>
-                  <option value="Ready For Dispatch">Ready For Dispatch</option>
-                  <option value="Completed">Completed</option>
-                  <option value="Archived">Archived</option>
-                </select>
-              </div>
-              <div class="form-group">
-                <label for="routeDepartureDate">Departure Date *</label>
-                <input type="date" id="routeDepartureDate" required />
-              </div>
-              <div class="form-group">
-                <label for="routeDepartureTime">Departure Time *</label>
-                <input type="time" id="routeDepartureTime" required />
-              </div>
-              <div class="form-group">
-                <label for="routeEstimatedDistance">Estimated Distance</label>
-                <input type="text" id="routeEstimatedDistance" readonly placeholder="Run optimization" />
-              </div>
-              <div class="form-group">
-                <label for="routeEstimatedTime">Estimated Travel Time</label>
-                <input type="text" id="routeEstimatedTime" readonly placeholder="Run optimization" />
-              </div>
-              <div class="form-group">
-                <label for="routeOptStrategy">Optimization Strategy</label>
-                <input type="text" id="routeOptStrategy" readonly />
-              </div>
-              <div class="form-group">
-                <label for="routeOptScore">Optimization Score</label>
-                <input type="text" id="routeOptScore" readonly />
-              </div>
-              <div class="form-group full-width">
-                <label for="routePurpose">Purpose</label>
-                <input type="text" id="routePurpose" placeholder="Trip purpose" />
-              </div>
-              <div class="form-group full-width">
-                <label for="routeNotes">Notes</label>
-                <textarea id="routeNotes" rows="3" placeholder="Optional notes"></textarea>
-              </div>
-            </div>
-            <div id="routeOptimizeSummary" class="route-optimize-summary" hidden></div>
-            <div class="modal-footer">
-              <button type="button" class="btn-outline" id="cancelRouteForm">Cancel</button>
-              <button type="button" class="btn-outline" id="saveRouteTemplateFromForm">
-                Save as Template
-              </button>
-              <button type="button" class="btn-outline" id="optimizeRouteBtn">
-                <i class="ph ph-path"></i>
-                Optimize Route
-              </button>
-              <button type="submit" class="btn-primary" id="saveRouteBtn">Save Route</button>
-            </div>
-          </form>
-        </div>
-      </div>
-    </div>
-
-    <!-- View Route Modal -->
-    <div id="viewRouteModal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="viewRouteModalTitle">
-      <div class="custom-modal">
-        <div class="modal-header">
-          <div>
-            <h2 id="viewRouteModalTitle">Route Details</h2>
-            <p>Read-only planned route information.</p>
-          </div>
-          <button type="button" class="modal-close" id="closeViewRouteModal" aria-label="Close route details">
-            <i class="ph ph-x"></i>
-          </button>
-        </div>
-        <div class="modal-body">
-          <div class="view-route-grid">
-            <div><label>Route Number</label><p id="viewRouteNumber"></p></div>
-            <div><label>Status</label><p id="viewRouteStatus"></p></div>
-            <div><label>Priority</label><p id="viewRoutePriority"></p></div>
-            <div><label>Departure</label><p id="viewRouteDeparture"></p></div>
-            <div><label>Origin</label><p id="viewRouteOrigin"></p></div>
-            <div><label>Destination</label><p id="viewRouteDestination"></p></div>
-            <div><label>Stops</label><p id="viewRouteStops"></p></div>
-            <div><label>Department</label><p id="viewRouteDepartment"></p></div>
-            <div><label>Vehicle</label><p id="viewRouteVehicle"></p></div>
-            <div><label>Driver</label><p id="viewRouteDriver"></p></div>
-            <div><label>Distance</label><p id="viewRouteDistance"></p></div>
-            <div><label>Travel Time</label><p id="viewRouteTime"></p></div>
-            <div><label>Strategy</label><p id="viewRouteStrategy"></p></div>
-            <div><label>Score</label><p id="viewRouteScore"></p></div>
-            <div><label>Purpose</label><p id="viewRoutePurpose"></p></div>
-            <div><label>Created</label><p id="viewRouteCreated"></p></div>
-            <div><label>Updated</label><p id="viewRouteUpdated"></p></div>
-            <div style="grid-column: 1 / -1"><label>Notes</label><p id="viewRouteNotes"></p></div>
-            <div style="grid-column: 1 / -1">
-              <label>Status History / Timeline</label>
-              <ul class="route-timeline" id="viewRouteTimeline"></ul>
             </div>
           </div>
-        </div>
-        <div class="modal-footer">
-          <button type="button" class="btn-outline" id="closeViewRouteBtn">Close</button>
-          <button type="button" class="btn-outline" id="duplicateRouteFromViewBtn">
-            <i class="ph ph-copy"></i>
-            Duplicate
-          </button>
-          <button type="button" class="btn-outline" id="archiveRouteFromViewBtn">
-            <i class="ph ph-archive"></i>
-            Archive
-          </button>
-          <button type="button" class="btn-outline" id="restoreRouteFromViewBtn" hidden>
-            <i class="ph ph-arrow-counter-clockwise"></i>
-            Restore
-          </button>
-          <button type="button" class="btn-primary" id="editRouteFromViewBtn">
-            <i class="ph ph-pencil-simple"></i>
-            Edit Route
-          </button>
-        </div>
-      </div>
-    </div>
-
-    <!-- Delete Route Modal -->
-    <div id="deleteRouteModal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="deleteRouteModalTitle">
-      <div class="custom-modal delete-modal">
-        <button type="button" class="modal-close" id="closeDeleteRouteModal" aria-label="Close delete route modal">
-          <i class="ph ph-x"></i>
-        </button>
-        <div class="delete-icon"><i class="ph-fill ph-warning-circle"></i></div>
-        <h2 id="deleteRouteModalTitle">Delete Route</h2>
-        <p id="deleteRouteModalDescription">Are you sure you want to delete this route?</p>
-        <p class="delete-note">This action cannot be undone.</p>
-        <div class="modal-footer">
-          <button type="button" class="btn-outline" id="cancelDeleteRoute">Cancel</button>
-          <button type="button" class="btn-danger" id="confirmDeleteRoute">
-            <i class="ph ph-trash"></i>
-            Delete Route
-          </button>
-        </div>
-      </div>
-    </div>
+      @endif
+    
 
     <script>
       window.HIMS_GOOGLE_MAPS_KEY =
@@ -550,6 +626,16 @@
             language: "en",
         });
     </script>
+
+    <script>
+        window.FLEET_RBAC = window.FLEET_RBAC || {};
+        window.FLEET_RBAC.role =
+            @json(auth()->user()?->role);
+        window.FLEET_RBAC.route_planning =
+            @json($routePermissions ?? []);
+    </script>
+
+    <script src="{{ asset('assets/js/helpers/rbac.js') }}"></script>
 
     <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>

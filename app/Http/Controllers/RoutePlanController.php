@@ -8,9 +8,11 @@ use App\Models\FleetSetting;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 
 class RoutePlanController extends Controller
 {
+    use AuthorizesRequests;
     /**
      * Display route plans.
      */
@@ -35,18 +37,28 @@ class RoutePlanController extends Controller
     
     public function index(Request $request)
     {
+        $this->authorize('viewAny', RoutePlan::class);
+
+        $user = $request->user();
+
         $query = RoutePlan::with([
             'reservation.vehicle',
             'reservation.driver',
             'stops',
         ]);
 
+        $query =
+            $this->applyRouteVisibility(
+                $query,
+                $user
+            );
+        
+        
         /*
         |--------------------------------------------------------------------------
         | Search
         |--------------------------------------------------------------------------
         */
-
         if ($request->filled('search')) {
             $search = trim($request->search);
 
@@ -136,7 +148,44 @@ class RoutePlanController extends Controller
             ]);
         }
 
-        return view('route-planning.index');
+        $routePermissions = [
+            'role' =>
+                $user->role,
+            'canCreate' =>
+                $user->can(
+                    'create',
+                    RoutePlan::class
+                ),
+            'canUpdate' =>
+                $user->hasRole(
+                    'fleet_manager',
+                    'dispatcher'
+                ),
+            'canDelete' =>
+                $user->hasRole(
+                    'fleet_manager',
+                    'dispatcher'
+                ),
+            'canArchive' =>
+                $user->hasRole(
+                    'fleet_manager',
+                    'dispatcher'
+                ),
+            'canRestore' =>
+                $user->hasRole(
+                    'fleet_manager',
+                    'dispatcher'
+                ),
+            'canDuplicate' =>
+                $user->hasRole(
+                    'fleet_manager',
+                    'dispatcher'
+                ),
+        ];
+        return view(
+            'route-planning.index',
+            compact('routePermissions')
+        );
     }
 
     /**
@@ -144,6 +193,8 @@ class RoutePlanController extends Controller
      */
     public function availableReservations()
     {
+        $this->authorize('create', RoutePlan::class);
+
         $reservations = Reservation::with([
             'vehicle',
             'driver',
@@ -164,6 +215,8 @@ class RoutePlanController extends Controller
      */
    public function store(Request $request)
     {
+        $this->authorize('create', RoutePlan::class);
+
         $validator = Validator::make(
             $request->all(),
             [
@@ -379,6 +432,8 @@ class RoutePlanController extends Controller
      */
     public function show(RoutePlan $routePlan)
     {
+        $this->authorize('view', $routePlan);
+
         $routePlan->load([
             'reservation.vehicle',
             'reservation.driver',
@@ -397,6 +452,9 @@ class RoutePlanController extends Controller
         Request $request,
         RoutePlan $routePlan
     ) {
+
+        $this->authorize('update', $routePlan);
+
         $validator = Validator::make(
             $request->all(),
             [
@@ -672,6 +730,8 @@ class RoutePlanController extends Controller
      */
     public function archive(RoutePlan $routePlan)
     {
+        $this->authorize('update', $routePlan);
+
         $routePlan->load([
             'reservation.dispatch',
         ]);
@@ -724,6 +784,8 @@ class RoutePlanController extends Controller
      */
     public function restore(RoutePlan $routePlan)
     {
+        $this->authorize('update', $routePlan);
+
         $routePlan->load([
             'reservation.dispatch',
         ]);
@@ -799,6 +861,8 @@ class RoutePlanController extends Controller
      */
     public function destroy(RoutePlan $routePlan)
     {
+        $this->authorize('delete', $routePlan);
+
         $routePlan->load([
             'reservation.dispatch',
         ]);
@@ -862,6 +926,10 @@ class RoutePlanController extends Controller
         Request $request,
         RoutePlan $routePlan
     ) {
+        $this->authorize('view', $routePlan);
+
+        $this->authorize('create', RoutePlan::class);
+
         $validator = Validator::make(
             $request->all(),
             [
@@ -1043,42 +1111,67 @@ class RoutePlanController extends Controller
     /**
      * Route Planning statistics.
      */
-    public function stats()
-    {
-        $routes = RoutePlan::with([
+    public function stats(
+        Request $request
+    ) {
+        $this->authorize('viewAny', RoutePlan::class);
+
+        $user = $request->user();
+
+        $query = RoutePlan::with([
             'reservation.vehicle',
-        ])->get();
-        $activeRoutes = $routes->where(
-            'status',
-            '!=',
-            'Archived'
-        );
-        $ready = $activeRoutes
-            ->where(
+        ]);
+        $query =
+            $this->applyRouteVisibility(
+                $query,
+                $user
+            );
+
+        $routes =
+            $query->get();
+        $activeRoutes =
+            $routes->where(
                 'status',
-                'Ready For Dispatch'
-            )
-            ->count();
-        $highPriority = $activeRoutes
-            ->whereIn(
-                'priority',
-                ['High', 'Emergency']
-            )
-            ->count();
-        $distances = $activeRoutes
-            ->pluck('estimated_distance')
-            ->filter(
-                fn ($value) =>
-                    $value !== null &&
-                    (float) $value >= 0
+                '!=',
+                'Archived'
             );
-        $times = $activeRoutes
-            ->pluck('estimated_time')
-            ->filter(
-                fn ($value) =>
-                    $value !== null &&
-                    (int) $value >= 0
-            );
+        $ready =
+            $activeRoutes
+                ->where(
+                    'status',
+                    'Ready For Dispatch'
+                )
+                ->count();
+        $highPriority =
+            $activeRoutes
+                ->whereIn(
+                    'priority',
+                    [
+                        'High',
+                        'Emergency',
+                    ]
+                )
+                ->count();
+        $distances =
+            $activeRoutes
+                ->pluck(
+                    'estimated_distance'
+                )
+                ->filter(
+                    fn ($value) =>
+                        $value !== null &&
+                        (float) $value >= 0
+                );
+        $times =
+            $activeRoutes
+                ->pluck(
+                    'estimated_time'
+                )
+                ->filter(
+                    fn ($value) =>
+                        $value !== null &&
+                        (int) $value >= 0
+                );
         $averageDistance =
             $distances->count() > 0
                 ? round(
@@ -1092,15 +1185,17 @@ class RoutePlanController extends Controller
                     $times->avg()
                 )
                 : 0;
-
-        $assignedVehicles = $activeRoutes
-            ->map(
-                fn ($route) =>
-                    $route->reservation?->vehicle_id
-            )
-            ->filter()
-            ->unique()
-            ->count();
+        $assignedVehicles =
+            $activeRoutes
+                ->map(
+                    fn ($route) =>
+                        $route
+                            ->reservation
+                            ?->vehicle_id
+                )
+                ->filter()
+                ->unique()
+                ->count();
 
         return response()->json([
             'total' =>
@@ -1169,9 +1264,36 @@ class RoutePlanController extends Controller
      */
     public function nextNumber()
     {
+        $this->authorize('create', RoutePlan::class);
+
         return response()->json([
             'route_number' =>
                 $this->generateRouteNumber(),
         ]);
+    }
+
+    private function applyRouteVisibility(
+        $query,
+        $user
+    ) {
+        if ($user->hasRole('driver')) {
+            $driverId =
+                $user->driverProfile?->id;
+
+            if ($driverId) {
+                $query->whereHas(
+                    'reservation',
+                    fn ($reservation) =>
+                        $reservation->where(
+                            'driver_id',
+                            $driverId
+                        )
+                );
+            } else {
+                $query->whereRaw('1 = 0');
+            }
+        }
+
+        return $query;
     }
 }

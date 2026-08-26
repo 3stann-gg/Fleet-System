@@ -69,18 +69,18 @@ function saveRouteAsTemplateFromForm() {
 
   const now = new Date().toISOString();
   const template = {
-    id: existing?.id || "tpl-" + Date.now().toString(36),
-    name: trimmed,
-    origin: data.origin,
-    destination: data.destination,
-    stops: data.stops || [],
-    priority: data.priority || "Medium",
-    department: data.department || "",
-    purpose: data.purpose || "",
-    recommendedVehicle: data.vehicle || "",
-    optimizationStrategy: data.optimizationStrategy || "",
-    createdAt: existing?.createdAt || now,
-    updatedAt: now,
+      id: existing?.id || "tpl-" + Date.now().toString(36),
+      name: trimmed,
+      origin: data.origin,
+      destination: data.destination,
+      stops: data.stops || [],
+      priority: data.priority || "Normal",
+      department: data.department || "",
+      purpose: data.purpose || "",
+      recommendedVehicle: data.vehicle || "",
+      optimizationStrategy: data.optimizationStrategy || "",
+      createdAt: existing?.createdAt || now,
+      updatedAt: now,
   };
 
   const next = existing
@@ -104,38 +104,42 @@ function saveRouteAsTemplateFromForm() {
 }
 
 function applySelectedRouteTemplate() {
-  const select = document.getElementById("routeTemplateSelect");
-  const id = select?.value;
-  if (!id) return;
+    const select = document.getElementById("routeTemplateSelect");
+    const id = select?.value;
+    if (!id) return;
 
-  const template = readRouteTemplates().find((t) => t.id === id);
-  if (!template) {
-    renderRouteTemplateSelect();
-    return;
-  }
-
-  /* Open new route form if closed, then apply */
-  const modal = document.getElementById("routeFormModal");
-  if (!modal?.classList.contains("show")) {
-    if (typeof openRouteFormModal === "function") {
-      openRouteFormModal("add");
+    const template = readRouteTemplates().find((t) => t.id === id);
+    if (!template) {
+        renderRouteTemplateSelect();
+        return;
     }
-  }
 
-  document.getElementById("routeOrigin").value = template.origin || "";
-  document.getElementById("routeDestination").value = template.destination || "";
-  if (typeof renderRouteStops === "function") {
-    renderRouteStops(template.stops && template.stops.length ? template.stops : [""]);
-  }
-  if (template.priority) {
-    document.getElementById("routePriority").value = template.priority;
-  }
-  if (template.department) {
-    document.getElementById("routeDepartment").value = template.department;
-  }
-  if (template.purpose) {
-    document.getElementById("routePurpose").value = template.purpose;
-  }
+    /* Open new route form if closed, then apply */
+    const modal = document.getElementById("routeFormModal");
+    if (!modal?.classList.contains("show")) {
+        if (typeof openRouteFormModal === "function") {
+            openRouteFormModal("add");
+        }
+    }
+
+    document.getElementById("routeOrigin").value = template.origin || "";
+    document.getElementById("routeDestination").value =
+        template.destination || "";
+    if (typeof renderRouteStops === "function") {
+        renderRouteStops(
+            template.stops && template.stops.length ? template.stops : [""],
+        );
+    }
+    if (template.priority) {
+        document.getElementById("routePriority").value = template.priority;
+    }
+    if (template.department) {
+        document.getElementById("routeDepartment").value = template.department;
+    }
+    if (template.purpose) {
+        document.getElementById("routePurpose").value = template.purpose;
+    }
+    /*
   if (template.recommendedVehicle) {
     document.getElementById("routeVehicle").value = template.recommendedVehicle;
   }
@@ -143,10 +147,10 @@ function applySelectedRouteTemplate() {
     document.getElementById("routeOptStrategy").value =
       template.optimizationStrategy;
   }
-
-  if (typeof showToast === "function") {
-    showToast("Template applied: " + template.name, "success");
-  }
+  */
+    if (typeof showToast === "function") {
+        showToast("Template applied: " + template.name, "success");
+    }
 }
 
 function renameSelectedRouteTemplate() {

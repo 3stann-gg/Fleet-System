@@ -16,6 +16,62 @@ function escapeReportOptionHtml(value) {
         .replaceAll("'", "&#039;");
 }
 
+function applyReportsScopeUi() {
+    const scope = reportsState?.sources?.scope || {};
+
+    const departmentSelect = document.getElementById("reportDepartmentFilter");
+
+    if (scope.department && departmentSelect) {
+        departmentSelect.innerHTML = "";
+        const option = document.createElement("option");
+        option.value = scope.department;
+        option.textContent = scope.department;
+        departmentSelect.appendChild(option);
+        departmentSelect.value = scope.department;
+        departmentSelect.disabled = true;
+    }
+}
+
+function applyReportsTypeAccess() {
+    const select = document.getElementById("reportTypeFilter");
+    if (!select) {
+        return;
+    }
+    const permissions = window.FLEET_RBAC?.reports || {};
+    const allowed = Array.isArray(permissions.allowedReportTypes)
+        ? permissions.allowedReportTypes
+        : [];
+    if (!allowed.length) {
+        return;
+    }
+    const labels = {
+        overview: "Overview",
+        utilization: "Fleet Utilization",
+        trips: "Trip & Dispatch",
+        reservations: "Reservations",
+        maintenance: "Maintenance",
+        fuel: "Fuel & Cost",
+        drivers: "Driver Performance",
+    };
+    const current = select.value || "overview";
+    select.replaceChildren();
+    allowed.forEach((type) => {
+        if (!labels[type]) {
+            return;
+        }
+        const option = document.createElement("option");
+        option.value = type;
+        option.textContent = labels[type];
+        select.appendChild(option);
+    });
+
+    if (allowed.includes(current)) {
+        select.value = current;
+    } else {
+        select.value = allowed.includes("overview") ? "overview" : allowed[0];
+    }
+}
+
 function populateReportVehicleFilter(sources) {
     const select = document.getElementById("reportVehicleFilter");
 
@@ -150,6 +206,7 @@ async function initReportsPage() {
         return;
     }
     reportsPageInitialized = true;
+    applyReportsTypeAccess();
     /*
   |--------------------------------------------------------------------------
   | Initialize Table
@@ -172,6 +229,8 @@ async function initReportsPage() {
             reportsState.sources = await getAllReportsSourceData();
             populateReportVehicleFilter(reportsState.sources);
             populateReportDepartmentFilter(reportsState.sources);
+            applyReportsScopeUi();
+            applyReportsTypeAccess();
         }
     } catch (error) {
         console.error("Unable to load Reports filter sources:", error);
@@ -246,6 +305,8 @@ async function initReportsPage() {
           */
                 populateReportVehicleFilter(reportsState.sources);
                 populateReportDepartmentFilter(reportsState.sources);
+                applyReportsScopeUi();
+                applyReportsTypeAccess();
                 if (typeof showToast === "function") {
                     showToast("Reports refreshed.", "success");
                 }

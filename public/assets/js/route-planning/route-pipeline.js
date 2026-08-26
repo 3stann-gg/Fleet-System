@@ -595,23 +595,31 @@ function buildRouteTableRow(record) {
   |--------------------------------------------------------------------------
   | Delete Button
   |--------------------------------------------------------------------------
-  |
   | Backend allows delete only for
   | Draft / Planned Route Plans.
-  |
-  */
-    const canDelete = ["Draft", "Planned"].includes(record.status);
-    /*
   |--------------------------------------------------------------------------
   | Edit Button
   |--------------------------------------------------------------------------
-  |
   | Completed/Archived operational records
   | should not normally be edited.
-  |
   */
+    const hasUpdatePermission =
+        window.FleetRBAC?.hasPermission?.("route_planning", "canUpdate") ===
+        true;
+    const hasDeletePermission =
+        window.FleetRBAC?.hasPermission?.("route_planning", "canDelete") ===
+        true;
+    /*
+    |--------------------------------------------------------------------------
+    | Lifecycle + RBAC
+    |--------------------------------------------------------------------------
+    */
+    const canEdit =
+        hasUpdatePermission &&
+        !["Completed", "Archived"].includes(record.status);
 
-    const canEdit = !["Completed", "Archived"].includes(record.status);
+    const canDelete =
+        hasDeletePermission && ["Draft", "Planned"].includes(record.status);
 
     tr.innerHTML = `
     <td>
@@ -683,44 +691,56 @@ function buildRouteTableRow(record) {
     </td>
 
     <td>
-      <div class="action-buttons">
+        <div class="action-buttons">
+            <button
+            type="button"
+            class="action-btn view-route"
+            aria-label="View ${escapeRouteHtml(record.routeNumber)}"
+            title="View Route"
+            >
+            <i class="ph ph-eye"></i>
+            </button>
 
-        <button
-          type="button"
-          class="action-btn view-route"
-          aria-label="View ${escapeRouteHtml(record.routeNumber)}"
-          title="View Route"
-        >
-          <i class="ph ph-eye"></i>
-        </button>
+            ${
+                hasUpdatePermission
+                    ? `
+                        <button
+                        type="button"
+                        class="action-btn edit-route"
+                        aria-label="Edit ${escapeRouteHtml(record.routeNumber)}"
+                        title="${
+                            canEdit
+                                ? "Edit Route"
+                                : "This route can no longer be edited"
+                        }"
+                        ${canEdit ? "" : "disabled"}
+                        >
+                        <i class="ph ph-pencil-simple"></i>
+                        </button>
+                    `
+                    : ""
+            }
 
-        <button
-          type="button"
-          class="action-btn edit-route"
-          aria-label="Edit ${escapeRouteHtml(record.routeNumber)}"
-          title="${
-              canEdit ? "Edit Route" : "This route can no longer be edited"
-          }"
-          ${canEdit ? "" : "disabled"}
-        >
-          <i class="ph ph-pencil-simple"></i>
-        </button>
-
-        <button
-          type="button"
-          class="action-btn delete-route"
-          aria-label="Delete ${escapeRouteHtml(record.routeNumber)}"
-          title="${
-              canDelete
-                  ? "Delete Route"
-                  : "Only Draft or Planned routes can be deleted"
-          }"
-          ${canDelete ? "" : "disabled"}
-        >
-          <i class="ph ph-trash"></i>
-        </button>
-
-      </div>
+            ${
+                hasDeletePermission
+                    ? `
+                        <button
+                        type="button"
+                        class="action-btn delete-route"
+                        aria-label="Delete ${escapeRouteHtml(record.routeNumber)}"
+                        title="${
+                            canDelete
+                                ? "Delete Route"
+                                : "Only Draft or Planned routes can be deleted"
+                        }"
+                        ${canDelete ? "" : "disabled"}
+                        >
+                        <i class="ph ph-trash"></i>
+                        </button>
+                    `
+                    : ""
+            }
+        </div>
     </td>
   `;
 

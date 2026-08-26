@@ -15,6 +15,8 @@ use App\Http\Controllers\CostBudgetController;
 use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\FleetNotificationController;
 use App\Http\Controllers\FleetSearchController;
+use App\Http\Controllers\CostAnalysisController;
+use App\Http\Controllers\ReportController;
 
 
 /*
@@ -364,9 +366,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     */
     Route::middleware('fleet.module:fuel')->group(function () {
 
-        Route::view(
+        Route::get(
             '/fuel',
-            'fuel.index'
+            [FuelLogController::class, 'page']
         )->name('fuel');
 
         Route::get(
@@ -485,6 +487,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
         )->name('cost-analysis');
 
         Route::get(
+            '/cost-analysis/data',
+            [CostAnalysisController::class, 'data']
+        )->name('cost-analysis.data');
+
+        Route::get(
             '/cost-analysis/budget',
             [CostBudgetController::class, 'show']
         )->name('cost-analysis.budget.show');
@@ -519,10 +526,15 @@ Route::middleware(['auth', 'verified'])->group(function () {
     */
     Route::middleware('fleet.module:reports')->group(function () {
 
-        Route::view(
+        Route::get(
             '/reports',
-            'reports.index'
+            [ReportController::class, 'index']
         )->name('reports');
+
+        Route::get(
+            '/reports/data',
+            [ReportController::class, 'data']
+        )->name('reports.data');
 
     });
 

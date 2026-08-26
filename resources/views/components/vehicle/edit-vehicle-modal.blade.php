@@ -79,6 +79,28 @@
               <option>Motorcycle</option>
             </select>
           </div>
+
+          <div class="form-group">
+              <label for="editVehicleDepartment">
+                  Department
+                  <span
+                      id="editVehicleDepartmentRequiredMark"
+                      hidden
+                  >*</span>
+              </label>
+              <select
+                  id="editVehicleDepartment"
+                  name="department"
+              >
+                  <option value="">Select Department</option>
+                  <option value="Emergency">Emergency</option>
+                  <option value="Outpatient">Outpatient</option>
+                  <option value="Laboratory">Laboratory</option>
+                  <option value="Facilities">Facilities</option>
+                  <option value="Admin">Admin</option>
+                  <option value="Logistics">Logistics</option>
+              </select>
+          </div>
         
           <div class="form-group">
               <label for="editVehicleCapacity">Capacity</label>

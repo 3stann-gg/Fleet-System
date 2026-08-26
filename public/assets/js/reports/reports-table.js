@@ -268,7 +268,7 @@ function renderReportsTable() {
             : sorted === "desc"
               ? "ph-caret-down"
               : "ph-caret-up-down";
-        return `<th class="${sortable ? "sortable" : ""}" data-field="${escapeReportsTableHtml(col.key)}"" ${
+        return `<th class="${sortable ? "sortable" : ""}" data-field="${escapeReportsTableHtml(col.key)}" ${
             sorted
                 ? `aria-sort="${sorted === "asc" ? "ascending" : "descending"}"`
                 : ""

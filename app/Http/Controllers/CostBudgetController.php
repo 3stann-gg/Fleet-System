@@ -7,11 +7,16 @@ use App\Models\CostBudgetHistory;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 
 class CostBudgetController extends Controller
 {
+    use AuthorizesRequests;
+
     public function show()
     {
+        $this->authorize('viewAny', CostBudget::class);
+
         $budget = CostBudget::first();
 
         return response()->json([
@@ -23,6 +28,8 @@ class CostBudgetController extends Controller
 
     public function history()
     {
+        $this->authorize('viewAny', CostBudget::class);
+
         $history = CostBudgetHistory::query()
             ->latest('id')
             ->limit(50)
@@ -61,6 +68,8 @@ class CostBudgetController extends Controller
 
     public function save(Request $request)
     {
+        $this->authorize('manage', CostBudget::class);
+
         $validator = Validator::make(
             $request->all(),
             [
@@ -69,58 +78,48 @@ class CostBudgetController extends Controller
                     'numeric',
                     'min:0',
                 ],
-
                 'period_type' => [
                     'required',
                     'in:filter,monthly,quarterly,yearly,custom',
                 ],
-
                 'start_date' => [
                     'nullable',
                     'date',
                 ],
-
                 'end_date' => [
                     'nullable',
                     'date',
                     'after_or_equal:start_date',
                 ],
-
                 'notes' => [
                     'nullable',
                     'string',
                     'max:500',
                 ],
-
                 'category_budgets' => [
                     'nullable',
                     'array',
                 ],
-
                 'category_budgets.Fuel' => [
                     'nullable',
                     'numeric',
                     'min:0',
                 ],
-
                 'category_budgets.Maintenance' => [
                     'nullable',
                     'numeric',
                     'min:0',
                 ],
-
                 'category_budgets.TripOperations' => [
                     'nullable',
                     'numeric',
                     'min:0',
                 ],
-
                 'category_budgets.ReservationOperations' => [
                     'nullable',
                     'numeric',
                     'min:0',
                 ],
-
                 'category_budgets.Other' => [
                     'nullable',
                     'numeric',
@@ -245,6 +244,8 @@ class CostBudgetController extends Controller
 
     public function clear()
     {
+        $this->authorize('manage', CostBudget::class);
+
         try {
             DB::transaction(
                 function () {
@@ -294,6 +295,8 @@ class CostBudgetController extends Controller
 
     public function clearHistory()
     {
+        $this->authorize('manage', CostBudget::class);
+        
         CostBudgetHistory::query()
             ->delete();
 

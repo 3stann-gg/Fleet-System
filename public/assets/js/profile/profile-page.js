@@ -16,6 +16,14 @@ let profilePreviewUrl = null;
 /* ==========================================
    COMMON HELPERS
 ========================================== */
+//   RBAC
+function getProfilePermissions() {
+    return window.FLEET_RBAC?.profile || {};
+}
+function canEditAdministrativeProfile() {
+    return getProfilePermissions().canEditAdministrative === true;
+}
+
 function profileToast(message, type = "info") {
     if (typeof showToast === "function") {
         showToast(message, type);
@@ -174,6 +182,7 @@ function isValidProfilePhone(value) {
 
 function validateProfileForm() {
     profileClearErrors();
+
     let valid = true;
 
     const firstName = profileGetValue("profileFirstName");
@@ -186,30 +195,47 @@ function validateProfileForm() {
 
     if (!firstName) {
         profileSetError("profileFirstName", "First name is required.");
+
         valid = false;
     }
     if (!lastName) {
         profileSetError("profileLastName", "Last name is required.");
+
         valid = false;
     }
     if (!displayName) {
         profileSetError("profileDisplayName", "Display name is required.");
+
         valid = false;
     }
-    if (!department) {
-        profileSetError("profileDepartment", "Department is required.");
-        valid = false;
-    }
-    if (!jobTitle) {
-        profileSetError("profileJobTitle", "Job title is required.");
-        valid = false;
+
+    /*
+    |--------------------------------------------------------------------------
+    | Administrative Profile Fields
+    |--------------------------------------------------------------------------
+    | Only IT Admin may edit these fields.
+    |--------------------------------------------------------------------------
+    */
+    if (canEditAdministrativeProfile()) {
+        if (!department) {
+            profileSetError("profileDepartment", "Department is required.");
+
+            valid = false;
+        }
+        if (!jobTitle) {
+            profileSetError("profileJobTitle", "Job title is required.");
+
+            valid = false;
+        }
     }
     if (!isValidProfileEmail(email)) {
         profileSetError("profileEmail", "Enter a valid email address.");
+
         valid = false;
     }
     if (!isValidProfilePhone(mobile)) {
         profileSetError("profileMobile", "Enter a valid mobile number.");
+
         valid = false;
     }
     if (!valid) {
@@ -607,10 +633,17 @@ function initProfilePage() {
     });
 }
 
-if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", initProfilePage);
-} else {
+function initializeProfileScripts() {
     initProfilePage();
     initPasswordToggles();
+    /*
+     * Keep only if account deletion
+     * is actually supported.
+     */
     initDeleteAccountModal();
+}
+if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", initializeProfileScripts);
+} else {
+    initializeProfileScripts();
 }

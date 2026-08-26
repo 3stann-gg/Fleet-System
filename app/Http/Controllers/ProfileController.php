@@ -17,8 +17,32 @@ class ProfileController extends Controller
      */
     public function edit(Request $request): View
     {
+        $user = $request->user();
+
+        abort_unless(
+            $user->canViewModule('profile'),
+            403
+        );
+
+        $profilePermissions = [
+            'role' => $user->role,
+
+            'canEditPersonal' => true,
+
+            'canEditAdministrative' =>
+                $user->hasRole('it_admin'),
+
+            'canAccessSettings' =>
+                $user->hasRole(
+                    'fleet_manager',
+                    'it_admin'
+                ),
+        ];
+
         return view('profile.index', [
-            'user' => $request->user(),
+            'user' => $user,
+            'profilePermissions' =>
+                $profilePermissions,
         ]);
     }
 
@@ -30,14 +54,42 @@ class ProfileController extends Controller
     ): RedirectResponse {
         $user = $request->user();
 
+        abort_unless(
+            $user->canViewModule('profile'),
+            403
+        );
+
         $validated = $request->validated();
+
+        /*
+        |--------------------------------------------------------------------------
+        | Never Self-Edit Account Authorization Fields
+        |--------------------------------------------------------------------------
+        */
+        unset(
+            $validated['role'],
+            $validated['status'],
+            $validated['last_login_at'],
+            $validated['email_verified_at']
+        );
+        /*
+        |--------------------------------------------------------------------------
+        | Administrative Profile Fields
+        |--------------------------------------------------------------------------
+        */
+        if (!$user->hasRole('it_admin')) {
+            unset(
+                $validated['employee_id'],
+                $validated['department'],
+                $validated['job_title']
+            );
+        }
 
         /*
         |--------------------------------------------------------------------------
         | Remove profile photo if requested
         |--------------------------------------------------------------------------
         */
-
         if (
             $request->boolean(
                 'remove_profile_photo'
