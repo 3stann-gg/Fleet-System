@@ -23,6 +23,9 @@ function getProfilePermissions() {
 function canEditAdministrativeProfile() {
     return getProfilePermissions().canEditAdministrative === true;
 }
+function isDriverProfile() {
+    return window.FLEET_RBAC?.role === "driver";
+}
 
 function profileToast(message, type = "info") {
     if (typeof showToast === "function") {
@@ -193,20 +196,22 @@ function validateProfileForm() {
     const email = profileGetValue("profileEmail");
     const mobile = profileGetValue("profileMobile");
 
-    if (!firstName) {
-        profileSetError("profileFirstName", "First name is required.");
+    if (!isDriverProfile()) {
+        if (!firstName) {
+            profileSetError("profileFirstName", "First name is required.");
 
-        valid = false;
-    }
-    if (!lastName) {
-        profileSetError("profileLastName", "Last name is required.");
+            valid = false;
+        }
+        if (!lastName) {
+            profileSetError("profileLastName", "Last name is required.");
 
-        valid = false;
-    }
-    if (!displayName) {
-        profileSetError("profileDisplayName", "Display name is required.");
+            valid = false;
+        }
+        if (!displayName) {
+            profileSetError("profileDisplayName", "Display name is required.");
 
-        valid = false;
+            valid = false;
+        }
     }
 
     /*
@@ -228,12 +233,14 @@ function validateProfileForm() {
             valid = false;
         }
     }
+    /*
     if (!isValidProfileEmail(email)) {
         profileSetError("profileEmail", "Enter a valid email address.");
 
         valid = false;
     }
-    if (!isValidProfilePhone(mobile)) {
+    */
+    if (!isDriverProfile() && !isValidProfilePhone(mobile)) {
         profileSetError("profileMobile", "Enter a valid mobile number.");
 
         valid = false;
@@ -388,22 +395,41 @@ function removeProfilePhotoPreview() {
 ========================================== */
 function resetUserProfilePage() {
     const form = document.getElementById("userProfileForm");
+
     if (!form) {
         return;
     }
     clearProfilePreviewUrl();
+    /*
+    |--------------------------------------------------------------------------
+    | Restore original form values
+    |--------------------------------------------------------------------------
+    */
     form.reset();
     const removeInput = document.getElementById("removeProfilePhoto");
     if (removeInput) {
         removeInput.value = "0";
     }
     /*
-     * Because form.reset() restores the
-     * server-rendered original image state,
-     * reload is the cleanest way to restore
-     * the full profile preview exactly.
-     */
-    window.location.reload();
+    |--------------------------------------------------------------------------
+    | Reset photo state
+    |--------------------------------------------------------------------------
+    */
+    profilePhotoChanged = false;
+    profilePhotoRemoved = false;
+    /*
+    |--------------------------------------------------------------------------
+    | Restore preview/UI
+    |--------------------------------------------------------------------------
+    */
+    applyProfileLivePreview();
+    captureProfileBaseline();
+    /*
+    |--------------------------------------------------------------------------
+    | Reset Toast
+    |--------------------------------------------------------------------------
+    */
+    profileToast("Unsave changes discarded.", "info");
 }
 
 /* ==========================================

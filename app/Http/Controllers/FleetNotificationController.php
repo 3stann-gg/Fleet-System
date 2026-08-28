@@ -57,11 +57,44 @@ class FleetNotificationController extends Controller
                 */
                 ->filter(
                     function ($notification) use ($user) {
-                        return FleetNotificationService
-                            ::userCanAccessLink(
-                                $user,
-                                $notification->link
-                            );
+                        /*
+                        |--------------------------------------------------------------------------
+                        | Module RBAC
+                        |--------------------------------------------------------------------------
+                        */
+                        if (
+                            !FleetNotificationService
+                                ::userCanAccessLink(
+                                    $user,
+                                    $notification->link
+                                )
+                        ) {
+                            return false;
+                        }
+
+                        /*
+                        |--------------------------------------------------------------------------
+                        | Driver - owned notifications only
+                        |--------------------------------------------------------------------------
+                        */
+                        if (
+                            $user->hasRole(
+                                'driver'
+                            )
+                        ) {
+                            return FleetNotificationService
+                                ::driverOwnsNotification(
+                                    $user,
+                                    $notification
+                                );
+                        }
+
+                        /*
+                        |--------------------------------------------------------------------------
+                        | Other Roles
+                        |--------------------------------------------------------------------------
+                        */
+                        return true;
                     }
                 )
 
@@ -124,6 +157,21 @@ class FleetNotificationController extends Controller
             403
         );
 
+        if (
+            $user->hasRole(
+                'driver'
+            )
+        ) {
+            abort_unless(
+                FleetNotificationService
+                    ::driverOwnsNotification(
+                        $user,
+                        $notification
+                    ),
+                403
+            );
+        }
+
         $notification->update([
             'status' =>
                 'Read',
@@ -179,11 +227,29 @@ class FleetNotificationController extends Controller
             $notifications
                 ->filter(
                     function ($notification) use ($user) {
-                        return FleetNotificationService
-                            ::userCanAccessLink(
-                                $user,
-                                $notification->link
-                            );
+                        if (
+                            !FleetNotificationService
+                                ::userCanAccessLink(
+                                    $user,
+                                    $notification->link
+                                )
+                        ) {
+                            return false;
+                        }
+
+                        if (
+                            $user->hasRole(
+                                'driver'
+                            )
+                        ) {
+                            return FleetNotificationService
+                                ::driverOwnsNotification(
+                                    $user,
+                                    $notification
+                                );
+                        }
+
+                        return true;
                     }
                 )
                 ->pluck('id');

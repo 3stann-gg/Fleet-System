@@ -292,6 +292,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
         );
 
         Route::post(
+            '/drivers/{driver}/create-account',
+            [DriverController::class, 'createAccount']
+        )->name('drivers.create-account');
+
+        Route::post(
             '/drivers',
             [DriverController::class, 'store']
         )->name('drivers.store');

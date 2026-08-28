@@ -3,12 +3,16 @@
 namespace App\Http\Controllers;
 
 use App\Models\Driver;
+use App\Models\User;
 use App\Models\FleetSetting;
 use App\Services\FleetNotificationService;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 
 class DriverController extends Controller
@@ -185,90 +189,370 @@ class DriverController extends Controller
     public function store(Request $request)
     {
         $this->authorize('create', Driver::class);
-
         $driverSettings =
-        $this->getDriverSettings();
+            $this->getDriverSettings();
         $requireLicenseExpiry =
-            (bool) $driverSettings['requireLicenseExpiry'];
-        if (!$request->filled('status')) {
+            (bool)
+            $driverSettings[
+                'requireLicenseExpiry'
+            ];
+
+        if (
+            !$request->filled(
+                'status'
+            )
+        ) {
             $request->merge([
                 'status' =>
-                    $driverSettings['defaultStatus'],
+                    $driverSettings[
+                        'defaultStatus'
+                    ],
             ]);
         }
 
-       $validator = Validator::make($request->all(), [
-            'first_name'          => 'required|string|max:255',
-            'last_name'           => 'required|string|max:255',
-            'license_number'      => 'required|string|unique:drivers,license_number',
-            'license_class'       => 'required|string',
-            'license_expiry' => [
-                $requireLicenseExpiry
-                    ? 'required'
-                    : 'nullable',
-                'date',
-            ],
-            'contact_number'      => 'required|string|max:20',
-            'email'               => 'nullable|email|max:255',
-            'experience'          => 'nullable|integer|min:0',
-            'address'             => 'nullable|string',
-            'emergency_contact'   => 'nullable|string|max:20',
-            'notes'               => 'nullable|string',
-            'assigned_vehicle_id' => 'nullable|exists:vehicles,id',
-            'status' => [
-                'required',
-                Rule::in([
-                    'Available',
-                    'On Leave',
-                    'Inactive',
-                ]),
-            ],
-            'photo'               => 'nullable|image|mimes:jpg,jpeg,png|max:2048',
+        $request->merge([
+            'license_number' =>
+                trim(
+                    (string)
+                    $request->input(
+                        'license_number',
+                        ''
+                    )
+                ),
+
+            'email' =>
+                trim(
+                    (string)
+                    $request->input(
+                        'email',
+                        ''
+                    )
+                ),
         ]);
 
-        if ($validator->fails()) {
+        $validator =
+            Validator::make(
+                $request->all(),
+                [
+                    'first_name' => [
+                        'required',
+                        'string',
+                        'max:255',
+                    ],
+
+                    'last_name' => [
+                        'required',
+                        'string',
+                        'max:255',
+                    ],
+
+                    'license_number' => [
+                        'bail',
+                        'required',
+                        'string',
+                        'min:3',
+                        'max:100',
+                        Rule::unique(
+                            'drivers',
+                            'license_number'
+                        ),
+                    ],
+
+                    'license_class' => [
+                        'required',
+                        'string',
+                    ],
+
+                    'license_expiry' => [
+                        $requireLicenseExpiry
+                            ? 'required'
+                            : 'nullable',
+                        'date',
+                    ],
+
+                    'contact_number' => [
+                        'required',
+                        'string',
+                        'max:20',
+                    ],
+
+                    'email' => [
+                        'bail',
+                        'required',
+                        'email',
+                        'max:255',
+                        Rule::unique(
+                            'users',
+                            'email'
+                        ),
+                        Rule::unique(
+                            'drivers',
+                            'email'
+                        ),
+                    ],
+
+                    'experience' => [
+                        'nullable',
+                        'integer',
+                        'min:0',
+                    ],
+
+                    'address' => [
+                        'nullable',
+                        'string',
+                    ],
+
+                    'emergency_contact' => [
+                        'nullable',
+                        'string',
+                        'max:20',
+                    ],
+
+                    'notes' => [
+                        'nullable',
+                        'string',
+                    ],
+
+                    'assigned_vehicle_id' => [
+                        'nullable',
+                        'exists:vehicles,id',
+                    ],
+
+                    'status' => [
+                        'required',
+
+                        Rule::in([
+                            'Available',
+                            'On Leave',
+                            'Inactive',
+                        ]),
+                    ],
+
+                    'photo' => [
+                        'nullable',
+                        'image',
+                        'mimes:jpg,jpeg,png',
+                        'max:2048',
+                    ],
+                ]
+            );
+
+        if (
+            $validator->fails()
+        ) {
             return response()->json([
                 'success' => false,
-                'errors' => $validator->errors(),
+                'errors' =>
+                    $validator->errors(),
             ], 422);
         }
 
-        $validated = $validator->validated();
+        $validated =
+            $validator->validated();
 
-        if ($request->hasFile('photo')) {
-            $validated['photo'] = $request->file('photo')->store('drivers', 'public');
-        }
-
-        $driver = Driver::create($validated);
         /*
         |--------------------------------------------------------------------------
-        | Generate Permanent Driver Number
+        | Store Photo First
         |--------------------------------------------------------------------------
-        | Uses the database primary key so numbers stay unique and are not reused.
         */
-        $driver->forceFill([
-            'driver_number' =>
-                'DRV-' .
-                str_pad(
-                    (string) $driver->id,
-                    3,
-                    '0',
-                    STR_PAD_LEFT
-                ),
-        ])->save();
+        $photoPath = null;
 
-        $driver->refresh();
+        if (
+            $request->hasFile(
+                'photo'
+            )
+        ) {
+            $photoPath =
+                $request
+                    ->file('photo')
+                    ->store(
+                        'drivers',
+                        'public'
+                    );
 
-        $this->createLicenseExpiryNotification(
-            $driver,
-            $driverSettings['warnLicenseDays']
-        );
+            $validated['photo'] =
+                $photoPath;
+        }
 
-        return response()->json([
-            'success' => true,
-            'message' =>
-                'Driver added successfully!',
-        ]);
+        try {
+            $result =
+                DB::transaction(
+                    function () use (
+                        $validated
+                    ) {
+                        /*
+                        |--------------------------------------------------------------------------
+                        | Create Driver first
+                        |--------------------------------------------------------------------------
+                        |
+                        | We need the DB ID to generate DRV-001.
+                        |--------------------------------------------------------------------------
+                        */
+                        $driver =
+                            Driver::create(
+                                collect(
+                                    $validated
+                                )
+                                    ->except(
+                                        'user_id'
+                                    )
+                                    ->toArray()
+                            );
+
+                        /*
+                        |--------------------------------------------------------------------------
+                        | Generate Permanent Driver Number
+                        |--------------------------------------------------------------------------
+                        */
+                        $driverNumber =
+                            'DRV-' .
+                            str_pad(
+                                (string)
+                                $driver->id,
+                                3,
+                                '0',
+                                STR_PAD_LEFT
+                            );
+
+                        $driver->forceFill([
+                            'driver_number' =>
+                                $driverNumber,
+                        ])->save();
+
+                        /*
+                        |--------------------------------------------------------------------------
+                        | Generate Temporary Password
+                        |--------------------------------------------------------------------------
+                        |
+                        | DRV-001 → #drv001
+                        |--------------------------------------------------------------------------
+                        */
+                        $temporaryPassword =
+                            '#' .
+                            strtolower(
+                                str_replace(
+                                    '-',
+                                    '',
+                                    $driverNumber
+                                )
+                            );
+
+                        /*
+                        |--------------------------------------------------------------------------
+                        | Create Driver User Account
+                        |--------------------------------------------------------------------------
+                        */
+                        $user = User::create([
+                            'first_name' =>
+                                $validated['first_name'],
+
+                            'last_name' =>
+                                $validated['last_name'],
+
+                            'name' =>
+                                trim(
+                                    $validated['first_name'] .
+                                    ' ' .
+                                    $validated['last_name']
+                                ),
+
+                            'email' =>
+                                $validated['email'],
+                            
+                            'mobile_number' =>
+                                $validated['contact_number'],
+
+                            'password' =>
+                                Hash::make(
+                                    $temporaryPassword
+                                ),
+
+                            'role' =>
+                                'driver',
+
+                            'job_title' =>
+                                'Driver',
+                        ]);
+
+                        /*
+                        |--------------------------------------------------------------------------
+                        | Link Driver ↔ User
+                        |--------------------------------------------------------------------------
+                        */
+                        $driver->forceFill([
+                            'user_id' =>
+                                $user->id,
+                        ])->save();
+
+                        $driver->refresh();
+
+                        $driver->load([
+                            'user',
+                            'vehicle',
+                        ]);
+
+                        return $driver;
+                    }
+                );
+
+            $driver = $result;
+            /*
+            |--------------------------------------------------------------------------
+            | License Expiry Notification
+            |--------------------------------------------------------------------------
+            | Driver/account creation has already succeeded.
+            | A notification failure must not make the request appear failed.
+            |--------------------------------------------------------------------------
+            */
+            try {
+                $this->createLicenseExpiryNotification(
+                    $driver,
+                    $driverSettings['warnLicenseDays']
+                );
+            } catch (\Throwable $e) {
+                report($e);
+            }
+
+            return response()->json([
+                'success' =>
+                    true,
+
+                'message' =>
+                    'Driver and driver account created successfully!',
+
+                'driver' =>
+                    $driver,
+            ], 201);
+
+        } catch (\Throwable $e) {
+            /*
+            |--------------------------------------------------------------------------
+            | Delete uploaded photo if transaction failed
+            |--------------------------------------------------------------------------
+            */
+            if (
+                $photoPath &&
+                Storage::disk(
+                    'public'
+                )->exists(
+                    $photoPath
+                )
+            ) {
+                Storage::disk(
+                    'public'
+                )->delete(
+                    $photoPath
+                );
+            }
+
+            return response()->json([
+                'success' =>
+                    false,
+
+                'message' =>
+                    $e->getMessage(),
+            ], 422);
+        }
     }
 
     public function show(Driver $driver)
@@ -315,7 +599,17 @@ class DriverController extends Controller
                 'date',
             ],
             'contact_number'     => 'required|string|max:20',
-            'email'              => 'nullable|email|max:255',
+            'email' => [
+                'required',
+                'email',
+                'max:255',
+
+                Rule::unique('drivers', 'email')
+                    ->ignore($driver->id),
+
+                Rule::unique('users', 'email')
+                    ->ignore($driver->user_id),
+            ],
             'experience'         => 'nullable|integer|min:0',
             'address'            => 'nullable|string',
             'emergency_contact'  => 'nullable|string|max:20',
@@ -344,7 +638,63 @@ class DriverController extends Controller
                 ->store('drivers', 'public');
         }
 
-        $driver->update($validated);
+        DB::transaction(function () use (
+            $driver,
+            $validated
+        ) {
+            /*
+            |--------------------------------------------------------------------------
+            | Update Driver Profile
+            |--------------------------------------------------------------------------
+            */
+            $driver->update(
+                $validated
+            );
+
+            /*
+            |--------------------------------------------------------------------------
+            | Sync Linked Driver Account
+            |--------------------------------------------------------------------------
+            */
+            $user =
+                $driver->user;
+
+            if (
+                $user &&
+                $user->role === 'driver'
+            ) {
+                $userUpdates = [
+                    'first_name' =>
+                        $driver->first_name,
+
+                    'last_name' =>
+                        $driver->last_name,
+
+                    'name' =>
+                        trim(
+                            $driver->first_name .
+                            ' ' .
+                            $driver->last_name
+                        ),
+                    
+                    'mobile_number' =>
+                        $driver->contact_number,
+                ];
+
+                if (
+                    $driver->wasChanged(
+                        'email'
+                    )
+                ) {
+                    $userUpdates['email'] =
+                        $driver->email;
+                }
+
+                $user->update(
+                    $userUpdates
+                );
+            }
+        });
 
         $driver->refresh();
 
@@ -398,32 +748,74 @@ class DriverController extends Controller
     {
         $this->authorize('delete', $driver);
 
-        $driver->delete();
+        DB::transaction(function () use ($driver) {
+            $user = $driver->user;
+
+            $driver->delete();
+
+            if (
+                $user &&
+                $user->role === 'driver'
+            ) {
+                $user->delete();
+            }
+        });
 
         return response()->json([
             'success' => true,
-            'message' => 'Driver deleted successfully.',
+            'message' =>
+                'Driver and linked account deleted successfully.',
         ]);
     }
 
     public function bulkDelete(Request $request)
-    {   
+    {
         $this->authorize('deleteAny', Driver::class);
 
         $request->validate([
-            'ids' => 'required|array',
-            'ids.*' => 'exists:drivers,id',
+            'ids' => [
+                'required',
+                'array',
+            ],
+            'ids.*' => [
+                'exists:drivers,id',
+            ],
         ]);
 
-        Driver::whereIn('id', $request->ids)->delete();
+        DB::transaction(function () use ($request) {
+            $drivers =
+                Driver::with('user')
+                    ->whereIn(
+                        'id',
+                        $request->ids
+                    )
+                    ->get();
+
+            foreach ($drivers as $driver) {
+                $user =
+                    $driver->user;
+
+                $driver->delete();
+
+                if (
+                    $user &&
+                    $user->role === 'driver'
+                ) {
+                    $user->delete();
+                }
+            }
+        });
 
         return response()->json([
             'success' => true,
-            'message' => 'Driver(s) deleted successfully.',
+            'message' =>
+                'Driver(s) and linked account(s) deleted successfully.',
         ]);
     }
 
-    public function getDrivers()
+    public function getDrivers(
+        Request $request
+    )
     {
         $this->authorize('viewAny', Driver::class);
 
@@ -433,7 +825,10 @@ class DriverController extends Controller
             $this->getDriverSettings();
         $warningDays =
             $driverSettings['warnLicenseDays'];
-        $query = Driver::with('vehicle')
+        $query = Driver::with([
+            'vehicle',
+            'user',
+        ])
             ->latest();
         /*
         |--------------------------------------------------------------------------
@@ -505,5 +900,97 @@ class DriverController extends Controller
             ]);
 
         return response()->json($drivers);
+    }
+
+    public function createAccount(Driver $driver)
+    {
+        $this->authorize('update', $driver);
+
+        if ($driver->user_id) {
+            return response()->json([
+                'success' => false,
+                'message' => 'This driver already has a linked account.',
+            ], 422);
+        }
+
+        if (!$driver->email) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Driver email is required before creating an account.',
+            ], 422);
+        }
+
+        if (
+            User::where(
+                'email',
+                $driver->email
+            )->exists()
+        ) {
+            return response()->json([
+                'success' => false,
+                'message' => 'An account with this email already exists.',
+            ], 422);
+        }
+
+        $driverNumber =
+            $driver->driver_number;
+
+        if (!$driverNumber) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Driver number is missing.',
+            ], 422);
+        }
+
+        $temporaryPassword =
+            '#' .
+            strtolower(
+                str_replace(
+                    '-',
+                    '',
+                    $driverNumber
+                )
+            );
+
+        DB::transaction(
+            function () use (
+                $driver,
+                $temporaryPassword
+            ) {
+                $user = User::create([
+                    'name' =>
+                        trim(
+                            $driver->first_name .
+                            ' ' .
+                            $driver->last_name
+                        ),
+
+                    'email' =>
+                        $driver->email,
+
+                    'password' =>
+                        Hash::make(
+                            $temporaryPassword
+                        ),
+
+                    'role' =>
+                        'driver',
+
+                    'job_title' =>
+                        'Driver',
+                ]);
+
+                $driver->forceFill([
+                    'user_id' =>
+                        $user->id,
+                ])->save();
+            }
+        );
+
+        return response()->json([
+            'success' => true,
+            'message' =>
+                'Driver account created and linked successfully.',
+        ]);
     }
 }

@@ -1,5 +1,5 @@
 /* ==========================================
-   Fleet Frontend RBAC Helpers :))
+   Fleet Frontend RBAC Helpers 
 ========================================== */
 
 window.FleetRBAC = window.FleetRBAC || {};

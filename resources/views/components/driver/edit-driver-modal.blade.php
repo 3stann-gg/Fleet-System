@@ -132,7 +132,7 @@
           </div>
 
           <div class="form-group">
-            <label for="editDriverEmail">Email</label>
+            <label for="editDriverEmail">Email *</label>
             <input type="email" id="editDriverEmail" />
           </div>
 

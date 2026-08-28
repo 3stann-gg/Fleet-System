@@ -128,11 +128,12 @@
           </div>
 
           <div class="form-group">
-            <label for="driverEmail">Email</label>
+            <label for="driverEmail">Email *</label>
             <input
                 type="email"
                 id="driverEmail"
                 name="email"
+                required
             />
           </div>
 

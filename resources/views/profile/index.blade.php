@@ -244,12 +244,18 @@
 
                             <input
                                 type="text"
-                                name="first_name"
+                                @if($user->role !== 'driver')
+                                    name="first_name"
+                                @endif
                                 id="profileFirstName"
                                 maxlength="60"
-                                required
                                 autocomplete="given-name"
                                 value="{{ old('first_name', $user->first_name) }}"
+                                @if($user->role === 'driver')
+                                    readonly
+                                @else
+                                    required
+                                @endif
                             >
 
                             @error('first_name')
@@ -284,12 +290,18 @@
 
                             <input
                                 type="text"
-                                name="last_name"
+                                @if($user->role !== 'driver')
+                                    name="last_name"
+                                @endif
                                 id="profileLastName"
                                 maxlength="60"
-                                required
                                 autocomplete="family-name"
                                 value="{{ old('last_name', $user->last_name) }}"
+                                @if($user->role === 'driver')
+                                    readonly
+                                @else
+                                    required
+                                @endif
                             >
 
                             @error('last_name')
@@ -309,12 +321,18 @@
 
                             <input
                                 type="text"
-                                name="name"
+                                @if($user->role !== 'driver')
+                                    name="name"
+                                @endif
                                 id="profileDisplayName"
                                 maxlength="120"
-                                required
                                 autocomplete="name"
                                 value="{{ old('name', $user->name) }}"
+                                @if($user->role === 'driver')
+                                    readonly
+                                @else
+                                    required
+                                @endif
                             >
 
                             @error('name')
@@ -443,12 +461,11 @@
 
                             <input
                                 type="email"
-                                name="email"
                                 id="profileEmail"
                                 maxlength="120"
-                                required
                                 autocomplete="email"
-                                value="{{ old('email', $user->email) }}"
+                                value="{{ $user->email }}"
+                                readonly
                             >
 
                             @error('email')
@@ -468,11 +485,16 @@
 
                             <input
                                 type="tel"
-                                name="mobile_number"
+                                @unless($user->hasRole('driver'))
+                                    name="mobile_number"
+                                @endunless
                                 id="profileMobile"
                                 maxlength="40"
                                 autocomplete="tel"
                                 value="{{ old('mobile_number', $user->mobile_number) }}"
+                                @if($user->hasRole('driver'))
+                                    readonly
+                                @endif
                             >
 
                             @error('mobile_number')

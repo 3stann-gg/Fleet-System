@@ -41,15 +41,6 @@ class ProfileUpdateRequest extends FormRequest
                 'max:120',
             ],
 
-            'email' => [
-                'required',
-                'string',
-                'email',
-                'max:120',
-                Rule::unique('users', 'email')
-                    ->ignore($user->id),
-            ],
-
             'mobile_number' => [
                 'nullable',
                 'string',
@@ -83,14 +74,32 @@ class ProfileUpdateRequest extends FormRequest
 
         /*
         |--------------------------------------------------------------------------
-        | IT Admin - Full Profile Access
+        | Driver Managed Fields
+        |--------------------------------------------------------------------------
+        |
+        | Driver name and mobile number are managed from the Driver module.
         |--------------------------------------------------------------------------
         */
-        if ($user->hasRole('it_admin')) {
+        if ($user?->hasRole('driver')) {
+            unset(
+                $rules['first_name'],
+                $rules['last_name'],
+                $rules['name'],
+                $rules['mobile_number']
+            );
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | IT Admin - Full Administrative Profile Access
+        |--------------------------------------------------------------------------
+        */
+        if ($user?->hasRole('it_admin')) {
             $rules['employee_id'] = [
                 'nullable',
                 'string',
                 'max:40',
+
                 Rule::unique(
                     'users',
                     'employee_id'

@@ -5,6 +5,9 @@ namespace App\Services;
 use App\Models\FleetNotification;
 use App\Models\FleetSetting;
 use App\Models\User;
+use App\Models\Driver;
+use App\Models\Reservation;
+use App\Models\Dispatch;
 
 class FleetNotificationService
 {
@@ -213,6 +216,170 @@ class FleetNotificationService
             ->canViewModule(
                 $module
             );
+    }
+
+    public static function driverOwnsNotification(
+        User $user,
+        FleetNotification $notification
+    ): bool {
+        /*
+        |--------------------------------------------------------------------------
+        | Non-driver
+        |--------------------------------------------------------------------------
+        */
+        if (
+            !$user->hasRole(
+                'driver'
+            )
+        ) {
+            return true;
+        }
+
+        $driver =
+            $user->driverProfile;
+
+        if (!$driver) {
+            return false;
+        }
+
+        $eventKey =
+            trim(
+                (string) (
+                    $notification->event_key
+                    ?? ''
+                )
+            );
+
+        /*
+        |--------------------------------------------------------------------------
+        | Driver License Notification
+        |--------------------------------------------------------------------------
+        |
+        | Example:
+        | driver_license_expiring:12:2026-09-15
+        |--------------------------------------------------------------------------
+        */
+        if (
+            str_starts_with(
+                $eventKey,
+                'driver_license_expiring:'
+            )
+        ) {
+            $parts =
+                explode(
+                    ':',
+                    $eventKey
+                );
+
+            $notificationDriverId =
+                isset($parts[1])
+                    ? (int) $parts[1]
+                    : 0;
+
+            return (
+                $notificationDriverId ===
+                (int) $driver->id
+            );
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Reservation Notification
+        |--------------------------------------------------------------------------
+        |
+        | Supported event key:
+        | reservation:{reservation_id}:...
+        |--------------------------------------------------------------------------
+        */
+        if (
+            str_starts_with(
+                $eventKey,
+                'reservation:'
+            )
+        ) {
+            $parts =
+                explode(
+                    ':',
+                    $eventKey
+                );
+
+            $reservationId =
+                isset($parts[1])
+                    ? (int) $parts[1]
+                    : 0;
+
+            if (!$reservationId) {
+                return false;
+            }
+
+            return Reservation::query()
+                ->where(
+                    'id',
+                    $reservationId
+                )
+                ->where(
+                    'driver_id',
+                    $driver->id
+                )
+                ->exists();
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Dispatch Notification
+        |--------------------------------------------------------------------------
+        |
+        | Supported event key:
+        | dispatch:{dispatch_id}:...
+        |--------------------------------------------------------------------------
+        */
+        if (
+            str_starts_with(
+                $eventKey,
+                'dispatch:'
+            )
+        ) {
+            $parts =
+                explode(
+                    ':',
+                    $eventKey
+                );
+
+            $dispatchId =
+                isset($parts[1])
+                    ? (int) $parts[1]
+                    : 0;
+
+            if (!$dispatchId) {
+                return false;
+            }
+
+            return Dispatch::query()
+                ->where(
+                    'id',
+                    $dispatchId
+                )
+                ->whereHas(
+                    'reservation',
+                    function ($query) use ($driver) {
+                        $query->where(
+                            'driver_id',
+                            $driver->id
+                        );
+                    }
+                )
+                ->exists();
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Unknown / generic notification
+        |--------------------------------------------------------------------------
+        |
+        | Driver should not receive fleet-wide generic notifications.
+        |--------------------------------------------------------------------------
+        */
+        return false;
     }
 
     /**

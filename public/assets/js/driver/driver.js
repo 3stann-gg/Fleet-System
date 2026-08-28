@@ -218,5 +218,4 @@ document.addEventListener("DOMContentLoaded", () => {
     initDriverModal();
     initDriverForm();
     initDriverImageUpload();
-    initDriverAdd();
 });

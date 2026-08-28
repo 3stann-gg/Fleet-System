@@ -70,8 +70,22 @@ class ProfileController extends Controller
             $validated['role'],
             $validated['status'],
             $validated['last_login_at'],
-            $validated['email_verified_at']
+            $validated['email_verified_at'],
+            $validated['email']
         );
+        /*
+        |--------------------------------------------------------------------------
+        | Driver Name Protection
+        |--------------------------------------------------------------------------
+        */
+        if ($user->hasRole('driver')) {
+            unset(
+                $validated['first_name'],
+                $validated['last_name'],
+                $validated['name'],
+                $validated['mobile_number']
+            );
+        }
         /*
         |--------------------------------------------------------------------------
         | Administrative Profile Fields
@@ -165,7 +179,7 @@ class ProfileController extends Controller
         | Email verification reset
         |--------------------------------------------------------------------------
         */
-
+        /*
         if (
             isset(
                 $validated['email']
@@ -176,7 +190,7 @@ class ProfileController extends Controller
             $user->email_verified_at =
                 null;
         }
-
+        */
         /*
         |--------------------------------------------------------------------------
         | Update allowed profile information
