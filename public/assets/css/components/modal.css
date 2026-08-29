@@ -596,3 +596,256 @@
   top: 16px;
   right: 16px;
 }
+
+
+/* Account Management */
+#accountManagementModal .custom-modal {
+  width: min(100% - 32px, 1100px);
+  max-height: min(92vh, 920px);
+}
+
+/* Header */
+#accountManagementModal .modal-header {
+  padding: 24px 32px;
+}
+
+/* Main body */
+#accountManagementModal .modal-body {
+  padding: 28px 32px 32px;
+}
+
+/* Account action selector spacing */
+#accountManagementModal
+  #accountManagementAction {
+  width: 100%;
+}
+
+/* Space between action selector and dynamic content */
+#accountManagementModal
+  #accountManagementContent {
+  margin-top: 28px;
+}
+
+/* Dynamic forms */
+#accountManagementModal .form-grid {
+  display: grid;
+  grid-template-columns:
+    repeat(2, minmax(0, 1fr));
+  column-gap: 28px;
+  row-gap: 22px;
+}
+
+/* Keep full-width fields full */
+#accountManagementModal
+  .form-group.full-width {
+  grid-column: 1 / -1;
+}
+
+/* Better label spacing */
+#accountManagementModal .form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+#accountManagementModal
+  .form-group label {
+  margin: 0;
+}
+
+/* Consistent control height */
+#accountManagementModal input,
+#accountManagementModal select,
+#accountManagementModal textarea {
+  width: 100%;
+  min-height: var(--control-height);
+}
+
+/* Dynamic form spacing */
+#accountManagementModal
+  #createUserAccountForm,
+#accountManagementModal
+  #updateUserAccountForm,
+#accountManagementModal
+  #resetUserPasswordForm {
+  margin-top: 0;
+}
+
+/* Update account selected-user area */
+#accountManagementModal
+  #updateAccountFormContainer {
+  margin-top: 28px;
+}
+
+/* Delete selected-user details */
+#accountManagementModal
+  #deleteAccountDetails {
+  margin-top: 28px;
+}
+
+/* Delete summary spacing */
+#accountManagementModal
+  .account-delete-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+#accountManagementModal
+  .account-delete-summary p {
+  margin: 6px 0 0;
+}
+
+/* Notes */
+#accountManagementModal
+  .settings-note {
+  margin-top: 22px;
+  line-height: 1.6;
+}
+
+/* Empty state */
+#accountManagementModal
+  .settings-empty-state {
+  min-height: 90px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  text-align: center;
+}
+
+#accountManagementModal
+  .settings-empty-state i {
+  font-size: 24px;
+}
+
+/* Footer */
+#accountManagementModal
+  .modal-footer {
+  margin-top: 28px;
+  padding: 22px 0 0;
+  border-top:
+    1px solid var(--color-border);
+  background: transparent;
+  gap: 12px;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  #accountManagementModal
+    .custom-modal {
+    width: min(100% - 20px, 760px);
+  }
+
+  #accountManagementModal
+    .modal-header {
+    padding: 20px;
+  }
+
+  #accountManagementModal
+    .modal-body {
+    padding: 20px;
+  }
+
+  #accountManagementModal
+    .form-grid {
+    grid-template-columns: 1fr;
+    row-gap: 18px;
+  }
+}
+
+#accountManagementModal .settings-empty-state {
+    min-height: 90px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Account Management - Delete Account */
+#accountManagementModal .account-delete-summary {
+  width: 100%;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+#accountManagementModal .account-delete-summary > div {
+  min-width: 0;
+}
+
+#accountManagementModal .account-delete-summary strong {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+#accountManagementModal .account-delete-summary p {
+  margin: 4px 0 0;
+  color: var(--color-text-muted);
+  line-height: 1.5;
+}
+
+/* Driver warning */
+#accountManagementModal .account-delete-summary .settings-note {
+  width: 100%;
+  margin: 0;
+  padding: 12px 14px;
+  box-sizing: border-box;
+}
+
+/* Confirmation row */
+#accountManagementModal .account-delete-confirmation {
+  width: 100%;
+  min-width: 0;
+}
+
+#accountManagementModal .account-delete-confirmation label {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  color: var(--color-text);
+  font-size: var(--font-size-sm);
+  line-height: 1.5;
+}
+
+#accountManagementModal .account-delete-confirmation input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  min-width: 16px;
+  min-height: 16px;
+  flex: 0 0 16px;
+  margin: 0;
+}
+
+#accountManagementModal .account-delete-confirmation span {
+  min-width: 0;
+  flex: 1;
+  white-space: normal;
+  word-break: normal;
+  overflow-wrap: break-word;
+}
+
+/* Prevent horizontal overflow */
+#accountManagementModal .modal-body,
+#accountManagementModal #accountManagementContent,
+#accountManagementModal #deleteAccountDetails {
+  min-width: 0;
+  overflow-x: hidden;
+}
+
+/* Delete footer */
+#accountManagementModal .account-delete-summary .modal-footer {
+  width: 100%;
+  margin-top: 8px;
+  padding: 20px 0 0;
+  box-sizing: border-box;
+  justify-content: flex-end;
+}

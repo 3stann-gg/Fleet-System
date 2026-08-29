@@ -17,15 +17,18 @@ use App\Http\Controllers\FleetNotificationController;
 use App\Http\Controllers\FleetSearchController;
 use App\Http\Controllers\CostAnalysisController;
 use App\Http\Controllers\ReportController;
+use App\Http\Controllers\UserAccountController;
 
 
 /*
 |--------------------------------------------------------------------------
 | PUBLIC ROUTES
 |--------------------------------------------------------------------------
-*/
+*/  
 Route::get('/', function () {
-    return view('welcome');
+    return auth()->check()
+        ? redirect()->route('dashboard')
+        : redirect()->route('login');
 });
 
 
@@ -561,6 +564,26 @@ Route::middleware(['auth', 'verified'])->group(function () {
             [SettingsController::class, 'index']
         )->name('settings');
 
+        Route::get(
+            '/settings/accounts',
+            [UserAccountController::class, 'index']
+        )->name('settings.accounts.index');
+
+        Route::post(
+            '/settings/accounts',
+            [UserAccountController::class, 'store']
+        )->name('settings.accounts.store');
+
+        Route::get(
+            '/settings/accounts/{user}',
+            [UserAccountController::class, 'show']
+        )->name('settings.accounts.show');
+
+        Route::patch(
+            '/settings/accounts/{user}',
+            [UserAccountController::class, 'update']
+        )->name('settings.accounts.update');
+
         Route::put(
             '/settings',
             [SettingsController::class, 'update']
@@ -571,6 +594,16 @@ Route::middleware(['auth', 'verified'])->group(function () {
             [SettingsController::class, 'reset']
         )->name('settings.reset');
 
-    });
+        Route::post(
+            '/settings/accounts/{user}/reset-password',
+            [UserAccountController::class, 'resetPassword']
+        )->name('settings.accounts.reset-password');
 
+        Route::delete(
+            '/settings/accounts/{user}',
+            [UserAccountController::class, 'destroy']
+        )->name('settings.accounts.destroy');
+
+    });
+    
 });

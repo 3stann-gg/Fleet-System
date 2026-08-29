@@ -1,125 +1,139 @@
 /* ==========================================
-   Login page controller (frontend session only)
+   Login Page
+   Laravel Breeze handles authentication
+   JS handles UI validation + custom toast
 ========================================== */
 
 let loginPageInitialized = false;
 
 function loginSetError(id, message) {
-  const input = document.getElementById(id);
-  const err = document.getElementById(id + "Error");
-  if (input) {
-    if (message) {
-      input.classList.add("is-invalid");
-      input.setAttribute("aria-invalid", "true");
-    } else {
-      input.classList.remove("is-invalid");
-      input.removeAttribute("aria-invalid");
+    const input = document.getElementById(id);
+    const error = document.getElementById(id + "Error");
+
+    if (input) {
+        if (message) {
+            input.classList.add("is-invalid");
+            input.setAttribute("aria-invalid", "true");
+        } else {
+            input.classList.remove("is-invalid");
+            input.removeAttribute("aria-invalid");
+        }
     }
-  }
-  if (err) {
-    err.textContent = message || "";
-    err.hidden = !message;
-  }
+
+    if (error) {
+        error.textContent = message || "";
+        error.hidden = !message;
+    }
 }
 
 function loginClearErrors() {
-  loginSetError("loginEmail", "");
-  loginSetError("loginPassword", "");
+    loginSetError("loginEmail", "");
+    loginSetError("loginPassword", "");
 }
 
-function loginToast(message, type) {
-  if (typeof showToast === "function") {
-    showToast(message, type || "info");
-    return;
-  }
-  const host = document.getElementById("loginFormError");
-  if (host) {
-    host.hidden = false;
-    host.textContent = message;
-  }
+function loginToast(message, type = "info") {
+    if (typeof showToast === "function") {
+        showToast(message, type);
+        return;
+    }
+
+    const fallback = document.getElementById("loginFormError");
+
+    if (fallback) {
+        fallback.hidden = false;
+        fallback.textContent = message;
+    }
 }
 
 function initLoginPage() {
-  if (loginPageInitialized) return;
-  const form = document.getElementById("loginForm");
-  if (!form) return;
-  loginPageInitialized = true;
-
-  if (typeof redirectIfAuthenticated === "function") {
-    if (redirectIfAuthenticated()) return;
-  } else if (typeof isAuthenticated === "function" && isAuthenticated()) {
-    window.location.replace("/dashboard");
-    return;
-  }
-
-  const submitBtn = document.getElementById("loginSubmitBtn");
-  const emailInput = document.getElementById("loginEmail");
-  const passwordInput = document.getElementById("loginPassword");
-  const rememberInput = document.getElementById("loginRemember");
-
-  document.getElementById("loginForgotBtn")?.addEventListener("click", (e) => {
-    e.preventDefault();
-    loginToast(
-      "Password recovery will be available after authentication integration.",
-      "info",
-    );
-  });
-
-  form.addEventListener("submit", (event) => {
-    event.preventDefault();
-    loginClearErrors();
-
-    const email = (emailInput?.value || "").trim();
-    const password = passwordInput?.value || "";
-    const remember = Boolean(rememberInput?.checked);
-    let valid = true;
-
-    if (!email) {
-      loginSetError("loginEmail", "Email is required.");
-      valid = false;
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      loginSetError("loginEmail", "Enter a valid email address.");
-      valid = false;
+    if (loginPageInitialized) {
+        return;
     }
 
-    if (!password) {
-      loginSetError("loginPassword", "Password is required.");
-      valid = false;
+    const form = document.getElementById("loginForm");
+
+    if (!form) {
+        return;
     }
 
-    if (!valid) {
-      loginToast("Please correct the highlighted fields.", "warning");
-      form.querySelector(".is-invalid")?.focus();
-      return;
-    }
+    loginPageInitialized = true;
 
-    if (submitBtn) {
-      submitBtn.disabled = true;
-      submitBtn.setAttribute("aria-busy", "true");
-      submitBtn.textContent = "Signing in…";
-    }
+    const emailInput = document.getElementById("loginEmail");
 
-    const result =
-      typeof login === "function"
-        ? login(email, password, remember)
-        : { ok: false, error: "Authentication utility is unavailable." };
+    const passwordInput = document.getElementById("loginPassword");
 
-    if (!result.ok) {
-      if (submitBtn) {
-        submitBtn.disabled = false;
-        submitBtn.removeAttribute("aria-busy");
-        submitBtn.textContent = "Sign In";
-      }
-      loginToast(result.error || "Unable to sign in.", "error");
-      passwordInput?.focus();
-      return;
-    }
+    const submitButton = document.getElementById("loginSubmitBtn");
 
-    loginToast("Welcome to HIMS Fleet.", "success");
-    window.location.replace("/dashboard");
-  });
+    /*
+    |--------------------------------------------------------------------------
+    | Clear local field errors while typing
+    |--------------------------------------------------------------------------
+    */
+
+    emailInput?.addEventListener("input", () => {
+        loginSetError("loginEmail", "");
+    });
+
+    passwordInput?.addEventListener("input", () => {
+        loginSetError("loginPassword", "");
+    });
+
+    /*
+    |--------------------------------------------------------------------------
+    | Client-side validation only
+    |--------------------------------------------------------------------------
+    */
+
+    form.addEventListener("submit", (event) => {
+        loginClearErrors();
+
+        const email = (emailInput?.value || "").trim();
+
+        const password = passwordInput?.value || "";
+
+        let valid = true;
+
+        if (!email) {
+            loginSetError("loginEmail", "Email is required.");
+
+            valid = false;
+        } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            loginSetError("loginEmail", "Enter a valid email address.");
+
+            valid = false;
+        }
+
+        if (!password) {
+            loginSetError("loginPassword", "Password is required.");
+
+            valid = false;
+        }
+
+        if (!valid) {
+            event.preventDefault();
+
+            loginToast("Please correct the highlighted fields.", "warning");
+
+            form.querySelector(".is-invalid")?.focus();
+
+            return;
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | IMPORTANT:
+        | Valid form is submitted normally to Laravel Breeze.
+        |--------------------------------------------------------------------------
+        */
+
+        if (submitButton) {
+            submitButton.disabled = true;
+
+            submitButton.setAttribute("aria-busy", "true");
+
+            submitButton.textContent = "Signing in…";
+        }
+    });
 }
 
-document.addEventListener("DOMContentLoaded", () => {
-  initLoginPage();
-});
+document.addEventListener("DOMContentLoaded", initLoginPage);

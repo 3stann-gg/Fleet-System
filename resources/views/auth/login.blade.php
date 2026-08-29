@@ -41,47 +41,77 @@
         <section class="login-card card" aria-labelledby="loginHeading">
           <h2 id="loginHeading">Sign in</h2>
           <p class="login-lead">
-            Frontend session only — not real authentication. Use the demo
-            credentials below for local access.
+              Sign in with your HIMS Fleet account to continue.
           </p>
 
           <p class="login-field-error" id="loginFormError" hidden role="alert"></p>
 
-          <form class="login-form" method="POST" action="{{ route('login') }}">
+          <form
+              class="login-form"
+              id="loginForm"
+              method="POST"
+              action="{{ route('login') }}"
+              novalidate
+          >
             @csrf
             <div class="form-group">
-              <label for="loginEmail">Email</label>
-              <input
-                  type="email"
-                  id="loginEmail"
-                  name="email"
-                  value="{{ old('email') }}"
-                  autocomplete="username"
-                  required
-                  autofocus
-                  maxlength="120"
-                  placeholder="admin@talahospital.com"
-              />
-              @error('email')
-              <p class="login-field-error">{{ $message }}</p>
-              @enderror
+                <label for="loginEmail">
+                    Email
+                </label>
+
+                <input
+                    type="email"
+                    id="loginEmail"
+                    name="email"
+                    value="{{ old('email') }}"
+                    autocomplete="username"
+                    required
+                    autofocus
+                    maxlength="120"
+                    placeholder="admin@talahospital.com"
+                    @class([
+                        'is-invalid' => $errors->has('email'),
+                    ])
+                />
+
+                <p
+                    class="login-field-error"
+                    id="loginEmailError"
+                    @if (!$errors->has('email')) hidden @endif
+                >
+                    @error('email')
+                        {{ $message }}
+                    @enderror
+                </p>
             </div>
 
             <div class="form-group">
-              <label for="loginPassword">Password</label>
-              <input
-                  type="password"
-                  id="loginPassword"
-                  name="password"
-                  autocomplete="current-password"
-                  required
-                  maxlength="120"
-                  placeholder="Enter password"
-              />
+                <label for="loginPassword">
+                    Password
+                </label>
 
-              @error('password')
-              <p class="login-field-error">{{ $message }}</p>
-              @enderror
+                <input
+                    type="password"
+                    id="loginPassword"
+                    name="password"
+                    autocomplete="current-password"
+                    required
+                    maxlength="120"
+                    placeholder="Enter password"
+                    @class([
+                        'is-invalid' => $errors->has('password'),
+                    ])
+                />
+
+                <p
+                    class="login-field-error"
+                    id="loginPasswordError"
+                    @if (!$errors->has('password')) hidden @endif
+                >
+                    @error('password')
+                        {{ $message }}
+                    @enderror
+                </p>
             </div>
 
             <div class="login-row">
@@ -100,16 +130,10 @@
               Sign In
             </button>
           </form>
-
-          <div class="login-demo" aria-label="Demo credentials">
-            <strong>Demo Credentials</strong> (frontend only — not secure)<br />
-            Email: <code>admin@talahospital.com</code><br />
-            Password: <code>admin123</code>
-          </div>
         </section>
 
         <footer class="login-footer">
-          <p>Hospital Operations Suite · Frontend session simulation</p>
+            <p>Hospital Operations Suite · Fleet &amp; Transportation Management</p>
         </footer>
       </div>
     </main>
@@ -120,18 +144,40 @@
     <script src="{{ asset('assets/js/core/toast.js') }}"></script>
     <script src="{{ asset('assets/js/core/main.js') }}"></script>
     <script src="{{ asset('assets/js/auth/login.js') }}"></script>
+
     <script>
-      document.addEventListener("DOMContentLoaded", function () {
-        if (typeof applyEarlyTheme === "function") applyEarlyTheme();
-        if (typeof initToast === "function") initToast();
-        var host = document.getElementById("toast");
-        if (host && !document.getElementById("toastContainer")) {
-          var box = document.createElement("div");
-          box.id = "toastContainer";
-          box.className = "toast-container";
-          host.appendChild(box);
-        }
-      });
+        document.addEventListener("DOMContentLoaded", function () {
+            if (typeof applyEarlyTheme === "function") {
+                applyEarlyTheme();
+            }
+
+            if (typeof initToast === "function") {
+                initToast();
+            }
+
+            const host = document.getElementById("toast");
+
+            if (
+                host &&
+                !document.getElementById("toastContainer")
+            ) {
+                const box = document.createElement("div");
+
+                box.id = "toastContainer";
+                box.className = "toast-container";
+
+                host.appendChild(box);
+            }
+
+            @if ($errors->any())
+                if (typeof showToast === "function") {
+                    showToast(
+                        @json($errors->first()),
+                        "error"
+                    );
+                }
+            @endif
+        });
     </script>
   </body>
 </html>

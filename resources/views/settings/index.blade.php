@@ -73,6 +73,17 @@
                   <i class="ph ph-palette" aria-hidden="true"></i>
                   Appearance
                 </button>
+                <button
+                    type="button"
+                    data-settings-section="settingsAccounts"
+                >
+                    <i
+                        class="ph ph-users-three"
+                        aria-hidden="true"
+                    ></i>
+
+                    Accounts
+                </button>
                 <button type="button" data-settings-section="settingsData">
                   <i class="ph ph-database" aria-hidden="true"></i>
                   Data
@@ -564,6 +575,50 @@
                   </p>
                 </section>
 
+                <!--Accounts-->
+                <section
+                    class="card settings-card"
+                    id="settingsAccounts"
+                >
+                    <div class="card-header">
+                        <div>
+                            <h3>
+                                <i
+                                    class="ph ph-users-three"
+                                    aria-hidden="true"
+                                ></i>
+
+                                Account Management
+                            </h3>
+
+                            <p class="card-subtitle">
+                                Create, update, reset, and remove user accounts.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="settings-data-actions">
+                        <button
+                            type="button"
+                            class="btn-primary"
+                            id="openAccountManagementModal"
+                        >
+                            <i
+                                class="ph ph-user-gear"
+                                aria-hidden="true"
+                            ></i>
+
+                            Manage User Accounts
+                        </button>
+                    </div>
+
+                    <p class="settings-note">
+                        Account actions are managed separately from Fleet Settings
+                        and do not change vehicle, reservation, dispatch, or other
+                        operational records.
+                    </p>
+                </section>
+
                 <!-- Data -->
                 <section class="card settings-card" id="settingsData">
                   <div class="card-header">
@@ -648,10 +703,15 @@
           </div>
         </section>
 
+    @include(
+      'settings.partials.account-management-modal'
+    )
+
     @push('scripts')
 
     <script src="{{ asset('assets/js/settings/settings-store.js') }}"></script>
     <script src="{{ asset('assets/js/settings/settings.js') }}"></script>
+    <script src=" {{ asset('assets/js/settings/account-management.js') }}"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/js/bootstrap.bundle.min.js"></script>
 
     @endpush
