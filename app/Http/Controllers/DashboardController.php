@@ -451,7 +451,51 @@ class DashboardController extends Controller
                 )
                 ->limit(5)
                 ->get();
+        /*
+        |--------------------------------------------------------------------------
+        | Dashboard Map Dispatch Data
+        |--------------------------------------------------------------------------
+        | Lightweight data only for Leaflet map markers.
+        | Uses the already-scoped dispatch queue, so Driver and Department Head
+        | still receive only the dispatch records they are allowed to see.
+        |--------------------------------------------------------------------------
+        */
+        $dashboardMapDispatches =
+            $dispatchQueue
+                ->map(function ($dispatch) {
+                    $reservation =
+                        $dispatch->reservation;
 
+                    if (!$reservation) {
+                        return null;
+                    }
+                    return [
+                        'id' =>
+                            $dispatch->id,
+
+                        'dispatch_number' =>
+                            $dispatch->dispatch_number,
+                        'status' =>
+                            $dispatch->trip_status,
+                        'pickup' =>
+                            $reservation->pickup_location,
+                        'destination' =>
+                            $reservation->destination,
+                        'vehicle' =>
+                            $reservation->vehicle
+                                ?->display_label,
+                        'driver' =>
+                            trim(
+                                ($reservation->driver
+                                    ?->first_name ?? '')
+                                . ' ' .
+                                ($reservation->driver
+                                    ?->last_name ?? '')
+                            ),
+                    ];
+                })
+                ->filter()
+                ->values();
         /*
         |--------------------------------------------------------------------------
         | Vehicle Status
@@ -652,6 +696,7 @@ class DashboardController extends Controller
                 'driversOnDuty',
                 'averageFuelLevel',
                 'dispatchQueue',
+                'dashboardMapDispatches',
                 'vehicles',
                 'maintenanceAlerts',
                 'weeklyActivity',

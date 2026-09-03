@@ -610,3 +610,29 @@
     width: 18px;
   }
 }
+
+/* ----- Leafletjs Map ----- */
+.dashboard-leaflet-map {
+    width: 100%;
+    min-height: 360px;
+    height: 420px;
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    border: 1px solid var(--color-border);
+    background: var(--color-surface-muted);
+}
+
+.dashboard-map-note {
+    margin-top: 12px;
+}
+
+.dashboard-leaflet-map .leaflet-control-attribution {
+    font-size: 10px;
+}
+
+@media (max-width: 768px) {
+    .dashboard-leaflet-map {
+        height: 320px;
+        min-height: 320px;
+    }
+}

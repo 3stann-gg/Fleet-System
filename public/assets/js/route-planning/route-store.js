@@ -5,7 +5,7 @@
    - Laravel/MySQL is the source of truth
    - routePlanningRecords is temporary UI state only
    - Route templates may remain in localStorage
-   - Route optimization is still simulated for now
+   - Route coordinates are persisted by Laravel/MySQL
 ========================================== */
 
 /* ==========================================
@@ -267,16 +267,34 @@ function normalizeRouteApiRecord(raw, index = 0) {
         raw.optimization_score === null || raw.optimization_score === undefined
             ? null
             : Number(raw.optimization_score);
-    const stops = Array.isArray(raw.stops)
+    const orderedStops = Array.isArray(raw.stops)
         ? raw.stops
               .slice()
               .sort(
                   (a, b) =>
                       Number(a.stop_order || 0) - Number(b.stop_order || 0),
               )
-              .map((stop) => String(stop.location || "").trim())
-              .filter(Boolean)
+              .filter((stop) => String(stop?.location || "").trim())
         : [];
+    const stops = orderedStops.map((stop) =>
+        String(stop.location || "").trim(),
+    );
+    const stopCoordinates = orderedStops.map((stop) => ({
+        location: String(stop.location || "").trim(),
+        latitude:
+            stop.latitude === null ||
+            stop.latitude === undefined ||
+            stop.latitude === ""
+                ? null
+                : Number(stop.latitude),
+
+        longitude:
+            stop.longitude === null ||
+            stop.longitude === undefined ||
+            stop.longitude === ""
+                ? null
+                : Number(stop.longitude),
+    }));
 
     return {
         /*
@@ -306,8 +324,33 @@ function normalizeRouteApiRecord(raw, index = 0) {
     |--------------------------------------------------------------------------
     */
         origin: String(raw.origin || "").trim(),
+        originLatitude:
+            raw.origin_latitude === null ||
+            raw.origin_latitude === undefined ||
+            raw.origin_latitude === ""
+                ? null
+                : Number(raw.origin_latitude),
+        originLongitude:
+            raw.origin_longitude === null ||
+            raw.origin_longitude === undefined ||
+            raw.origin_longitude === ""
+                ? null
+                : Number(raw.origin_longitude),
         destination: String(raw.destination || "").trim(),
+        destinationLatitude:
+            raw.destination_latitude === null ||
+            raw.destination_latitude === undefined ||
+            raw.destination_latitude === ""
+                ? null
+                : Number(raw.destination_latitude),
+        destinationLongitude:
+            raw.destination_longitude === null ||
+            raw.destination_longitude === undefined ||
+            raw.destination_longitude === ""
+                ? null
+                : Number(raw.destination_longitude),
         stops,
+        stopCoordinates,
         /*
     |--------------------------------------------------------------------------
     | Reservation Resources
@@ -408,7 +451,11 @@ function cloneRouteRecord(record) {
         ...record,
 
         stops: Array.isArray(record.stops) ? record.stops.slice() : [],
-
+        stopCoordinates: Array.isArray(record.stopCoordinates)
+            ? record.stopCoordinates.map((stop) => ({
+                  ...stop,
+              }))
+            : [],
         statusHistory: Array.isArray(record.statusHistory)
             ? record.statusHistory.map((history) => ({
                   ...history,
@@ -439,9 +486,50 @@ function normalizeRouteRecord(raw, index = 0) {
         reservationNumber: String(raw.reservationNumber || "").trim(),
         routeNumber: String(raw.routeNumber || "").trim(),
         origin: String(raw.origin || "").trim(),
+        originLatitude:
+            raw.originLatitude === null ||
+            raw.originLatitude === undefined ||
+            raw.originLatitude === ""
+                ? null
+                : Number(raw.originLatitude),
+        originLongitude:
+            raw.originLongitude === null ||
+            raw.originLongitude === undefined ||
+            raw.originLongitude === ""
+                ? null
+                : Number(raw.originLongitude),
         destination: String(raw.destination || "").trim(),
+        destinationLatitude:
+            raw.destinationLatitude === null ||
+            raw.destinationLatitude === undefined ||
+            raw.destinationLatitude === ""
+                ? null
+                : Number(raw.destinationLatitude),
+        destinationLongitude:
+            raw.destinationLongitude === null ||
+            raw.destinationLongitude === undefined ||
+            raw.destinationLongitude === ""
+                ? null
+                : Number(raw.destinationLongitude),
         stops: Array.isArray(raw.stops)
             ? raw.stops.map((stop) => String(stop || "").trim()).filter(Boolean)
+            : [],
+        stopCoordinates: Array.isArray(raw.stopCoordinates)
+            ? raw.stopCoordinates.map((stop) => ({
+                  location: String(stop?.location || "").trim(),
+                  latitude:
+                      stop?.latitude === null ||
+                      stop?.latitude === undefined ||
+                      stop?.latitude === ""
+                          ? null
+                          : Number(stop.latitude),
+                  longitude:
+                      stop?.longitude === null ||
+                      stop?.longitude === undefined ||
+                      stop?.longitude === ""
+                          ? null
+                          : Number(stop.longitude),
+              }))
             : [],
         vehicle: String(raw.vehicle || "").trim(),
         driver: String(raw.driver || "").trim(),

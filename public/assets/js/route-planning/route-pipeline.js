@@ -16,14 +16,18 @@ let isRefreshingRoutes = false;
 let isLoadingRouteData = false;
 
 /* ==========================================
-   GOOGLE MAPS STATE
+   LEAFLET / ROUTING STATE
 ========================================== */
-let routeGoogleMap = null;
-let routeGoogleMapPolylines = [];
-let routeGoogleMapMarkers = [];
-let routeGoogleMapInitialized = false;
-let routeGoogleMapRequestToken = 0; 
+let routeLeafletMap = null;
+let routeLeafletRouteLayer = null;
+let routeLeafletMarkerLayer = null;
+let routeLeafletMapInitialized = false;
+let routeRoutingRequestToken = 0;
 let routeNextOriginalOrder = 0;
+const ROUTE_GEOCODE_CACHE_KEY =
+    "himsFleetRoutePlanningGeocodeCache";
+
+let routeLastGeocodeRequestAt = 0;
 
 let routeSortState = {
     field: null,
@@ -846,226 +850,647 @@ function renderRoutePagination(total) {
 }
 
 /* ==========================================
-   GOOGLE MAPS
+   LEAFLET + NOMINATIM + OSRM
 ========================================== */
-async function initRouteGoogleMap() {
-    if (routeGoogleMapInitialized && routeGoogleMap) {
-        return routeGoogleMap;
+function routeSleep(ms) {
+    return new Promise((resolve) => {
+        window.setTimeout(resolve, ms);
+    });
+}
+
+function readRouteGeocodeCache() {
+    try {
+        return JSON.parse(
+            sessionStorage.getItem(
+                ROUTE_GEOCODE_CACHE_KEY
+            ) || "{}"
+        );
+    } catch {
+        return {};
+    }
+}
+
+function writeRouteGeocodeCache(cache) {
+    try {
+        sessionStorage.setItem(
+            ROUTE_GEOCODE_CACHE_KEY,
+            JSON.stringify(cache)
+        );
+    } catch {
+        // Ignore storage failure.
+    }
+}
+
+/**
+ * Public Nominatim should not be requested rapidly.
+ * Cached addresses do not trigger another network request.
+ */
+async function waitForRouteGeocoderSlot() {
+    const minimumGap = 1100;
+    const elapsed =
+        Date.now() -
+        routeLastGeocodeRequestAt;
+    if (elapsed < minimumGap) {
+        await routeSleep(
+            minimumGap - elapsed
+        );
+    }
+    routeLastGeocodeRequestAt =
+        Date.now();
+}
+
+async function geocodeRouteLocation(address) {
+    const normalized =
+        String(address || "").trim();
+    if (!normalized) {
+        return null;
+    }
+    const cache =
+        readRouteGeocodeCache();
+    const cacheKey =
+        normalized.toLowerCase();
+    if (cache[cacheKey]) {
+        return cache[cacheKey];
+    }
+    await waitForRouteGeocoderSlot();
+    /*
+    |--------------------------------------------------------------------------
+    | Add Philippines to improve local matching
+    |--------------------------------------------------------------------------
+    */
+    const query =
+        encodeURIComponent(
+            `${normalized}, Philippines`
+        );
+    const response = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&countrycodes=ph&q=${query}`,
+        {
+            method: "GET",
+            headers: {
+                Accept: "application/json",
+            },
+        },
+    );
+    if (!response.ok) {
+        throw new Error(
+            "Unable to search the route location."
+        );
+    }
+    const results =
+        await response.json();
+    if (
+        !Array.isArray(results) ||
+        results.length === 0
+    ) {
+        throw new Error(
+            `Location not found: ${normalized}`
+        );
+    }
+    const result = {
+        lat:
+            Number(results[0].lat),
+        lng:
+            Number(results[0].lon),
+        displayName:
+            results[0].display_name ||
+            normalized,
+    };
+    if (
+        !Number.isFinite(result.lat) ||
+        !Number.isFinite(result.lng)
+    ) {
+        throw new Error(
+            `Invalid coordinates returned for: ${normalized}`
+        );
+    }
+    cache[cacheKey] =
+        result;
+    writeRouteGeocodeCache(
+        cache
+    );
+    return result;
+}
+
+async function initRouteLeafletMap() {
+    if (
+        routeLeafletMapInitialized &&
+        routeLeafletMap
+    ) {
+        return routeLeafletMap;
     }
     const mapElement =
         document.getElementById(
-            "routeGoogleMap",
+            "routeLeafletMap"
         );
     if (!mapElement) {
         return null;
     }
-    if (
-        !window.google ||
-        !google.maps ||
-        typeof google.maps.importLibrary !== "function"
-    ) {
+    if (typeof L === "undefined") {
         console.warn(
-            "Google Maps JavaScript API is not available.",
+            "Leaflet is not available."
         );
-        return null;
-    }
-    try {
-        const { Map } =
-            await google.maps.importLibrary(
-                "maps",
-            );
-        /*
-        |--------------------------------------------------------------------------
-        | Default center: Quezon City
-        |--------------------------------------------------------------------------
-        |
-        | Actual route bounds will replace this once a RoutePlan is rendered.
-        |
-        */
-        routeGoogleMap =
-            new Map(
-                mapElement,
-                {
-                    center: {
-                        lat: 14.6760,
-                        lng: 121.0437,
-                    },
-                    zoom: 12,
-                    mapTypeControl: false,
-                    streetViewControl: false,
-                    fullscreenControl: true,
-                    gestureHandling: "cooperative",
-                    mapId: "DEMO_MAP_ID",
-                },
-            );
-        routeGoogleMapInitialized =
-            true;
-        return routeGoogleMap;
-    } catch (error) {
-        console.error(
-            "Unable to initialize Google Map:",
-            error,
-        );
-        return null;
-    }
-}
-
-function clearRouteGoogleMap() {
-    routeGoogleMapPolylines.forEach((polyline) => {
-        try {
-            polyline.setMap(null);
-        } catch (error) {
-            console.warn("Unable to remove route polyline:", error);
-        }
-    });
-    routeGoogleMapPolylines = [];
-    routeGoogleMapMarkers.forEach((marker) => {
-        try {
-            marker.map = null;
-        } catch (error) {
-            console.warn("Unable to remove route marker:", error);
-        }
-    });
-    routeGoogleMapMarkers = [];
-}
-
-async function fitRouteGoogleMapToPath(path) {
-    if (!routeGoogleMap || !Array.isArray(path) || path.length === 0) {
-        return;
-    }
-    try {
-        const { LatLngBounds } = await google.maps.importLibrary("core");
-        const bounds = new LatLngBounds();
-        path.forEach((point) => {
-            bounds.extend(point);
-        });
-        routeGoogleMap.fitBounds(bounds);
-    } catch (error) {
-        console.warn("Unable to fit map to route:", error);
-    }
-}
-
-async function renderGoogleRoute(record) {
-    const map = await initRouteGoogleMap();
-
-    if (!map) {
-        return null;
-    }
-    clearRouteGoogleMap();
-    if (!record || !record.origin || !record.destination) {
         return null;
     }
     /*
     |--------------------------------------------------------------------------
-    | Prevent old async request from overwriting a newer selected route
+    | Tala Hospital / DJNRMHS
     |--------------------------------------------------------------------------
     */
-    const requestToken = ++routeGoogleMapRequestToken;
-    try {
-        const { Route } = await google.maps.importLibrary("routes");
-        const stops = Array.isArray(record.stops)
-            ? record.stops
-                  .map((stop) => String(stop || "").trim())
-                  .filter(Boolean)
-            : [];
-        /*
-        |--------------------------------------------------------------------------
-        | Build intermediate waypoints
-        |--------------------------------------------------------------------------
-        */
-        const intermediates = stops.map((stop) => ({
-            location: stop,
-        }));
-        /*
-        |--------------------------------------------------------------------------
-        | Compute actual driving route
-        |--------------------------------------------------------------------------
-        */
-        const request = {
-            origin: record.origin,
-            destination: record.destination,
-            travelMode: "DRIVING",
-            routingPreference: "TRAFFIC_AWARE",
-            fields: [
-                "path",
-                "distanceMeters",
-                "durationMillis",
-                "optimizedIntermediateWaypointIndices",
-            ],
-        };
-        if (intermediates.length > 0) {
-            request.intermediates = intermediates;
-            /*
-            |--------------------------------------------------------------------------
-            | Let Google determine best stop order
-            |--------------------------------------------------------------------------
-            */
-            request.optimizeWaypointOrder = true;
+    const hospitalLocation = [
+        14.7707,
+        121.0659,
+    ];
+    routeLeafletMap =
+        L.map(
+            mapElement,
+            {
+                zoomControl: true,
+                scrollWheelZoom: false,
+            }
+        ).setView(
+            hospitalLocation,
+            13
+        );
+    L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        maxZoom: 19,
+        attribution:
+            '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+    }).addTo(routeLeafletMap);
+    routeLeafletMarkerLayer =
+        L.layerGroup().addTo(
+            routeLeafletMap
+        );
+    routeLeafletMapInitialized =
+        true;
+    window.setTimeout(
+        () => {
+            routeLeafletMap
+                ?.invalidateSize();
+        },
+        150
+    );
+    return routeLeafletMap;
+}
+
+function clearRouteLeafletMap() {
+    if (routeLeafletRouteLayer) {
+        try {
+            routeLeafletMap
+                ?.removeLayer(
+                    routeLeafletRouteLayer
+                );
+        } catch (error) {
+            console.warn(
+                "Unable to remove route layer:",
+                error
+            );
         }
-        const response = await Route.computeRoutes(request);
+
+        routeLeafletRouteLayer =
+            null;
+    }
+    if (routeLeafletMarkerLayer) {
+        routeLeafletMarkerLayer
+            .clearLayers();
+    }
+}
+
+function createRouteMarkerIcon(type, label = "") {
+    let markerClass = "route-map-marker";
+    let content = "";
+    if (type === "origin") {
+        markerClass += " route-map-marker-origin";
+        content = `
+            <i
+                class="ph ph-hospital"
+                aria-hidden="true"
+            ></i>
+        `;
+    } else if (type === "destination") {
+        markerClass += " route-map-marker-destination";
+        content = `
+            <i
+                class="ph ph-map-pin"
+                aria-hidden="true"
+            ></i>
+        `;
+    } else {
+        markerClass += " route-map-marker-stop";
+        content = escapeRouteHtml(label);
+    }
+    return L.divIcon({
+        className: "hims-route-marker-icon",
+        html: `
+            <div class="${markerClass}">
+                ${content}
+            </div>
+        `,
+        iconSize: [36, 36],
+        iconAnchor: [18, 18],
+        popupAnchor: [0, -22],
+    });
+}
+
+function addRouteLeafletMarker(
+    coordinate,
+    title,
+    description,
+    type = "stop",
+    label = "",
+) {
+    if (!routeLeafletMarkerLayer || !coordinate) {
+        return null;
+    }
+    const marker = L.marker([coordinate.lat, coordinate.lng], {
+        icon: createRouteMarkerIcon(type, label),
+    }).addTo(routeLeafletMarkerLayer).bindPopup(`
+            <strong>${escapeRouteHtml(title)}</strong><br>
+            ${escapeRouteHtml(description || "")}
+        `);
+
+    return marker;
+}
+
+function hasValidRouteCoordinate(lat, lng) {
+    if (
+        lat === null ||
+        lat === undefined ||
+        lat === "" ||
+        lng === null ||
+        lng === undefined ||
+        lng === ""
+    ) {
+        return false;
+    }
+    const latitude = Number(lat);
+    const longitude = Number(lng);
+    return (
+        Number.isFinite(latitude) &&
+        Number.isFinite(longitude) &&
+        latitude >= -90 &&
+        latitude <= 90 &&
+        longitude >= -180 &&
+        longitude <= 180
+    );
+}
+
+function makeRouteCoordinate(lat, lng, displayName = "") {
+    if (!hasValidRouteCoordinate(lat, lng)) {
+        return null;
+    }
+    return {
+        lat: Number(lat),
+        lng: Number(lng),
+        displayName: String(displayName || "").trim(),
+    };
+}
+/**
+ * Convert route addresses into coordinates.
+ *
+ * Order:
+ * Origin → Stop 1 → Stop 2 → ... → Destination
+ */
+async function geocodeRouteRecord(record) {
+    if (!record || !record.origin || !record.destination) {
+        throw new Error("Origin and destination are required.");
+    }
+    /*
+    |--------------------------------------------------------------------------
+    | Origin
+    |--------------------------------------------------------------------------
+    | Prefer saved MySQL coordinates.
+    | Fall back to Nominatim only when coordinates are missing.
+    |--------------------------------------------------------------------------
+    */
+    let origin = makeRouteCoordinate(
+        record.originLatitude,
+        record.originLongitude,
+        record.origin,
+    );
+    if (!origin) {
+        origin = await geocodeRouteLocation(record.origin);
+    }
+    /*
+    |--------------------------------------------------------------------------
+    | Stops
+    |--------------------------------------------------------------------------
+    */
+    const stops = Array.isArray(record.stops)
+        ? record.stops.map((stop) => String(stop || "").trim()).filter(Boolean)
+        : [];
+    const persistedStopCoordinates = Array.isArray(record.stopCoordinates)
+        ? record.stopCoordinates
+        : [];
+    const stopCoordinates = [];
+    for (let index = 0; index < stops.length; index++) {
+        const location = stops[index];
+        const persisted = persistedStopCoordinates[index] || null;
         /*
         |--------------------------------------------------------------------------
-        | Ignore stale response
+        | Only reuse a coordinate when it belongs to the same stop.
         |--------------------------------------------------------------------------
         */
-        if (requestToken !== routeGoogleMapRequestToken) {
+        const sameLocation =
+            persisted &&
+            String(persisted.location || "")
+                .trim()
+                .toLowerCase() === location.toLowerCase();
+        let coordinate = null;
+        if (
+            sameLocation &&
+            hasValidRouteCoordinate(persisted.latitude, persisted.longitude)
+        ) {
+            coordinate = makeRouteCoordinate(
+                persisted.latitude,
+                persisted.longitude,
+                location,
+            );
+        }
+        /*
+        |--------------------------------------------------------------------------
+        | Missing coordinate → Nominatim fallback
+        |--------------------------------------------------------------------------
+        */
+        if (!coordinate) {
+            coordinate = await geocodeRouteLocation(location);
+        }
+        stopCoordinates.push({
+            location,
+            coordinate,
+        });
+    }
+    /*
+    |--------------------------------------------------------------------------
+    | Destination
+    |--------------------------------------------------------------------------
+    */
+    let destination = makeRouteCoordinate(
+        record.destinationLatitude,
+        record.destinationLongitude,
+        record.destination,
+    );
+    if (!destination) {
+        destination = await geocodeRouteLocation(record.destination);
+    }
+    return {
+        origin,
+        stops: stopCoordinates,
+        destination,
+    };
+}
+
+async function requestOsrmOptimizedTrip(routeCoordinates) {
+    const coordinates = [
+        routeCoordinates.origin,
+        ...routeCoordinates.stops.map((stop) => stop.coordinate),
+        routeCoordinates.destination,
+    ];
+    const coordinateString = coordinates
+        .map((point) => `${point.lng},${point.lat}`)
+        .join(";");
+    const url =
+        `https://router.project-osrm.org/trip/v1/driving/${coordinateString}` +
+        "?source=first" +
+        "&destination=last" +
+        "&roundtrip=false" +
+        "&overview=full" +
+        "&geometries=geojson" +
+        "&steps=false";
+    const response = await fetch(url, {
+        headers: {
+            Accept: "application/json",
+        },
+    });
+    if (!response.ok) {
+        throw new Error(
+            `OSRM Trip request failed with status ${response.status}.`,
+        );
+    }
+    const data = await response.json();
+    if (
+        data?.code !== "Ok" ||
+        !Array.isArray(data.trips) ||
+        data.trips.length === 0
+    ) {
+        throw new Error(
+            data?.message || "No optimized driving route was found.",
+        );
+    }
+    return {
+        trip: data.trips[0],
+        waypoints: Array.isArray(data.waypoints) ? data.waypoints : [],
+    };
+}
+
+function getOptimizedRouteStops(originalStops, waypoints) {
+    if (
+        !Array.isArray(originalStops) ||
+        originalStops.length === 0 ||
+        !Array.isArray(waypoints)
+    ) {
+        return originalStops || [];
+    }
+    const entries = [];
+    for (
+        let originalIndex = 0;
+        originalIndex < originalStops.length;
+        originalIndex++
+    ) {
+        const waypoint = waypoints[originalIndex + 1];
+        if (!waypoint) {
+            continue;
+        }
+
+        entries.push({
+            location: originalStops[originalIndex],
+            originalStopIndex: originalIndex,
+            optimizedPosition: Number(waypoint.waypoint_index),
+        });
+    }
+    entries.sort((a, b) => a.optimizedPosition - b.optimizedPosition);
+    return entries;
+}
+/**
+ * Request an actual driving route from OSRM.
+ *
+ * IMPORTANT:
+ * OSRM coordinate format:
+ * longitude,latitude
+ */
+async function requestOsrmRoute(
+    routeCoordinates
+) {
+    const coordinates = [
+        routeCoordinates.origin,
+        ...routeCoordinates.stops.map(
+            (stop) =>
+                stop.coordinate
+        ),
+        routeCoordinates.destination,
+    ];
+    const coordinateString =
+        coordinates
+            .map(
+                (point) =>
+                    `${point.lng},${point.lat}`
+            )
+            .join(";");
+   const url =
+       `https://router.project-osrm.org/route/v1/driving/${coordinateString}` +
+       "?overview=full&geometries=geojson&steps=false";
+
+    const response =
+        await fetch(
+            url,
+            {
+                headers: {
+                    Accept:
+                        "application/json",
+                },
+            }
+        );
+    if (!response.ok) {
+        throw new Error(
+            "Unable to calculate the driving route."
+        );
+    }
+    const data =
+        await response.json();
+    if (
+        data?.code !== "Ok" ||
+        !Array.isArray(
+            data.routes
+        ) ||
+        data.routes.length === 0
+    ) {
+        throw new Error(
+            "No driving route was found between the selected locations."
+        );
+    }
+    return data.routes[0];
+}
+/**
+ * Draw an OSRM GeoJSON route onto Leaflet.
+ */
+function drawRouteOnLeaflet(route, routeCoordinates, record) {
+    if (!routeLeafletMap || !route?.geometry) {
+        return;
+    }
+
+    clearRouteLeafletMap();
+    routeLeafletRouteLayer = L.geoJSON(route.geometry, {
+        style: {
+            weight: 6,
+            opacity: 0.85,
+        },
+    }).addTo(routeLeafletMap);
+    addRouteLeafletMarker(
+        routeCoordinates.origin,
+        "Origin",
+        record.origin,
+        "origin"
+    );
+    routeCoordinates.stops.forEach((stop, index) => {
+        addRouteLeafletMarker(
+            stop.coordinate,
+            `Stop ${index + 1}`,
+            stop.location,
+            "stop",
+            String(index + 1)
+        );
+    });
+    addRouteLeafletMarker(
+        routeCoordinates.destination,
+        "Destination",
+        record.destination,
+        "destination"
+    );
+    const bounds = routeLeafletRouteLayer.getBounds();
+    if (bounds && bounds.isValid()) {
+        routeLeafletMap.fitBounds(bounds, {
+            padding: [40, 40],
+        });
+    }
+    window.setTimeout(() => {
+        routeLeafletMap?.invalidateSize();
+    }, 100);
+}
+/**
+ * Main routing function.
+ *
+ * This is reusable by:
+ * - Route map preview
+ * - Optimize Route button
+ *
+ * options.draw = false
+ * can calculate a route without drawing it.
+ */
+async function calculateRouteWithOsrm(
+    record,
+    options = {}
+) {
+    const map =
+        await initRouteLeafletMap();
+    if (
+        options.draw !== false &&
+        !map
+    ) {
+        return null;
+    }
+    if (
+        !record ||
+        !record.origin ||
+        !record.destination
+    ) {
+        return null;
+    }
+    const requestToken =
+        ++routeRoutingRequestToken;
+    try {
+        const routeCoordinates = await geocodeRouteRecord(record);
+        if (requestToken !== routeRoutingRequestToken) {
             return null;
         }
-        const routes = response?.routes || [];
-        if (routes.length === 0) {
-            throw new Error("Google Maps could not find a driving route.");
+        const route = await requestOsrmRoute(routeCoordinates);
+        if (requestToken !== routeRoutingRequestToken) {
+            return null;
         }
-        const route = routes[0];
         /*
         |--------------------------------------------------------------------------
-        | Draw route polyline
+        | OSRM result
         |--------------------------------------------------------------------------
         */
-        routeGoogleMapPolylines = route.createPolylines();
-        routeGoogleMapPolylines.forEach((polyline) => {
-            polyline.setMap(map);
-        });
-        /*
-        |--------------------------------------------------------------------------
-        | Draw Origin / Stops / Destination markers
-        |--------------------------------------------------------------------------
-        */
-        routeGoogleMapMarkers = await route.createWaypointAdvancedMarkers();
-        routeGoogleMapMarkers.forEach((marker) => {
-            marker.map = map;
-        });
-        /*
-        |--------------------------------------------------------------------------
-        | Fit map to entire route
-        |--------------------------------------------------------------------------
-        */
-        await fitRouteGoogleMapToPath(route.path || []);
-        /*
-        |--------------------------------------------------------------------------
-        | Real Google calculations
-        |--------------------------------------------------------------------------
-        */
-        const distanceMeters = Number(route.distanceMeters || 0);
-        const durationMillis = Number(route.durationMillis || 0);
+        const distanceMeters = Number(route.distance || 0);
+        const durationSeconds = Number(route.duration || 0);
         const distanceKm = distanceMeters > 0 ? distanceMeters / 1000 : null;
         const durationMinutes =
-            durationMillis > 0 ? Math.ceil(durationMillis / 60000) : null;
+            durationSeconds > 0 ? Math.ceil(durationSeconds / 60) : null;
+        if (options.draw !== false) {
+            drawRouteOnLeaflet(route, routeCoordinates, record);
+        }
         return {
-            distanceKm,
+            distanceKm:
+                distanceKm !== null ? Number(distanceKm.toFixed(2)) : null,
             durationMinutes,
-            optimizedWaypointOrder:
-                route.optimizedIntermediateWaypointIndices || [],
             route,
+            routeCoordinates,
         };
     } catch (error) {
-        console.error("Google route calculation failed:", error);
-        if (typeof showToast === "function") {
+        /*
+        |--------------------------------------------------------------------------
+        | Silent preview failures should not create red console noise.
+        |--------------------------------------------------------------------------
+        */
+        if (options.silent !== true) {
+            console.error("Route calculation failed:", error);
+        }
+        if (options.silent !== true && typeof showToast === "function") {
             showToast(
-                error.message || "Unable to calculate route using Google Maps.",
+                error.message || "Unable to calculate the route.",
                 "error",
             );
         }
-        return null;
+        throw error;
     }
 }
 
@@ -1083,7 +1508,7 @@ async function updateRouteMapPanel(record) {
     |--------------------------------------------------------------------------
     */
     if (!record) {
-        clearRouteGoogleMap();
+        clearRouteLeafletMap();
         if (distanceEl) {
             distanceEl.textContent = "—";
         }
@@ -1098,13 +1523,11 @@ async function updateRouteMapPanel(record) {
         }
         return;
     }
+
     /*
     |--------------------------------------------------------------------------
-    | Stored values first
+    | Stored database values
     |--------------------------------------------------------------------------
-    |
-    | The database remains our saved RoutePlan result.
-    |
     */
     if (distanceEl) {
         distanceEl.textContent = formatRouteDistance(record.estimatedDistance);
@@ -1125,10 +1548,17 @@ async function updateRouteMapPanel(record) {
     }
     /*
     |--------------------------------------------------------------------------
-    | Draw actual Google Map route
+    | Draw actual road route using Leaflet + OSRM
     |--------------------------------------------------------------------------
     */
-    await renderGoogleRoute(record);
+    try {
+        await calculateRouteWithOsrm(record, {
+            draw: true,
+            silent: true,
+        });
+    } catch (error) {
+        console.warn("Route preview unavailable:", error?.message || error);
+    }
 }
 
 function updateOptimizationSummaryPanel(record) {

@@ -10,6 +10,10 @@
       href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/css/bootstrap.min.css"
       rel="stylesheet"
     />
+    <link
+        rel="stylesheet"
+        href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    />
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
     <script src="{{ asset('assets/js/core/theme-boot.js') }}"></script>
     <!--

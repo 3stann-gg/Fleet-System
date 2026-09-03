@@ -236,6 +236,30 @@ class RoutePlanController extends Controller
                     'string',
                     'max:100',
                 ],
+                'origin_latitude' => [
+                    'nullable',
+                    'required_with:origin_longitude',
+                    'numeric',
+                    'between:-90,90',
+                ],
+                'origin_longitude' => [
+                    'nullable',
+                    'required_with:origin_latitude',
+                    'numeric',
+                    'between:-180,180',
+                ],
+                'destination_latitude' => [
+                    'nullable',
+                    'required_with:destination_longitude',
+                    'numeric',
+                    'between:-90,90',
+                ],
+                'destination_longitude' => [
+                    'nullable',
+                    'required_with:destination_latitude',
+                    'numeric',
+                    'between:-180,180',
+                ],
                 'estimated_distance' => [
                     'nullable',
                     'numeric',
@@ -274,6 +298,18 @@ class RoutePlanController extends Controller
                     'required',
                     'string',
                     'max:255',
+                ],
+                'stops.*.latitude' => [
+                    'nullable',
+                    'required_with:stops.*.longitude',
+                    'numeric',
+                    'between:-90,90',
+                ],
+                'stops.*.longitude' => [
+                    'nullable',
+                    'required_with:stops.*.latitude',
+                    'numeric',
+                    'between:-180,180',
                 ],
             ]
         );
@@ -361,8 +397,16 @@ class RoutePlanController extends Controller
                         $reservation->id,
                     'origin' =>
                         $reservation->pickup_location,
+                    'origin_latitude' =>
+                        $validated['origin_latitude'] ?? null,
+                    'origin_longitude' =>
+                        $validated['origin_longitude'] ?? null,
                     'destination' =>
                         $reservation->destination,
+                    'destination_latitude' =>
+                        $validated['destination_latitude'] ?? null,
+                    'destination_longitude' =>
+                        $validated['destination_longitude'] ?? null,
                     'priority' =>
                         $reservation->priority,
                     'department' =>
@@ -398,9 +442,12 @@ class RoutePlanController extends Controller
                     $routePlan->stops()->create([
                         'stop_order' =>
                             $index + 1,
-
                         'location' =>
                             $stop['location'],
+                        'latitude' =>
+                            $stop['latitude'] ?? null,
+                        'longitude' =>
+                            $stop['longitude'] ?? null,
                     ]);
                 }
 
@@ -477,6 +524,30 @@ class RoutePlanController extends Controller
                     'string',
                     'max:100',
                 ],
+                'origin_latitude' => [
+                    'nullable',
+                    'required_with:origin_longitude',
+                    'numeric',
+                    'between:-90,90',
+                ],
+                'origin_longitude' => [
+                    'nullable',
+                    'required_with:origin_latitude',
+                    'numeric',
+                    'between:-180,180',
+                ],
+                'destination_latitude' => [
+                    'nullable',
+                    'required_with:destination_longitude',
+                    'numeric',
+                    'between:-90,90',
+                ],
+                'destination_longitude' => [
+                    'nullable',
+                    'required_with:destination_latitude',
+                    'numeric',
+                    'between:-180,180',
+                ],
                 'status' => [
                     'required',
                     'in:Draft,Planned,Ready For Dispatch,Completed,Archived',
@@ -527,6 +598,18 @@ class RoutePlanController extends Controller
                     'required',
                     'string',
                     'max:255',
+                ],
+                'stops.*.latitude' => [
+                    'nullable',
+                    'required_with:stops.*.longitude',
+                    'numeric',
+                    'between:-90,90',
+                ],
+                'stops.*.longitude' => [
+                    'nullable',
+                    'required_with:stops.*.latitude',
+                    'numeric',
+                    'between:-180,180',
                 ],
             ]
         );
@@ -655,8 +738,16 @@ class RoutePlanController extends Controller
                 $routePlan->update([
                     'origin' =>
                         $validated['origin'],
+                    'origin_latitude' =>
+                        $validated['origin_latitude'] ?? null,
+                    'origin_longitude' =>
+                        $validated['origin_longitude'] ?? null,
                     'destination' =>
                         $validated['destination'],
+                    'destination_latitude' =>
+                        $validated['destination_latitude'] ?? null,
+                    'destination_longitude' =>
+                        $validated['destination_longitude'] ?? null,
                     'priority' =>
                         $validated['priority'],
                     'department' =>
@@ -696,9 +787,12 @@ class RoutePlanController extends Controller
                     $routePlan->stops()->create([
                         'stop_order' =>
                             $index + 1,
-
                         'location' =>
                             $stop['location'],
+                        'latitude' =>
+                            $stop['latitude'] ?? null,
+                        'longitude' =>
+                            $stop['longitude'] ?? null,
                     ]);
                 }
 
@@ -1042,8 +1136,16 @@ class RoutePlanController extends Controller
                         $reservation->id,
                     'origin' =>
                         $reservation->pickup_location,
+                    'origin_latitude' =>
+                        null,
+                    'origin_longitude' =>
+                        null,
                     'destination' =>
                         $reservation->destination,
+                    'destination_latitude' =>
+                        null,
+                    'destination_longitude' =>
+                        null,
                     'priority' =>
                         $reservation->priority,
                     'department' =>
@@ -1054,11 +1156,6 @@ class RoutePlanController extends Controller
                         $reservation->schedule_date,
                     'departure_time' =>
                         $reservation->schedule_time,
-                    /*
-                    |--------------------------------------------------------------------------
-                    | Recalculate Optimization
-                    |--------------------------------------------------------------------------
-                    */
                     'estimated_distance' =>
                         null,
                     'estimated_time' =>
@@ -1081,9 +1178,12 @@ class RoutePlanController extends Controller
                     $copy->stops()->create([
                         'stop_order' =>
                             $stop->stop_order,
-
                         'location' =>
                             $stop->location,
+                        'latitude' =>
+                            $stop->latitude,
+                        'longitude' =>
+                            $stop->longitude,
                     ]);
                 }
                 return $copy->load([

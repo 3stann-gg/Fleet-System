@@ -11,8 +11,15 @@ class RoutePlan extends Model
     protected $fillable = [
         'route_number',
         'reservation_id',
+
         'origin',
+        'origin_latitude',
+        'origin_longitude',
+
         'destination',
+        'destination_latitude',
+        'destination_longitude',
+
         'priority',
         'department',
         'status',
@@ -31,6 +38,11 @@ class RoutePlan extends Model
         'estimated_distance' => 'decimal:2',
         'optimization_score' => 'decimal:2',
         'estimated_time' => 'integer',
+
+        'origin_latitude' => 'decimal:7',
+        'origin_longitude' => 'decimal:7',
+        'destination_latitude' => 'decimal:7',
+        'destination_longitude' => 'decimal:7',
     ];
 
     public function reservation(): BelongsTo
