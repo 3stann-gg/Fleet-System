@@ -231,6 +231,15 @@ function applyLaravelValidationErrors(errors) {
     });
 }
 
+function hasRouteCoordinateValue(value) {
+    return (
+        value !== null &&
+        value !== undefined &&
+        value !== "" &&
+        Number.isFinite(Number(value))
+    );
+}
+
 /* ==========================================
    STOPS
 ========================================== */
@@ -474,13 +483,15 @@ async function populateRouteReservations(selectedReservation = null) {
 ========================================== */
 function collectRouteFormData() {
     const get = (id) => document.getElementById(id)?.value?.trim() || "";
+    const stops = getRouteStopsFromForm();
+    const routeCoordinates = routeLastOptimization?.routeCoordinates || null;
 
     return {
         reservationId: get("routeReservation"),
         routeNumber: get("routeNumber"),
         origin: get("routeOrigin"),
         destination: get("routeDestination"),
-        stops: getRouteStopsFromForm(),
+        stops,
         vehicle: get("routeVehicle"),
         driver: get("routeDriver"),
         priority: get("routePriority"),
@@ -500,120 +511,204 @@ function collectRouteFormData() {
         optimizationStrategy: get("routeOptStrategy"),
         optimizationScore:
             document.getElementById("routeOptScore")?.dataset.raw || "",
+
+        /*
+        |--------------------------------------------------------------------------
+        | Persisted origin coordinates
+        |--------------------------------------------------------------------------
+        */
+        originLatitude: routeCoordinates?.origin?.lat ?? null,
+        originLongitude: routeCoordinates?.origin?.lng ?? null,
+        /*
+        |--------------------------------------------------------------------------
+        | Persisted destination coordinates
+        |--------------------------------------------------------------------------
+        */
+        destinationLatitude: routeCoordinates?.destination?.lat ?? null,
+        destinationLongitude: routeCoordinates?.destination?.lng ?? null,
+        /*
+        |--------------------------------------------------------------------------
+        | Stop coordinates aligned with current optimized DOM order
+        |--------------------------------------------------------------------------
+        */
+        stopCoordinates: stops.map((location, index) => {
+            const stopCoordinate = routeCoordinates?.stops?.[index];
+            return {
+                location,
+                latitude: stopCoordinate?.coordinate?.lat ?? null,
+                longitude: stopCoordinate?.coordinate?.lng ?? null,
+            };
+        }),
     };
 }
 
-async function optimizeRouteWithGoogle(data) {
-    if (
-        !window.google ||
-        !google.maps ||
-        typeof google.maps.importLibrary !== "function"
-    ) {
-        throw new Error(
-            "Google Maps is not available. Check your Google Maps API configuration.",
-        );
-    }
+async function optimizeRouteWithOsrm(data) {
     if (!data.origin || !data.destination) {
         throw new Error("Origin and destination are required.");
     }
-    const { Route } = await google.maps.importLibrary("routes");
     const stops = Array.isArray(data.stops)
         ? data.stops.map((stop) => String(stop || "").trim()).filter(Boolean)
         : [];
-    const request = {
+
+    /*
+    |--------------------------------------------------------------------------
+    | First geocode all locations
+    |--------------------------------------------------------------------------
+    */
+    const routeCoordinates = await geocodeRouteRecord({
         origin: data.origin,
         destination: data.destination,
-        travelMode: "DRIVING",
-        routingPreference: "TRAFFIC_AWARE",
-        fields: [
-            "path",
-            "legs",
-            "distanceMeters",
-            "durationMillis",
-            "optimizedIntermediateWaypointIndices",
-        ],
-    };
-    if (stops.length > 0) {
-        request.intermediates = stops.map((stop) => ({
-            location: stop,
-        }));
-
-        request.optimizeWaypointOrder = true;
-    }
-    /*
-    |--------------------------------------------------------------------------
-    | Planned Departure
-    |--------------------------------------------------------------------------
-    */
-    if (data.departureDate && data.departureTime) {
-        const departureDateTime = new Date(
-            `${data.departureDate}T${data.departureTime}`,
-        );
-        if (
-            !Number.isNaN(departureDateTime.getTime()) &&
-            departureDateTime.getTime() >= Date.now()
-        ) {
-            request.departureTime = departureDateTime;
-        }
-    }
-    const { routes } = await Route.computeRoutes(request);
-    if (!Array.isArray(routes) || routes.length === 0) {
-        throw new Error(
-            "Google Maps could not find a route for the selected locations.",
-        );
-    }
-    const route = routes[0];
-    const distanceMeters = Number(route.distanceMeters || 0);
-    const durationMillis = Number(route.durationMillis || 0);
-    if (distanceMeters <= 0 || durationMillis <= 0) {
-        throw new Error("Google Maps returned incomplete route information.");
-    }
-    const estimatedDistance = Number((distanceMeters / 1000).toFixed(2));
-    const estimatedTravelTimeMinutes = Math.max(
-        1,
-        Math.ceil(durationMillis / 60000),
-    );
-    /*
-    |--------------------------------------------------------------------------
-    | Optimized Stop Order
-    |--------------------------------------------------------------------------
-    */
+        stops,
+    });
+    let estimatedDistance = null;
+    let estimatedTravelTimeMinutes = null;
+    let optimizationStrategy = "";
+    let optimizationScore = null;
     let optimizedStops = stops.slice();
-    const optimizedOrder = Array.isArray(
-        route.optimizedIntermediateWaypointIndices,
-    )
-        ? route.optimizedIntermediateWaypointIndices
-        : [];
-    if (stops.length > 0 && optimizedOrder.length === stops.length) {
-        optimizedStops = optimizedOrder
-            .map((index) => stops[index])
-            .filter(Boolean);
+    let optimizedRouteCoordinates = {
+        origin: routeCoordinates.origin,
+        stops: routeCoordinates.stops,
+        destination: routeCoordinates.destination,
+    };
+
+    let routeGeometry = null;
+    /*
+    |--------------------------------------------------------------------------
+    | 2+ Stops → true waypoint optimization
+    |--------------------------------------------------------------------------
+    */
+    if (stops.length >= 2) {
+        const optimized = await requestOsrmOptimizedTrip(routeCoordinates);
+        const trip = optimized.trip;
+        const optimizedStopEntries = getOptimizedRouteStops(
+            stops,
+            optimized.waypoints,
+        );
+        optimizedStops = optimizedStopEntries.map((entry) => entry.location);
+        /*
+        |--------------------------------------------------------------------------
+        | Coordinates must follow optimized stop order
+        |--------------------------------------------------------------------------
+        */
+        optimizedRouteCoordinates = {
+            origin: routeCoordinates.origin,
+            stops: optimizedStopEntries.map((entry) => ({
+                location: entry.location,
+                coordinate:
+                    routeCoordinates.stops[entry.originalStopIndex]
+                        ?.coordinate ?? null,
+            })),
+
+            destination: routeCoordinates.destination,
+        };
+        const distanceMeters = Number(trip.distance || 0);
+        const durationSeconds = Number(trip.duration || 0);
+        if (distanceMeters <= 0 || durationSeconds <= 0) {
+            throw new Error(
+                "The optimized route returned incomplete route information.",
+            );
+        }
+        estimatedDistance = Number((distanceMeters / 1000).toFixed(2));
+        estimatedTravelTimeMinutes = Math.max(
+            1,
+            Math.ceil(durationSeconds / 60),
+        );
+        optimizationStrategy = "OSRM Optimized Waypoints";
+        optimizationScore = 95;
+        routeGeometry = trip.geometry || null;
+
+        /*
+        |--------------------------------------------------------------------------
+        | Draw optimized route
+        |--------------------------------------------------------------------------
+        */
+        drawRouteOnLeaflet(trip, optimizedRouteCoordinates, {
+            origin: data.origin,
+
+            destination: data.destination,
+        });
+    } else {
+        /*
+        |--------------------------------------------------------------------------
+        | 0–1 Stop → normal route
+        |--------------------------------------------------------------------------
+        */
+        const routeResult = await calculateRouteWithOsrm(
+            {
+                origin: data.origin,
+                destination: data.destination,
+                stops,
+            },
+            {
+                draw: true,
+                /*
+                    |--------------------------------------------------------------------------
+                    | Let this function's caller handle errors once.
+                    |--------------------------------------------------------------------------
+                    */
+                silent: true,
+            },
+        );
+        if (!routeResult) {
+            throw new Error("Unable to calculate the route.");
+        }
+        estimatedDistance = Number(routeResult.distanceKm);
+        estimatedTravelTimeMinutes = Number(routeResult.durationMinutes);
+        optimizationStrategy =
+            stops.length === 1 ? "OSRM Multi-stop Route" : "OSRM Fastest Route";
+        optimizationScore = stops.length === 1 ? 92 : 95;
+        routeGeometry = routeResult.route?.geometry || null;
+        /*
+        |--------------------------------------------------------------------------
+        | calculateRouteWithOsrm() already returns the geocoded coordinates
+        |--------------------------------------------------------------------------
+        */
+        optimizedRouteCoordinates =
+            routeResult.routeCoordinates || routeCoordinates;
     }
+    /*
+    |--------------------------------------------------------------------------
+    | Final validation
+    |--------------------------------------------------------------------------
+    */
+    if (
+        !Number.isFinite(estimatedDistance) ||
+        estimatedDistance <= 0 ||
+        !Number.isFinite(estimatedTravelTimeMinutes) ||
+        estimatedTravelTimeMinutes <= 0
+    ) {
+        throw new Error(
+            "The routing service returned incomplete route information.",
+        );
+    }
+
     const vehicleSelect = document.getElementById("routeVehicle");
     const driverSelect = document.getElementById("routeDriver");
+
     return {
         estimatedDistance,
         estimatedTravelTimeMinutes,
         estimatedTravelTime: formatRouteMinutes(estimatedTravelTimeMinutes),
-        optimizationStrategy:
-            stops.length > 1
-                ? "Google Maps Optimized Waypoints"
-                : "Google Maps Fastest Route",
+        optimizationStrategy,
         /*
         |--------------------------------------------------------------------------
-        | Application-defined score
+        | Application-generated score.
+        | OSRM itself does not provide this score.
         |--------------------------------------------------------------------------
-        |
-        | Google does not provide a universal 0-100 optimization score.
-        |
         */
-        optimizationScore: stops.length > 1 ? 95 : 90,
+        optimizationScore,
         recommendedVehicle:
             vehicleSelect?.selectedOptions?.[0]?.textContent?.trim() || "—",
         recommendedDriver:
             driverSelect?.selectedOptions?.[0]?.textContent?.trim() || "—",
         optimizedStops,
-        googleRoute: route,
+        routeGeometry,
+        /*
+        |--------------------------------------------------------------------------
+        | Important for backend coordinate persistence
+        |--------------------------------------------------------------------------
+        */
+        routeCoordinates: optimizedRouteCoordinates,
     };
 }
 
@@ -647,7 +742,7 @@ function applyOptimizationToForm(result) {
     if (summary) {
         summary.hidden = false;
         summary.innerHTML = `
-            <strong>Google Maps Route Optimization</strong>
+            <strong>Route Calculation Complete</strong>
 
             <p>
                 Strategy:
@@ -773,6 +868,10 @@ function buildCreateRoutePayload(data) {
     return {
         reservation_id: Number(data.reservationId),
         department: data.department,
+        origin_latitude: data.originLatitude,
+        origin_longitude: data.originLongitude,
+        destination_latitude: data.destinationLatitude,
+        destination_longitude: data.destinationLongitude,
         estimated_distance:
             data.estimatedDistance === ""
                 ? null
@@ -788,16 +887,18 @@ function buildCreateRoutePayload(data) {
                 : Number(data.optimizationScore),
         purpose: data.purpose || null,
         notes: data.notes || null,
-        stops: data.stops.map((location) => ({
-            location,
-        })),
+        stops: data.stopCoordinates,
     };
 }
 
 function buildUpdateRoutePayload(data) {
     return {
         origin: data.origin,
+        origin_latitude: data.originLatitude,
+        origin_longitude: data.originLongitude,
         destination: data.destination,
+        destination_latitude: data.destinationLatitude,
+        destination_longitude: data.destinationLongitude,
         priority: data.priority,
         department: data.department,
         status: data.status,
@@ -818,9 +919,7 @@ function buildUpdateRoutePayload(data) {
                 : Number(data.optimizationScore),
         purpose: data.purpose || null,
         notes: data.notes || null,
-        stops: data.stops.map((location) => ({
-            location,
-        })),
+        stops: data.stopCoordinates,
     };
 }
 
@@ -970,6 +1069,60 @@ async function openRouteFormModal(mode, record = null) {
                     ? ""
                     : String(fullRoute.optimizationScore);
         }
+        /*
+        |--------------------------------------------------------------------------
+        | Restore persisted route optimization + coordinates
+        |--------------------------------------------------------------------------
+        */
+        const hasOriginCoordinates =
+            hasRouteCoordinateValue(fullRoute.originLatitude) &&
+            hasRouteCoordinateValue(fullRoute.originLongitude);
+        const hasDestinationCoordinates =
+            hasRouteCoordinateValue(fullRoute.destinationLatitude) &&
+            hasRouteCoordinateValue(fullRoute.destinationLongitude);
+        const restoredStopCoordinates = Array.isArray(fullRoute.stopCoordinates)
+            ? fullRoute.stopCoordinates.map((stop) => {
+                  const hasCoordinates =
+                      hasRouteCoordinateValue(stop?.latitude) &&
+                      hasRouteCoordinateValue(stop?.longitude);
+                  return {
+                      location: String(stop?.location || "").trim(),
+                      coordinate: hasCoordinates
+                          ? {
+                                lat: Number(stop.latitude),
+                                lng: Number(stop.longitude),
+                            }
+                          : null,
+                  };
+              })
+            : [];
+        routeLastOptimization = {
+            estimatedDistance: fullRoute.estimatedDistance,
+            estimatedTravelTimeMinutes: fullRoute.estimatedTravelTimeMinutes,
+            estimatedTravelTime: fullRoute.estimatedTravelTime,
+            optimizationStrategy: fullRoute.optimizationStrategy,
+            optimizationScore: fullRoute.optimizationScore,
+            optimizedStops: Array.isArray(fullRoute.stops)
+                ? fullRoute.stops.slice()
+                : [],
+            routeCoordinates: {
+                origin: hasOriginCoordinates
+                    ? {
+                          lat: Number(fullRoute.originLatitude),
+                          lng: Number(fullRoute.originLongitude),
+                          displayName: fullRoute.origin,
+                      }
+                    : null,
+                stops: restoredStopCoordinates,
+                destination: hasDestinationCoordinates
+                    ? {
+                          lat: Number(fullRoute.destinationLatitude),
+                          lng: Number(fullRoute.destinationLongitude),
+                          displayName: fullRoute.destination,
+                      }
+                    : null,
+            },
+        };
     } else {
 
     /*
@@ -1467,14 +1620,35 @@ async function runRouteOptimization({ showSuccessToast = true } = {}) {
     const data = collectRouteFormData();
     if (!data.origin || !data.destination) {
         throw new Error(
-            "Origin and destination are required before optimizing.",
+            "Origin and destination are required before calculating the route.",
         );
     }
-    const result = await optimizeRouteWithGoogle(data);
-    applyOptimizationToForm(result);
     /*
     |--------------------------------------------------------------------------
-    | Apply optimized stop order to form
+    | Calculate using Nominatim + OSRM.
+    | optimizeRouteWithOsrm() already draws the result.
+    |--------------------------------------------------------------------------
+    */
+    const result = await optimizeRouteWithOsrm(data);
+    if (
+        Array.isArray(data.stops) &&
+        Array.isArray(result.optimizedStops) &&
+        data.stops.length !== result.optimizedStops.length
+    ) {
+        throw new Error(
+            "The optimized route returned an incomplete stop sequence.",
+        );
+    }
+    /*
+    |--------------------------------------------------------------------------
+    | Store latest optimization result including coordinates
+    |--------------------------------------------------------------------------
+    */
+    applyOptimizationToForm(result);
+
+    /*
+    |--------------------------------------------------------------------------
+    | Render optimized stop order into form.
     |--------------------------------------------------------------------------
     */
     if (Array.isArray(result.optimizedStops)) {
@@ -1482,24 +1656,47 @@ async function runRouteOptimization({ showSuccessToast = true } = {}) {
     }
     /*
     |--------------------------------------------------------------------------
-    | Update Google Map preview
+    | Update map labels only.
+    | Do NOT call updateRouteMapPanel() here,
+    | because route is already drawn.
     |--------------------------------------------------------------------------
     */
-    if (typeof renderGoogleRoute === "function") {
-        await renderGoogleRoute({
-            origin: data.origin,
-            destination: data.destination,
-            stops: result.optimizedStops || data.stops,
-            estimatedDistance: result.estimatedDistance,
-            estimatedTravelTime: result.estimatedTravelTime,
-            optimizationStrategy: result.optimizationStrategy,
-            optimizationScore: result.optimizationScore,
-            status: data.status || "Draft",
-        });
+    const mapDistance = document.getElementById("mapDistanceLabel");
+    const mapEta = document.getElementById("mapEtaLabel");
+    const mapStatus = document.getElementById("mapStatusLabel");
+    const mapStrategy = document.getElementById("mapStrategyLabel");
+    if (mapDistance) {
+        mapDistance.textContent = formatRouteDistance(result.estimatedDistance);
     }
-
+    if (mapEta) {
+        mapEta.textContent = result.estimatedTravelTime || "—";
+    }
+    if (mapStatus) {
+        mapStatus.textContent = data.status || "Draft";
+    }
+    if (mapStrategy) {
+        mapStrategy.textContent = result.optimizationStrategy
+            ? result.optimizationStrategy +
+              (result.optimizationScore != null
+                  ? ` · Score ${result.optimizationScore}`
+                  : "")
+            : "—";
+    }
+    /*
+    |--------------------------------------------------------------------------
+    | Optimization summary
+    |--------------------------------------------------------------------------
+    */
+    updateOptimizationSummaryPanel({
+        estimatedDistance: result.estimatedDistance,
+        estimatedTravelTime: result.estimatedTravelTime,
+        optimizationStrategy: result.optimizationStrategy,
+        optimizationScore: result.optimizationScore,
+        vehicle: result.recommendedVehicle,
+        driver: result.recommendedDriver,
+    });
     if (showSuccessToast && typeof showToast === "function") {
-        showToast("Google Maps route optimization complete.", "success");
+        showToast("Route optimized successfully.", "success");
     }
     return result;
 }
@@ -1615,12 +1812,11 @@ function initRoutePlanningModals() {
                     showSuccessToast: true,
                 });
             } catch (error) {
-                console.error("Google Maps route optimization failed:", error);
+                console.error("Route calculation failed:", error);
 
                 if (typeof showToast === "function") {
                     showToast(
-                        error.message ||
-                            "Unable to optimize route using Google Maps.",
+                        error.message || "Unable to calculate the route.",
                         "error",
                     );
                 }

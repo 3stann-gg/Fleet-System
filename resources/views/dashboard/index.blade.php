@@ -544,18 +544,24 @@
                   <div class="card-header">
                     <div>
                       <h3>Fleet Operations Map</h3>
-                      <p class="card-subtitle">Vehicle location overview</p>
+                      <p class="card-subtitle">
+                          Hospital fleet operations coverage
+                      </p>
                     </div>
-                    <button type="button" class="btn-filter">Overview</button>
+                    <button type="button" class="btn-filter">Dispatches</button>
                   </div>
-                  <div class="map-placeholder">
-                    <i class="ph-fill ph-map-trifold" aria-hidden="true"></i>
-                    <h4>Map not connected</h4>
-                    <p>
-                      Live vehicle tracking is not enabled in this frontend build.
-                      Dispatch and vehicle lists remain available above.
-                    </p>
-                  </div>
+                  <div
+                      id="fleetOperationsMap"
+                      class="dashboard-leaflet-map"
+                      role="region"
+                      aria-label="Fleet Operations Map"
+                  ></div>
+
+                  <p class="settings-note dashboard-map-note">
+                      Map markers represent active dispatch pickup and destination
+                      locations based on reservation data. Live GPS vehicle tracking
+                      is not enabled.
+                  </p>
                 </div>
 
                 <div class="card analytics-card">
@@ -623,8 +629,12 @@
 
     <script>
         window.FLEET_RBAC = window.FLEET_RBAC || {};
-        window.FLEET_RBAC.role = @json(auth()->user()?->role);
-        window.FLEET_RBAC.dashboard = @json($dashboardPermissions ?? []);
+        window.FLEET_RBAC.role =
+            @json(auth()->user()?->role);
+        window.FLEET_RBAC.dashboard =
+            @json($dashboardPermissions ?? []);
+        window.DASHBOARD_MAP_DISPATCHES =
+            @json($dashboardMapDispatches ?? []);
     </script>
 
     <script src="{{ asset('assets/js/helpers/rbac.js') }}"></script>   
@@ -632,6 +642,7 @@
     @push('scripts')
     
     <script src="{{ asset('assets/js/core/pending-action.js') }}"></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="{{ asset('assets/js/dashboard/dashboard.js') }}"></script>
 
     @endpush

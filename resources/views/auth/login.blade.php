@@ -68,7 +68,7 @@
                     required
                     autofocus
                     maxlength="120"
-                    placeholder="admin@talahospital.com"
+                    placeholder="Enter email"
                     @class([
                         'is-invalid' => $errors->has('email'),
                     ])

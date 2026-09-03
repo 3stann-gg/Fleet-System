@@ -188,28 +188,42 @@
 
             <div class="route-planning-layout">
               <div class="card route-map-card">
-                <div class="card-header">
-                  <div>
-                    <h3>Route Map Preview</h3>
-                    <p class="card-subtitle">
-                      Live route preview powered by Google Maps
-                    </p>
+                  <div class="card-header">
+                      <div>
+                          <h3>Route Map Preview</h3>
+                          <p class="card-subtitle">
+                              Interactive route preview using OpenStreetMap
+                          </p>
+                      </div>
                   </div>
-                </div>
-                <div
-                  id="routeGoogleMap"
-                  class="route-google-map"
-                  aria-label="Google Maps route preview"
-                ></div>
-                <div class="route-map-meta">
-                  <div>Distance<strong id="mapDistanceLabel">—</strong></div>
-                  <div>ETA<strong id="mapEtaLabel">—</strong></div>
-                  <div>Status<strong id="mapStatusLabel">—</strong></div>
-                  <div>Strategy<strong id="mapStrategyLabel">—</strong></div>
-                </div>
-                <p class="route-map-note">
-                  Route distance and estimated travel time are calculated using Google Maps.
-                </p>
+                  <div
+                      id="routeLeafletMap"
+                      class="route-leaflet-map"
+                      role="region"
+                      aria-label="Route planning map preview"
+                  ></div>
+                  <div class="route-map-meta">
+                      <div>
+                          Distance
+                          <strong id="mapDistanceLabel">—</strong>
+                      </div>
+                      <div>
+                          ETA
+                          <strong id="mapEtaLabel">—</strong>
+                      </div>
+                      <div>
+                          Status
+                          <strong id="mapStatusLabel">—</strong>
+                      </div>
+                      <div>
+                          Strategy
+                          <strong id="mapStrategyLabel">—</strong>
+                      </div>
+                  </div>
+                  <p class="route-map-note">
+                      Route distance and estimated travel time are calculated
+                      using OpenStreetMap routing data.
+                  </p>
               </div>
 
               <div class="card route-opt-card">
@@ -217,7 +231,7 @@
                   <div>
                     <h3>Optimization Summary</h3>
                     <p class="card-subtitle">
-                      Google Maps route optimization results
+                        Route optimization and travel estimates
                     </p>
                   </div>
                 </div>
@@ -560,72 +574,6 @@
             </div>
           </div>
       @endif
-    
-
-    <script>
-      window.HIMS_GOOGLE_MAPS_KEY =
-          @json(config('services.google_maps.key'));
-    </script>
-    <script>
-        (g => {
-            var h, a, k,
-                p = "The Google Maps JavaScript API",
-                c = "google",
-                l = "importLibrary",
-                q = "__ib__",
-                m = document,
-                b = window;
-            b = b[c] || (b[c] = {});
-            var d = b.maps || (b.maps = {}),
-                r = new Set(),
-                e = new URLSearchParams(),
-                u = () =>
-                    h ||
-                    (h = new Promise(async (f, n) => {
-                        await (a = m.createElement("script"));
-                        e.set("libraries", [...r] + "");
-                        for (k in g) {
-                            e.set(
-                                k.replace(
-                                    /[A-Z]/g,
-                                    t => "_" + t[0].toLowerCase()
-                                ),
-                                g[k]
-                            );
-                        }
-                        e.set("callback", c + ".maps." + q);
-                        a.src =
-                            `https://maps.${c}apis.com/maps/api/js?` + e;
-                        d[q] = f;
-                        a.onerror = () =>
-                            h = n(
-                                Error(
-                                    p + " could not load."
-                                )
-                            );
-                        a.nonce =
-                            m.querySelector(
-                                "script[nonce]"
-                            )?.nonce || "";
-                        m.head.append(a);
-                    }));
-            d[l]
-                ? console.warn(
-                    p + " only loads once. Ignoring:",
-                    g
-                )
-                : d[l] = (f, ...n) =>
-                    r.add(f) &&
-                    u().then(() =>
-                        d[l](f, ...n)
-                    );
-        })({
-            key: window.HIMS_GOOGLE_MAPS_KEY,
-            v: "weekly",
-            region: "PH",
-            language: "en",
-        });
-    </script>
 
     <script>
         window.FLEET_RBAC = window.FLEET_RBAC || {};
@@ -643,13 +591,14 @@
 
     @push('scripts')
 
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="{{ asset('assets/js/components/dropdown.js') }}"></script>
     <script src="{{ asset('assets/js/route-planning/route-store.js') }}"></script>
     <script src="{{ asset('assets/js/route-planning/route-pipeline.js') }}"></script>
     <script src="{{ asset('assets/js/route-planning/route-modal.js') }}"></script>
     <script src="{{ asset('assets/js/route-planning/route-templates.js') }}"></script>
     <script src="{{ asset('assets/js/route-planning/route-export.js') }}"></script>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/js/bootstrap.bundle.min.js"></script>>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/js/bootstrap.bundle.min.js"></script>
 
     @endpush
 

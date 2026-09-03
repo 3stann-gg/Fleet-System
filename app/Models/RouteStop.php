@@ -11,10 +11,14 @@ class RouteStop extends Model
         'route_plan_id',
         'stop_order',
         'location',
+        'latitude',
+        'longitude',
     ];
 
     protected $casts = [
         'stop_order' => 'integer',
+        'latitude' => 'decimal:7',
+        'longitude' => 'decimal:7',
     ];
 
     public function routePlan(): BelongsTo
