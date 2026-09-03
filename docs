@@ -1,0 +1,657 @@
+Fleet-Transportation-Frontend-Starter/
+|-- .vscode/
+|   +-- settings.json
+|-- assets/
+|   |-- css/
+|   |   |-- base/
+|   |   |   |-- layout.css
+|   |   |   |-- motion.css
+|   |   |   |-- reset.css
+|   |   |   |-- responsive.css
+|   |   |   |-- typography.css
+|   |   |   |-- utilities.css
+|   |   |   +-- variables.css
+|   |   |-- components/
+|   |   |   |-- badges.css
+|   |   |   |-- buttons.css
+|   |   |   |-- cards.css
+|   |   |   |-- dropdown.css
+|   |   |   |-- forms.css
+|   |   |   |-- modal.css
+|   |   |   |-- navbar.css
+|   |   |   |-- pagination.css
+|   |   |   |-- search.css
+|   |   |   |-- sidebar.css
+|   |   |   |-- skeleton.css
+|   |   |   |-- tables.css
+|   |   |   |-- toast.css
+|   |   |   +-- toolbar.css
+|   |   |-- pages/
+|   |   |   |-- cost-analysis.css
+|   |   |   |-- dashboard.css
+|   |   |   |-- driver.css
+|   |   |   |-- fuel.css
+|   |   |   |-- login.css
+|   |   |   |-- maintenance.css
+|   |   |   |-- profile.css
+|   |   |   |-- reports.css
+|   |   |   |-- reservation.css
+|   |   |   |-- route-planning.css
+|   |   |   |-- settings.css
+|   |   |   +-- vehicle.css
+|   |   +-- style.css
+|   |-- images/
+|   |   |-- brand/
+|   |   |   |-- favicon.svg
+|   |   |   |-- hims-fleet-logo.svg
+|   |   |   +-- hims-fleet-mark.svg
+|   |   +-- vehicle-placeholder.svg
+|   +-- js/
+|       |-- auth/
+|       |   +-- login.js
+|       |-- components/
+|       |   |-- dropdown.js
+|       |   +-- navbar.js
+|       |-- core/
+|       |   |-- auth.js
+|       |   |-- auth-boot.js
+|       |   |-- include.js
+|       |   |-- main.js
+|       |   |-- pending-action.js
+|       |   |-- theme-boot.js
+|       |   |-- toast.js
+|       |   +-- user-profile.js
+|       |-- cost-analysis/
+|       |   |-- cost-budget.js
+|       |   |-- cost-charts.js
+|       |   |-- cost-data.js
+|       |   |-- cost-export.js
+|       |   |-- cost-init.js
+|       |   |-- cost-pipeline.js
+|       |   |-- cost-presets.js
+|       |   +-- cost-table.js
+|       |-- dashboard/
+|       |   +-- dashboard.js
+|       |-- dispatch/
+|       |   |-- dispatch-add.js
+|       |   |-- dispatch-bulk.js
+|       |   |-- dispatch-delete.js
+|       |   |-- dispatch-edit.js
+|       |   |-- dispatch-export.js
+|       |   |-- dispatch-filter.js
+|       |   |-- dispatch-modal.js
+|       |   |-- dispatch-pagination.js
+|       |   |-- dispatch-print.js
+|       |   |-- dispatch-sort.js
+|       |   |-- dispatch-stats.js
+|       |   +-- dispatch-view.js
+|       |-- driver/
+|       |   |-- driver.js
+|       |   |-- driver-add.js
+|       |   |-- driver-bulk.js
+|       |   |-- driver-delete.js
+|       |   |-- driver-edit.js
+|       |   |-- driver-export.js
+|       |   |-- driver-filter.js
+|       |   |-- driver-pagination.js
+|       |   |-- driver-print.js
+|       |   |-- driver-search.js
+|       |   |-- driver-sort.js
+|       |   |-- driver-stats.js
+|       |   +-- driver-view.js
+|       |-- fuel/
+|       |   |-- fuel-add.js
+|       |   |-- fuel-bulk.js
+|       |   |-- fuel-delete.js
+|       |   |-- fuel-edit.js
+|       |   |-- fuel-export.js
+|       |   |-- fuel-modal.js
+|       |   |-- fuel-pagination.js
+|       |   |-- fuel-print.js
+|       |   |-- fuel-search.js
+|       |   |-- fuel-sort.js
+|       |   |-- fuel-statistics.js
+|       |   +-- fuel-view.js
+|       |-- maintenance/
+|       |   |-- maintenance-add.js
+|       |   |-- maintenance-bulk.js
+|       |   |-- maintenance-delete.js
+|       |   |-- maintenance-edit.js
+|       |   |-- maintenance-export.js
+|       |   |-- maintenance-modal.js
+|       |   |-- maintenance-pagination.js
+|       |   |-- maintenance-print.js
+|       |   |-- maintenance-search.js
+|       |   |-- maintenance-sort.js
+|       |   |-- maintenance-statistics.js
+|       |   +-- maintenance-view.js
+|       |-- profile/
+|       |   +-- profile-page.js
+|       |-- reports/
+|       |   |-- reports.js
+|       |   |-- reports-charts.js
+|       |   |-- reports-data.js
+|       |   |-- reports-export.js
+|       |   |-- reports-pipeline.js
+|       |   |-- reports-presets.js
+|       |   +-- reports-table.js
+|       |-- reservation/
+|       |   |-- reservation-add.js
+|       |   |-- reservation-bulk.js
+|       |   |-- reservation-delete.js
+|       |   |-- reservation-edit.js
+|       |   |-- reservation-export.js
+|       |   |-- reservation-filter.js
+|       |   |-- reservation-modal.js
+|       |   |-- reservation-pagination.js
+|       |   |-- reservation-print.js
+|       |   |-- reservation-sort.js
+|       |   |-- reservation-stats.js
+|       |   +-- reservation-view.js
+|       |-- route-planning/
+|       |   |-- route-export.js
+|       |   |-- route-modal.js
+|       |   |-- route-pipeline.js
+|       |   |-- route-store.js
+|       |   +-- route-templates.js
+|       |-- settings/
+|       |   |-- settings.js
+|       |   +-- settings-store.js
+|       +-- vehicle/
+|           |-- vehicle-add.js
+|           |-- vehicle-bulk.js
+|           |-- vehicle-delete.js
+|           |-- vehicle-edit.js
+|           |-- vehicle-export.js
+|           |-- vehicle-filters.js
+|           |-- vehicle-form.js
+|           |-- vehicle-image.js
+|           |-- vehicle-modal.js
+|           |-- vehicle-pagination.js
+|           |-- vehicle-print.js
+|           |-- vehicle-sort.js
+|           |-- vehicle-stats.js
+|           +-- vehicle-view.js
+|-- components/
+|   |-- dispatch/
+|   |   |-- add-dispatch-modal.html
+|   |   |-- delete-dispatch-modal.html
+|   |   |-- edit-dispatch-modal.html
+|   |   +-- view-dispatch-modal.html
+|   |-- driver/
+|   |   |-- add-driver-modal.html
+|   |   |-- delete-driver-modal.html
+|   |   |-- edit-driver-modal.html
+|   |   +-- view-driver-modal.html
+|   |-- fuel/
+|   |   |-- add-fuel-modal.html
+|   |   |-- delete-fuel-modal.html
+|   |   |-- edit-fuel-modal.html
+|   |   +-- view-fuel-modal.html
+|   |-- maintenance/
+|   |   |-- add-maintenance-modal.html
+|   |   |-- delete-maintenance-modal.html
+|   |   |-- edit-maintenance-modal.html
+|   |   +-- view-maintenance-modal.html
+|   |-- reservation/
+|   |   |-- add-reservation-modal.html
+|   |   |-- delete-reservation-modal.html
+|   |   |-- edit-reservation-modal.html
+|   |   +-- view-reservation-modal.html
+|   |-- shared/
+|   |   |-- navbar.html
+|   |   |-- sidebar.html
+|   |   +-- toast.html
+|   +-- vehicle/
+|       |-- add-vehicle-modal.html
+|       |-- delete-vehicle-modal.html
+|       |-- edit-vehicle-modal.html
+|       +-- view-vehicle-modal.html
+|-- cost-analysis/
+|   +-- index.html
+|-- dashboard/
+|   +-- index.html
+|-- dispatch/
+|   +-- index.html
+|-- docs/
+|   |-- 03-FOLDER-STRUCTURE.md
+|   +-- design-system.md
+|-- driver/
+|   +-- index.html
+|-- fleet/
+|   +-- index.html
+|-- fuel/
+|   +-- index.html
+|-- login/
+|   +-- index.html
+|-- maintenance/
+|   +-- index.html
+|-- profile/
+|   +-- index.html
+|-- reports/
+|   +-- index.html
+|-- reservation/
+|   +-- index.html
+|-- route-planning/
+|   +-- index.html
+|-- settings/
+|   +-- index.html
+|-- .gitignore
+|-- index.html
++-- README.md
+
+FLEET-SYSTEM/ Backend
+|-- .vscode/
+|   +-- settings.json
+|-- assets/
+|   |-- css/
+|   |   |-- base/
+|   |   |   |-- layout.css
+|   |   |   |-- motion.css
+|   |   |   |-- reset.css
+|   |   |   |-- responsive.css
+|   |   |   |-- typography.css
+|   |   |   |-- utilities.css
+|   |   |   +-- variables.css
+|   |   |-- components/
+|   |   |   |-- badges.css
+|   |   |   |-- buttons.css
+|   |   |   |-- cards.css
+|   |   |   |-- dropdown.css
+|   |   |   |-- forms.css
+|   |   |   |-- modal.css
+|   |   |   |-- navbar.css
+|   |   |   |-- pagination.css
+|   |   |   |-- search.css
+|   |   |   |-- sidebar.css
+|   |   |   |-- skeleton.css
+|   |   |   |-- tables.css
+|   |   |   |-- toast.css
+|   |   |   +-- toolbar.css
+|   |   |-- pages/
+|   |   |   |-- cost-analysis.css
+|   |   |   |-- dashboard.css
+|   |   |   |-- driver.css
+|   |   |   |-- fuel.css
+|   |   |   |-- login.css
+|   |   |   |-- maintenance.css
+|   |   |   |-- profile.css
+|   |   |   |-- reports.css
+|   |   |   |-- reservation.css
+|   |   |   |-- route-planning.css
+|   |   |   |-- settings.css
+|   |   |   +-- vehicle.css
+|   |   +-- style.css
+|   |-- images/
+|   |   |-- brand/
+|   |   |   |-- favicon.svg
+|   |   |   |-- hims-fleet-logo.svg
+|   |   |   +-- hims-fleet-mark.svg
+|   |   +-- vehicle-placeholder.svg
+|   +-- js/
+|       |-- auth/
+|       |   +-- login.js
+|       |-- components/
+|       |   |-- dropdown.js
+|       |   +-- navbar.js
+|       |-- core/
+|       |   |-- auth.js
+|       |   |-- auth-boot.js
+|       |   |-- include.js
+|       |   |-- main.js
+|       |   |-- pending-action.js
+|       |   |-- theme-boot.js
+|       |   |-- toast.js
+|       |   +-- user-profile.js
+|       |-- cost-analysis/
+|       |   |-- cost-budget.js
+|       |   |-- cost-charts.js
+|       |   |-- cost-data.js
+|       |   |-- cost-export.js
+|       |   |-- cost-init.js
+|       |   |-- cost-pipeline.js
+|       |   |-- cost-presets.js
+|       |   +-- cost-table.js
+|       |-- dashboard/
+|       |   +-- dashboard.js
+|       |-- dispatch/
+|       |   |-- dispatch-add.js
+|       |   |-- dispatch-bulk.js
+|       |   |-- dispatch-delete.js
+|       |   |-- dispatch-edit.js
+|       |   |-- dispatch-export.js
+|       |   |-- dispatch-filter.js
+|       |   |-- dispatch-modal.js
+|       |   |-- dispatch-pagination.js
+|       |   |-- dispatch-print.js
+|       |   |-- dispatch-sort.js
+|       |   |-- dispatch-stats.js
+|       |   +-- dispatch-view.js
+|       |-- driver/
+|       |   |-- driver.js
+|       |   |-- driver-add.js
+|       |   |-- driver-bulk.js
+|       |   |-- driver-delete.js
+|       |   |-- driver-edit.js
+|       |   |-- driver-export.js
+|       |   |-- driver-filter.js
+|       |   |-- driver-pagination.js
+|       |   |-- driver-print.js
+|       |   |-- driver-search.js
+|       |   |-- driver-sort.js
+|       |   |-- driver-stats.js
+|       |   +-- driver-view.js
+|       |-- fuel/
+|       |   |-- fuel-add.js
+|       |   |-- fuel-bulk.js
+|       |   |-- fuel-delete.js
+|       |   |-- fuel-edit.js
+|       |   |-- fuel-export.js
+|       |   |-- fuel-modal.js
+|       |   |-- fuel-pagination.js
+|       |   |-- fuel-print.js
+|       |   |-- fuel-search.js
+|       |   |-- fuel-sort.js
+|       |   |-- fuel-statistics.js
+|       |   +-- fuel-view.js
+|       |-- maintenance/
+|       |   |-- maintenance-add.js
+|       |   |-- maintenance-bulk.js
+|       |   |-- maintenance-delete.js
+|       |   |-- maintenance-edit.js
+|       |   |-- maintenance-export.js
+|       |   |-- maintenance-modal.js
+|       |   |-- maintenance-pagination.js
+|       |   |-- maintenance-print.js
+|       |   |-- maintenance-search.js
+|       |   |-- maintenance-sort.js
+|       |   |-- maintenance-statistics.js
+|       |   +-- maintenance-view.js
+|       |-- profile/
+|       |   +-- profile-page.js
+|       |-- reports/
+|       |   |-- reports.js
+|       |   |-- reports-charts.js
+|       |   |-- reports-data.js
+|       |   |-- reports-export.js
+|       |   |-- reports-pipeline.js
+|       |   |-- reports-presets.js
+|       |   +-- reports-table.js
+|       |-- reservation/
+|       |   |-- reservation-add.js
+|       |   |-- reservation-bulk.js
+|       |   |-- reservation-delete.js
+|       |   |-- reservation-edit.js
+|       |   |-- reservation-export.js
+|       |   |-- reservation-filter.js
+|       |   |-- reservation-modal.js
+|       |   |-- reservation-pagination.js
+|       |   |-- reservation-print.js
+|       |   |-- reservation-sort.js
+|       |   |-- reservation-stats.js
+|       |   +-- reservation-view.js
+|       |-- route-planning/
+|       |   |-- route-export.js
+|       |   |-- route-modal.js
+|       |   |-- route-pipeline.js
+|       |   |-- route-store.js
+|       |   +-- route-templates.js
+|       |-- settings/
+|       |   |-- settings.js
+|       |   +-- settings-store.js
+|       +-- vehicle/
+|           |-- vehicle-add.js
+|           |-- vehicle-bulk.js
+|           |-- vehicle-delete.js
+|           |-- vehicle-edit.js
+|           |-- vehicle-export.js
+|           |-- vehicle-filters.js
+|           |-- vehicle-form.js
+|           |-- vehicle-image.js
+|           |-- vehicle-modal.js
+|           |-- vehicle-pagination.js
+|           |-- vehicle-print.js
+|           |-- vehicle-sort.js
+|           |-- vehicle-stats.js
+|           +-- vehicle-view.js
+|-- components/
+|   |-- dispatch/
+|   |   |-- add-dispatch-modal.html
+|   |   |-- delete-dispatch-modal.html
+|   |   |-- edit-dispatch-modal.html
+|   |   +-- view-dispatch-modal.html
+|   |-- driver/
+|   |   |-- add-driver-modal.html
+|   |   |-- delete-driver-modal.html
+|   |   |-- edit-driver-modal.html
+|   |   +-- view-driver-modal.html
+|   |-- fuel/
+|   |   |-- add-fuel-modal.html
+|   |   |-- delete-fuel-modal.html
+|   |   |-- edit-fuel-modal.html
+|   |   +-- view-fuel-modal.html
+|   |-- maintenance/
+|   |   |-- add-maintenance-modal.html
+|   |   |-- delete-maintenance-modal.html
+|   |   |-- edit-maintenance-modal.html
+|   |   +-- view-maintenance-modal.html
+|   |-- reservation/
+|   |   |-- add-reservation-modal.html
+|   |   |-- delete-reservation-modal.html
+|   |   |-- edit-reservation-modal.html
+|   |   +-- view-reservation-modal.html
+|   |-- shared/
+|   |   |-- navbar.html
+|   |   |-- sidebar.html
+|   |   +-- toast.html
+|   +-- vehicle/
+|       |-- add-vehicle-modal.html
+|       |-- delete-vehicle-modal.html
+|       |-- edit-vehicle-modal.html
+|       +-- view-vehicle-modal.html
+|-- cost-analysis/
+|   +-- index.html
+|-- dashboard/
+|   +-- index.html
+|-- dispatch/
+|   +-- index.html
+|-- docs/
+|   |-- 03-FOLDER-STRUCTURE.md
+|   +-- design-system.md
+|-- driver/
+|   +-- index.html
+|-- fleet/
+|   +-- index.html
+|-- fuel/
+|   +-- index.html
+|-- login/
+|   +-- index.html
+|-- maintenance/
+|   +-- index.html
+|-- profile/
+|   +-- index.html
+|-- reports/
+|   +-- index.html
+|-- reservation/
+|   +-- index.html
+|-- route-planning/
+|   +-- index.html
+|-- settings/
+|   +-- index.html
+|-- .gitignore
+|-- index.html
++-- README.md
+
+public/
+    |-- assets/
+    |   |-- css/
+    |   |   |-- base/
+    |   |   |   |-- layout.css
+    |   |   |   |-- motion.css
+    |   |   |   |-- reset.css
+    |   |   |   |-- responsive.css
+    |   |   |   |-- typography.css
+    |   |   |   |-- utilities.css
+    |   |   |   +-- variables.css
+    |   |   |-- components/
+    |   |   |   |-- badges.css
+    |   |   |   |-- buttons.css
+    |   |   |   |-- cards.css
+    |   |   |   |-- dropdown.css
+    |   |   |   |-- forms.css
+    |   |   |   |-- modal.css
+    |   |   |   |-- navbar.css
+    |   |   |   |-- pagination.css
+    |   |   |   |-- search.css
+    |   |   |   |-- sidebar.css
+    |   |   |   |-- skeleton.css
+    |   |   |   |-- tables.css
+    |   |   |   |-- toast.css
+    |   |   |   +-- toolbar.css
+    |   |   |-- pages/
+    |   |   |   |-- cost-analysis.css
+    |   |   |   |-- dashboard.css
+    |   |   |   |-- driver.css
+    |   |   |   |-- fuel.css
+    |   |   |   |-- login.css
+    |   |   |   |-- maintenance.css
+    |   |   |   |-- profile.css
+    |   |   |   |-- reports.css
+    |   |   |   |-- reservation.css
+    |   |   |   |-- route-planning.css
+    |   |   |   |-- settings.css
+    |   |   |   +-- vehicle.css
+    |   |   +-- style.css
+    |   |-- images/
+    |   |   |-- brand/
+    |   |   |   |-- favicon.svg
+    |   |   |   |-- hims-fleet-logo.svg
+    |   |   |   +-- hims-fleet-mark.svg
+    |   |   +-- vehicle-placeholder.svg
+    |   +-- js/
+    |       |-- auth/
+    |       |   +-- login.js
+    |       |-- components/
+    |       |   |-- dropdown.js
+    |       |   +-- navbar.js
+    |       |-- core/
+    |       |   |-- auth.js
+    |       |   |-- auth-boot.js
+    |       |   |-- include.js
+    |       |   |-- main.js
+    |       |   |-- pending-action.js
+    |       |   |-- theme-boot.js
+    |       |   |-- toast.js
+    |       |   +-- user-profile.js
+    |       |-- cost-analysis/
+    |       |   |-- cost-budget.js
+    |       |   |-- cost-charts.js
+    |       |   |-- cost-data.js
+    |       |   |-- cost-export.js
+    |       |   |-- cost-init.js
+    |       |   |-- cost-pipeline.js
+    |       |   |-- cost-presets.js
+    |       |   +-- cost-table.js
+    |       |-- dashboard/
+    |       |   +-- dashboard.js
+    |       |-- dispatch/
+    |       |   |-- dispatch-add.js
+    |       |   |-- dispatch-bulk.js
+    |       |   |-- dispatch-delete.js
+    |       |   |-- dispatch-edit.js
+    |       |   |-- dispatch-export.js
+    |       |   |-- dispatch-filter.js
+    |       |   |-- dispatch-modal.js
+    |       |   |-- dispatch-pagination.js
+    |       |   |-- dispatch-print.js
+    |       |   |-- dispatch-sort.js
+    |       |   |-- dispatch-stats.js
+    |       |   +-- dispatch-view.js
+    |       |-- driver/
+    |       |   |-- driver.js
+    |       |   |-- driver-add.js
+    |       |   |-- driver-bulk.js
+    |       |   |-- driver-delete.js
+    |       |   |-- driver-edit.js
+    |       |   |-- driver-export.js
+    |       |   |-- driver-filter.js
+    |       |   |-- driver-pagination.js
+    |       |   |-- driver-print.js
+    |       |   |-- driver-search.js
+    |       |   |-- driver-sort.js
+    |       |   |-- driver-stats.js
+    |       |   +-- driver-view.js
+    |       |-- fuel/
+    |       |   |-- fuel-add.js
+    |       |   |-- fuel-bulk.js
+    |       |   |-- fuel-delete.js
+    |       |   |-- fuel-edit.js
+    |       |   |-- fuel-export.js
+    |       |   |-- fuel-modal.js
+    |       |   |-- fuel-pagination.js
+    |       |   |-- fuel-print.js
+    |       |   |-- fuel-search.js
+    |       |   |-- fuel-sort.js
+    |       |   |-- fuel-statistics.js
+    |       |   +-- fuel-view.js
+    |       |-- maintenance/
+    |       |   |-- maintenance-add.js
+    |       |   |-- maintenance-bulk.js
+    |       |   |-- maintenance-delete.js
+    |       |   |-- maintenance-edit.js
+    |       |   |-- maintenance-export.js
+    |       |   |-- maintenance-modal.js
+    |       |   |-- maintenance-pagination.js
+    |       |   |-- maintenance-print.js
+    |       |   |-- maintenance-search.js
+    |       |   |-- maintenance-sort.js
+    |       |   |-- maintenance-statistics.js
+    |       |   +-- maintenance-view.js
+    |       |-- profile/
+    |       |   +-- profile-page.js
+    |       |-- reports/
+    |       |   |-- reports.js
+    |       |   |-- reports-charts.js
+    |       |   |-- reports-data.js
+    |       |   |-- reports-export.js
+    |       |   |-- reports-pipeline.js
+    |       |   |-- reports-presets.js
+    |       |   +-- reports-table.js
+    |       |-- reservation/
+    |       |   |-- reservation-add.js
+    |       |   |-- reservation-bulk.js
+    |       |   |-- reservation-delete.js
+    |       |   |-- reservation-edit.js
+    |       |   |-- reservation-export.js
+    |       |   |-- reservation-filter.js
+    |       |   |-- reservation-modal.js
+    |       |   |-- reservation-pagination.js
+    |       |   |-- reservation-print.js
+    |       |   |-- reservation-sort.js
+    |       |   |-- reservation-stats.js
+    |       |   +-- reservation-view.js
+    |       |-- route-planning/
+    |       |   |-- route-export.js
+    |       |   |-- route-modal.js
+    |       |   |-- route-pipeline.js
+    |       |   |-- route-store.js
+    |       |   +-- route-templates.js
+    |       |-- settings/
+    |       |   |-- settings.js
+    |       |   +-- settings-store.js
+    |       +-- vehicle/
+    |           |-- vehicle-add.js
+    |           |-- vehicle-bulk.js
+    |           |-- vehicle-delete.js
+    |           |-- vehicle-edit.js
+    |           |-- vehicle-export.js
+    |           |-- vehicle-filters.js
+    |           |-- vehicle-form.js
+    |           |-- vehicle-image.js
+    |           |-- vehicle-modal.js
+    |           |-- vehicle-pagination.js
+    |           |-- vehicle-print.js
+    |           |-- vehicle-sort.js
+    |           |-- vehicle-stats.js
+    |           +-- vehicle-view.js
+    
