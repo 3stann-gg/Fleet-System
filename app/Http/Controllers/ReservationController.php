@@ -65,9 +65,14 @@ class ReservationController extends Controller
     ): void {
         /*
         |--------------------------------------------------------------------------
-        | Vehicle is required if a driver is assigned
+        | Vehicle and Driver must be paired
         |--------------------------------------------------------------------------
         */
+        if ($vehicleId && !$driverId) {
+            throw new \Exception(
+                'A driver must be assigned when a vehicle is selected.'
+            );
+        }
         if (!$vehicleId && $driverId) {
             throw new \Exception(
                 'A driver cannot be assigned without a vehicle.'
@@ -133,6 +138,35 @@ class ReservationController extends Controller
         }
     }
 
+    private function validateVehicleHasAssignedDriver(
+        ?int $vehicleId
+    ): void {
+        if (!$vehicleId) {
+            return;
+        }
+
+        $vehicle = Vehicle::find($vehicleId);
+
+        if (!$vehicle) {
+            throw new \Exception(
+                'Selected vehicle was not found.'
+            );
+        }
+
+        $hasAssignedDriver = Driver::query()
+            ->where(
+                'assigned_vehicle_id',
+                $vehicle->id
+            )
+            ->exists();
+
+        if (!$hasAssignedDriver) {
+            throw new \Exception(
+                "Vehicle {$vehicle->brand} {$vehicle->model} has no assigned driver and cannot be used for this reservation."
+            );
+        }
+    }
+
     /**
      * Display a listing of reservations.
      */
@@ -146,6 +180,8 @@ class ReservationController extends Controller
             'vehicle',
             'driver',
             'requester',
+            'pickupHospital',
+            'destinationHospital',
             //'shipment',
         ]);
 
@@ -398,6 +434,14 @@ class ReservationController extends Controller
                         return $request->input('request_type') !== 'Supply Delivery';
                     }),
                 ],
+                'pickup_hospital_id' => [
+                    'nullable',
+                    'integer',
+                    Rule::exists('hospital_facilities', 'id')
+                        ->where(function ($query) {
+                            $query->where('status', true);
+                        }),
+                ],
                 'destination' => [
                     'nullable',
                     'string',
@@ -405,6 +449,14 @@ class ReservationController extends Controller
                     Rule::requiredIf(function () use ($request) {
                         return $request->input('request_type') !== 'Supply Delivery';
                     }),
+                ],
+                'destination_hospital_id' => [
+                    'nullable',
+                    'integer',
+                    Rule::exists('hospital_facilities', 'id')
+                        ->where(function ($query) {
+                            $query->where('status', true);
+                        }),
                 ],
                 'schedule_date' => [
                     'required',
@@ -457,7 +509,23 @@ class ReservationController extends Controller
         try {
             $validated = $validator->validated();
 
+            /*
+            |--------------------------------------------------------------------------
+            | Hospital Facility Resolution
+            |--------------------------------------------------------------------------
+            | For normal reservations, preserve the selected HospitalFacility IDs
+            | and use the facility's canonical name + address as the location text.
+            |
+            | Supply Delivery gets its locations from Logistics Shipment instead,
+            | so HospitalFacility IDs must be cleared.
+            |--------------------------------------------------------------------------
+            */
+
             if ($validated['request_type'] === 'Supply Delivery') {
+
+                $validated['pickup_hospital_id'] = null;
+                $validated['destination_hospital_id'] = null;
+
                 $shipment = \App\Models\Shipment::find(
                     $validated['shipment_id']
                 );
@@ -484,8 +552,10 @@ class ReservationController extends Controller
                 $validated['pickup_location'] =
                     $shipment->origin_address
                     ?: $shipment->pickup_location_name;
+
                 $validated['destination'] =
                     $shipment->destination_facility;
+
                 if (
                     !$validated['pickup_location'] ||
                     !$validated['destination']
@@ -494,8 +564,52 @@ class ReservationController extends Controller
                         'The selected Logistics shipment does not have a valid pickup location or destination.'
                     );
                 }
+
             } else {
+
                 $validated['shipment_id'] = null;
+
+                /*
+                |--------------------------------------------------------------------------
+                | Resolve Selected Pickup Facility
+                |--------------------------------------------------------------------------
+                */
+                if (!empty($validated['pickup_hospital_id'])) {
+
+                    $pickupHospital = HospitalFacility::query()
+                        ->where('status', true)
+                        ->find($validated['pickup_hospital_id']);
+
+                    if (!$pickupHospital) {
+                        throw new \Exception(
+                            'The selected pickup hospital or facility is no longer available.'
+                        );
+                    }
+
+                    $validated['pickup_location'] =
+                        $pickupHospital->name;
+                }
+
+                /*
+                |--------------------------------------------------------------------------
+                | Resolve Selected Destination Facility
+                |--------------------------------------------------------------------------
+                */
+                if (!empty($validated['destination_hospital_id'])) {
+
+                    $destinationHospital = HospitalFacility::query()
+                        ->where('status', true)
+                        ->find($validated['destination_hospital_id']);
+
+                    if (!$destinationHospital) {
+                        throw new \Exception(
+                            'The selected destination hospital or facility is no longer available.'
+                        );
+                    }
+
+                    $validated['destination'] =
+                        $destinationHospital->name;
+                }
             }
 
             $validated['requested_by'] =
@@ -596,6 +710,9 @@ class ReservationController extends Controller
                 $validated['vehicle_id'] ?? null,
                 $validated['driver_id'] ?? null
             );
+            $this->validateVehicleHasAssignedDriver(
+                $validated['vehicle_id'] ?? null
+            );
 
             $reservation = Reservation::create(
                 $validated
@@ -604,6 +721,8 @@ class ReservationController extends Controller
             $reservation->load([
                 'vehicle',
                 'driver',
+                'pickupHospital',
+                'destinationHospital',
                 //'shipment',
             ]);
 
@@ -738,6 +857,8 @@ class ReservationController extends Controller
             'vehicle',
             'driver',
             'requester',
+            'pickupHospital',
+            'destinationHospital',
             //'shipment',
         ]);
 
@@ -858,6 +979,14 @@ class ReservationController extends Controller
                             return $request->input('request_type') !== 'Supply Delivery';
                         }),
                     ],
+                    'pickup_hospital_id' => [
+                        'nullable',
+                        'integer',
+                        Rule::exists('hospital_facilities', 'id')
+                            ->where(function ($query) {
+                                $query->where('status', true);
+                            }),
+                    ],
                     'destination' => [
                         'nullable',
                         'string',
@@ -865,6 +994,14 @@ class ReservationController extends Controller
                         Rule::requiredIf(function () use ($request) {
                             return $request->input('request_type') !== 'Supply Delivery';
                         }),
+                    ],
+                    'destination_hospital_id' => [
+                        'nullable',
+                        'integer',
+                        Rule::exists('hospital_facilities', 'id')
+                            ->where(function ($query) {
+                                $query->where('status', true);
+                            }),
                     ],
                     'schedule_date' => [
                         'required',
@@ -921,6 +1058,45 @@ class ReservationController extends Controller
                     $validator->validated();
                 /*
                 |--------------------------------------------------------------------------
+<<<<<<< HEAD
+=======
+                | Hospital Facility Resolution
+                |--------------------------------------------------------------------------
+                */
+                if ($validated['request_type'] === 'Supply Delivery') {
+                    $validated['pickup_hospital_id'] = null;
+                    $validated['destination_hospital_id'] = null;
+
+                } else {
+                    if (!empty($validated['pickup_hospital_id'])) {
+
+                        $pickupHospital = HospitalFacility::query()
+                            ->where('status', true)
+                            ->find($validated['pickup_hospital_id']);
+                        if (!$pickupHospital) {
+                            throw new \Exception(
+                                'The selected pickup hospital or facility is no longer available.'
+                            );
+                        }
+                        $validated['pickup_location'] =
+                            $pickupHospital->name;
+                    }
+                    if (!empty($validated['destination_hospital_id'])) {
+                        $destinationHospital = HospitalFacility::query()
+                            ->where('status', true)
+                            ->find($validated['destination_hospital_id']);
+                        if (!$destinationHospital) {
+                            throw new \Exception(
+                                'The selected destination hospital or facility is no longer available.'
+                            );
+                        }
+                        $validated['destination'] =
+                            $destinationHospital->name;
+                    }
+                }
+                /*
+                |--------------------------------------------------------------------------
+>>>>>>> e741337 (UPDATED THE SYSTEM AGAIN)
                 | Preserve Existing Status
                 |--------------------------------------------------------------------------
                 | Dispatcher form currently has no Status field.
@@ -972,6 +1148,8 @@ class ReservationController extends Controller
                     'vehicle',
                     'driver',
                     'requester',
+                    'pickupHospital',
+                    'destinationHospital',
                 ]);
 
                 return response()->json([
@@ -1045,6 +1223,14 @@ class ReservationController extends Controller
                             return $request->input('request_type') !== 'Supply Delivery';
                         }),
                     ],
+                    'pickup_hospital_id' => [
+                        'nullable',
+                        'integer',
+                        Rule::exists('hospital_facilities', 'id')
+                            ->where(function ($query) {
+                                $query->where('status', true);
+                            }),
+                    ],
                     'destination' => [
                         'nullable',
                         'string',
@@ -1052,6 +1238,14 @@ class ReservationController extends Controller
                         Rule::requiredIf(function () use ($request) {
                             return $request->input('request_type') !== 'Supply Delivery';
                         }),
+                    ],
+                    'destination_hospital_id' => [
+                        'nullable',
+                        'integer',
+                        Rule::exists('hospital_facilities', 'id')
+                            ->where(function ($query) {
+                                $query->where('status', true);
+                            }),
                     ],
                     'schedule_date' => [
                         'required',
@@ -1101,6 +1295,65 @@ class ReservationController extends Controller
 
             $validated =
                 $validator->validated();
+            
+            /*
+            |--------------------------------------------------------------------------
+            | Hospital Facility Resolution
+            |--------------------------------------------------------------------------
+            */
+            if ($validated['request_type'] === 'Supply Delivery') {
+
+                $validated['pickup_hospital_id'] = null;
+                $validated['destination_hospital_id'] = null;
+
+            } else {
+
+                /*
+                |--------------------------------------------------------------------------
+                | Resolve Selected Pickup Facility
+                |--------------------------------------------------------------------------
+                */
+                if (!empty($validated['pickup_hospital_id'])) {
+
+                    $pickupHospital = HospitalFacility::query()
+                        ->where('status', true)
+                        ->find($validated['pickup_hospital_id']);
+
+                    if (!$pickupHospital) {
+                        return response()->json([
+                            'success' => false,
+                            'message' =>
+                                'The selected pickup hospital or facility is no longer available.',
+                        ], 422);
+                    }
+
+                    $validated['pickup_location'] =
+                        $pickupHospital->name;
+                }
+
+                /*
+                |--------------------------------------------------------------------------
+                | Resolve Selected Destination Facility
+                |--------------------------------------------------------------------------
+                */
+                if (!empty($validated['destination_hospital_id'])) {
+
+                    $destinationHospital = HospitalFacility::query()
+                        ->where('status', true)
+                        ->find($validated['destination_hospital_id']);
+
+                    if (!$destinationHospital) {
+                        return response()->json([
+                            'success' => false,
+                            'message' =>
+                                'The selected destination hospital or facility is no longer available.',
+                        ], 422);
+                    }
+
+                    $validated['destination'] =
+                        $destinationHospital->name;
+                }
+            }
 
             $oldAuditValues =
                 $this->getReservationAuditValues(
@@ -1167,6 +1420,8 @@ class ReservationController extends Controller
                 'vehicle',
                 'driver',
                 'requester',
+                'pickupHospital',
+                'destinationHospital',
             ]);
 
             return response()->json([
@@ -2172,8 +2427,14 @@ class ReservationController extends Controller
             'pickup_location' =>
                 $reservation->pickup_location,
 
+            'pickup_hospital_id' =>
+                $reservation->pickup_hospital_id,
+
             'destination' =>
                 $reservation->destination,
+
+            'destination_hospital_id' =>
+                $reservation->destination_hospital_id,
 
             'schedule_date' =>
                 $reservation->schedule_date
