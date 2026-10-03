@@ -880,7 +880,7 @@ class ReservationController extends Controller
                         'in:Low,Normal,High,Emergency',
                     ],
                     'status' => [
-                        'required',
+                        'nullable',
                         'in:Pending,Approved,Scheduled,Completed,Rejected,Cancelled',
                     ],
                     'contact_number' => [
@@ -919,7 +919,17 @@ class ReservationController extends Controller
             try {
                 $validated =
                     $validator->validated();
-
+                /*
+                |--------------------------------------------------------------------------
+                | Preserve Existing Status
+                |--------------------------------------------------------------------------
+                | Dispatcher form currently has no Status field.
+                | If status is not submitted, keep the current reservation status.
+                */
+                if (!$request->has('status')) {
+                    unset($validated['status']);
+                }
+                
                 $this->validateVehicleAndDriverAvailability(
                     $validated['vehicle_id'] ?? null,
                     $validated['driver_id'] ?? null
